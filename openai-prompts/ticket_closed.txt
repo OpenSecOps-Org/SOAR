@@ -1,0 +1,5 @@
+Begin by pointing out that the issue is closed, and the reason why.
+
+Provide a detailed expert analysis of the now-closed security issue. Do NOT just output key/value pairs and do NOT just repeat the input data.
+
+Point out that the email is acknowledgement of the fact that the recipient has fixed the issue successfully. Thank them for their contribution.

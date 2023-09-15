@@ -1,0 +1,522 @@
+Comment: A state machine that reacts on all incidents.
+StartAt: Determine Type
+States:
+    Determine Type:
+        Type: Task
+        Resource: '${DetermineTypeFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        ResultPath: $.incident
+        Next: Suppress?
+
+    Suppress?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.incident.suppress
+                BooleanEquals: true
+                Next: Suppress finding
+        Default: Get Local Incident Suppressions Table Entry
+
+    Get Local Incident Suppressions Table Entry:
+        Type: Task
+        Resource: 'arn:aws:states:::dynamodb:getItem'
+        Parameters:
+            TableName: '${LocalIncidentSuppressionsName}'
+            Key:
+                id:
+                    S.$: $.incident.finding_type
+        ResultPath: $.db.local-incident-suppressions
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - DynamoDB.SdkClientException
+                    - DynamoDB.InternalServerErrorException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Was there an entry?
+
+    Was there an entry?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.db.local-incident-suppressions.Item
+                IsPresent: false
+                Next: Compute Penalty Score
+        Default: Check whether to suppress incident locally
+
+    Check whether to suppress incident locally:
+        Type: Task
+        Resource: '${SuppressLocallyFunctionArn}'
+        Parameters:
+            account.$: $.account
+            table: local-incident-suppressions
+            db.$: $.db
+            region.$: $.finding.Resources[0].Region
+        ResultPath: $.suppress_locally
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Check local incident suppression result
+
+    Check local incident suppression result:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.suppress_locally
+                BooleanEquals: true
+                Next: Suppress finding
+        Default: Compute Penalty Score
+
+    Compute Penalty Score:
+        Type: Task
+        Resource: '${ComputePenaltyScoreFunctionArn}'
+        ResultPath: $.penalty_score
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Branch on type
+
+    Branch on type:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.incident.type
+                StringEquals: EC2
+                Next: GuardDuty EC2
+            -
+                Variable: $.incident.type
+                StringEquals: IAMUser
+                Next: GuardDuty IAMUser
+            -
+                Variable: $.incident.type
+                StringEquals: S3
+                Next: GuardDuty S3
+            -
+                Variable: $.incident.type
+                StringEquals: EKS
+                Next: GuardDuty EKS
+            -
+                Variable: $.incident.type
+                StringEquals: Generic
+                Next: Generic
+        Default: Suppress finding
+
+    GuardDuty EC2:
+        Type: Pass
+        Next: Terminate instance?
+
+    Terminate instance?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.incident.terminate
+                BooleanEquals: true
+                Next: Terminate or Snapshot?
+        Default: Format EC2 message
+
+    Terminate or Snapshot?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.DiskForensicsInvokeArn
+                StringEquals: ''
+                Next: Just terminate the instance
+        Default: Snapshot and terminate the instance
+
+    Just terminate the instance:
+        Type: Task
+        Resource: '${TerminateInstanceFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Format EC2 message
+
+    Snapshot and terminate the instance:
+        Type: Task
+        Resource: '${CallDiskForensicsCollectionFunctionArn}'
+        InputPath: $.finding
+        ResultPath: null
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Format EC2 message
+
+    Format EC2 message:
+        Type: Task
+        Resource: '${FormatGuardDutyEc2MessageFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Open Ticket?
+
+    GuardDuty IAMUser:
+        Type: Pass
+        Next: Format IAMUser message
+
+    Format IAMUser message:
+        Type: Task
+        Resource: '${FormatGuardDutyIamUserMessageFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Open Ticket?
+
+    GuardDuty S3:
+        Type: Pass
+        Next: Format S3 message
+
+    Format S3 message:
+        Type: Task
+        Resource: '${FormatGuardDutyS3MessageFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Open Ticket?
+
+    GuardDuty EKS:
+        Type: Pass
+        Next: Format EKS message
+
+    Format EKS message:
+        Type: Task
+        Resource: '${FormatGuardDutyEksMessageFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Open Ticket?
+
+    Generic:
+        Type: Pass
+        Next: Format Generic message
+
+    Format Generic message:
+        Type: Task
+        Resource: '${FormatGenericMessageFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Open Ticket?
+
+    Open Ticket?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.incident.open_ticket
+                BooleanEquals: true
+                Next: Open Ticket
+        Default: Fake the Ticket Id
+
+    Fake the Ticket Id:
+        Type: Pass
+        Result:
+            TicketOpen: "No"
+            TicketId: ""
+        ResultPath: "$.ticket"
+        Next: Remember Incident Opened
+
+    Open Ticket:
+        Type: Task
+        Resource: '${OpenTicketFunctionArn}'
+        ResultPath: $.ticket
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Remember Incident Opened
+
+    Remember Incident Opened:
+        Type: Task
+        Resource: '${RememberIncidentOpenedFunctionArn}'
+        Parameters:
+            Id.$: $.finding.Id
+            Account.$: $.account.Name
+            IncidentType.$: $.incident.finding_type
+            Title.$: $.finding.Title
+            Description.$: $.finding.Description
+            Environment.$: $.account.Environment
+            Team.$: $.account.Team
+            ProjectId.$: $.account.ProjectId
+            ProjectIdApp.$: $.account.ProjectIdApp
+            SeverityLabel.$: $.finding.FindingProviderFields.Severity.Label
+            PenaltyScore.$: $.penalty_score
+            TicketId.$: $.ticket.TicketId
+        ResultPath: null
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - DynamoDB.SdkClientException
+                    - DynamoDB.InternalServerErrorException
+                IntervalSeconds: 3
+                MaxAttempts: 100
+                BackoffRate: 3
+        Next:  Email to Whom?
+
+
+    Email to Whom?:
+        Type: Choice
+        Choices:
+            -
+                And:
+                    -
+                        Variable: $.finding.ProductFields.IncidentDomain
+                        IsPresent: true
+                    -
+                        Variable: $.finding.ProductFields.IncidentDomain
+                        StringEquals: APP
+                Next: AddAiInstructionsForAppIncident
+        Default: AddAiInstructionsForInfraIncident
+
+    AddAiInstructionsForAppIncident:
+        Type: Task
+        Resource: arn:aws:states:::dynamodb:getItem
+        Parameters:
+            TableName: "${OpenAIPromptsTableName}"
+            Key:
+                id: "incident_app"
+            ProjectionExpression: "instructions"
+        ResultSelector:
+            instructions.$: "$.Item.instructions.S"
+        ResultPath: "$.nested_instructions"
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - DynamoDB.SdkClientException
+                    - DynamoDB.InternalServerErrorException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: AddAiDataForAppIncident
+
+    AddAiDataForAppIncident:
+        Type: Task
+        Resource: '${QueryChatGPTFunctionArn}'
+        TimeoutSeconds: 120
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.TooManyRequestsException
+                    - Lambda.ServiceException
+                IntervalSeconds: 5
+                MaxAttempts: 5
+                BackoffRate: 2
+        Catch:
+            -   
+                ErrorEquals:
+                    - States.Timeout
+                Next: Send APP email
+            -   
+                ErrorEquals:
+                    - Lambda.TooManyRequestsException
+                    - Lambda.ServiceException
+                Next: Send APP email
+            -   
+                ErrorEquals:
+                -   States.ALL
+                ResultPath: "$.openai-error-info"
+                Next: OpenAiFailState
+        Next: Send APP email
+
+    Send APP email:
+        Type: Task
+        Resource: '${SendEmailFunctionArn}'
+        Parameters:
+            Recipient.$: $.account.TeamEmailApp
+            Subject.$: $.messages.email.subject
+            Body.$: $.messages.email.body
+            Html.$: $.messages.email.html
+            AiPlaintext.$: $.messages.ai.plaintext
+            AiHtml.$: $.messages.ai.html
+            TicketId.$: $.ticket.TicketId
+        ResultPath: null
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Suppress finding
+
+    AddAiInstructionsForInfraIncident:
+        Type: Task
+        Resource: arn:aws:states:::dynamodb:getItem
+        Parameters:
+            TableName: "${OpenAIPromptsTableName}"
+            Key:
+                id: "incident_infra"
+            ProjectionExpression: "instructions"
+        ResultSelector:
+            instructions.$: "$.Item.instructions.S"
+        ResultPath: "$.nested_instructions"
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - DynamoDB.SdkClientException
+                    - DynamoDB.InternalServerErrorException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: AddAiDataForInfraIncident
+
+    AddAiDataForInfraIncident:
+        Type: Task
+        Resource: '${QueryChatGPTFunctionArn}'
+        TimeoutSeconds: 120
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.TooManyRequestsException
+                    - Lambda.ServiceException
+                IntervalSeconds: 5
+                MaxAttempts: 5
+                BackoffRate: 2
+        Catch:
+            -   
+                ErrorEquals:
+                    - States.Timeout
+                Next: Send INFRA email
+            -   
+                ErrorEquals:
+                    - Lambda.TooManyRequestsException
+                    - Lambda.ServiceException
+                Next: Send INFRA email
+            -   
+                ErrorEquals:
+                -   States.ALL
+                ResultPath: "$.openai-error-info"
+                Next: OpenAiFailState
+        Next: Send INFRA email
+
+    Send INFRA email:
+        Type: Task
+        Resource: '${SendEmailFunctionArn}'
+        Parameters:
+            Recipient.$: $.account.TeamEmail
+            Subject.$: $.messages.email.subject
+            Body.$: $.messages.email.body
+            Html.$: $.messages.email.html
+            AiPlaintext.$: $.messages.ai.plaintext
+            AiHtml.$: $.messages.ai.html
+            TicketId.$: $.ticket.TicketId
+        ResultPath: null
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Suppress finding
+
+    Suppress finding:
+        Type: Task
+        Resource: '${SuppressFindingFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                    - TooManyRequestsException
+                IntervalSeconds: 3
+                MaxAttempts: 25
+                BackoffRate: 3
+        End: true
+
+    OpenAiFailState:
+        Type: Fail
+        Cause: "The call to the OpenAI API failed. See $.openai-error-info for more details."
+

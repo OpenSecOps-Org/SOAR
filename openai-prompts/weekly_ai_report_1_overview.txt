@@ -1,0 +1,97 @@
+[CONTEXT]
+- Severity levels are CRITICAL, HIGH, MEDIUM, LOW, and INFORMATIONAL.
+
+- If there are no open tickets:
+  - then the system is currently fully conforming to the desired security posture.
+  - be sure to use the past tense when referring to any issues.
+
+- Delegat SOAR constantly monitors and autoremediates issues whenever found. 
+- New tickets, incidents, or autoremediations are NEVER a sign of an improved security stance: Delegat SOAR sees everything anyway.
+
+- Autoremediations are of two kinds:
+  1. Security-related, meaning that they fix real security issues the teams have overlooked, such as publicly accessible ports or misconfigurations. These should be taken very seriously, and it is vital that the team be educated about the consequences so they can avoid making the same mistake again. A high number of autoremediations of this type is a bad sign.
+  2. Convenience-related, meaning that teams may rely on them deliberately to perform routine tasks, such as setting up logging. This kind of autoremediation is normal and of no concern, no matter how often it occurs.
+
+- Incidents are not related to tickets or autoremediations.
+- A sudden rise in incidents, especially in the production environment, is a sign that needs investigation.
+
+[HOW TO IDENTIFY SOAR INCIDENTS]
+- SOAR incidents can be identified by all of the following being true:
+  1. The account name is the same as the value of 'global_data.aws_organization_administrative_account_name'.
+  2. Its IncidentType must be exactly "Software and Configuration Checks/CloudWatch Alarms/soar-cloudwatch-alarms".
+  3. Its IncidentType may NOT contain "SOAR Incidents".
+  4. Its Title or Description must contain the substring "SOAR".
+
+[AREA SUMMARIES: HOW TO ACCURATELY SUMMARIZE YOUR FINDINGS]
+- Purpose: Extract main "areas" from this week's open tickets, autoremediations, and incidents for a high-level summary, not a detailed report.
+
+- Steps:
+
+1. Data Collection:
+  * Retrieve data for this week's open tickets, autoremediations, or incidents.
+
+2. Examine Data:
+  * Look at each item individually.
+
+3. Identify Areas:
+  * For tickets and autoremediations: ONLY consider the SecurityControlId, Title, and Description.
+  * For incidents: ONLY focus on IncidentType, Title, and Description.
+
+3. Name Areas Concisely:
+  * Use 2-4 word phrases from a title or description.
+    * "WAF rules specify that ..." ➞ "WAF rules".
+    * "ECR repositories should ..." ➞ "ECR repositories".
+    * "ECR private repositories should ..." ➞ "ECR repositories".
+    * "Application and Classic Load Balancers logging should ..." ➞ "load balancers".
+    * "APIs ... were invoked by user ... under anomalous circumstances ..." ➞ "anomalous API user access".
+    * "User access in database ..." ➞ "user access".
+    * "Password reset policies need ..." ➞ "password reset".
+  * NEVER quote the original title in full.
+  * Always include "SOAR failures" if SOAR incidents are present.
+
+5. Things to Avoid:
+  * Do NOT mention severities.
+  * Do NOT list full titles.
+  * Do NOT use long area names.
+
+6. Summary:
+  * Conclude by providing a high-level summary of the areas without mentioning severities or quoting full titles/descriptions. Double-check to ensure you've captured every area.
+  - Example Summary: "This week's focus areas include WAF rules, ECR repositories, User access, and Password reset."
+
+- Reminder: This is about capturing the gist. Too much detail or direct quotes will defeat the purpose. Double and triple-check your work!
+
+[INSTRUCTIONS]
+- The section should have subsections for the general security level, tickets, autoremediations, incidents, and accounts breakdown.
+- Be sure to end each Tickets/Autoremediations/Incidents/Accounts Breakdown subsection with the correct [[INSERT ...]] placeholder.
+
+[GENERAL]
+- To determine whether security has improved or deteriorated, you will consider ONLY this_week.total_penalty and last_week.total_penalty. Other factors such as the number of tickets identified, autoremediations, or the work of the security team should not be weighed in, as they are already included in the total_penalty.
+- You will double-check that you have fetched the correct values for total_penalty for this_week and last_week.
+  - If this_week.total_penalty is greater than last_week.total_penalty, it proves a deterioration in the security situation.
+  - If this_week.total_penalty is smaller than last_week.total_penalty, it proves an improvement in the security situation.
+  - You will provide figures to elaborate on this information.
+- Additionally, you will compare avg_penalty for this_week and last_week, ensuring that you have fetched the correct values. 
+  - You will provide figures to elaborate on this information.
+  - It is important to note that an increase in avg_penalty signifies that ticketed issues have become more serious but does not directly impact the security posture.
+
+[TICKETS]
+1. Provide information on n_open_tickets, n_overdue_tickets (if any), n_opened_tickets, and n_closed_tickets for this week and last week. Make sure you fetch the correct values for each week. Elaborate.
+  - Please note that the tickets that were closed may not be the same as the ones opened. It is possible that some of them were opened earlier, and/or that some of the tickets opened this week may still be open (unless there are no open tickets this week).
+2. Provide information about how many accounts had open tickets this week.
+3. Provide information about closed_tickets_avg_duration_seconds and closed_tickets_mdn_duration_seconds for this_week and last_week.
+  - Use human-readable format for all values. They should not be given in seconds.
+4. Use the instructions under "Area Summaries" to analyze this_week.open_tickets_redux and summarize all general areas they pertain to in one sentence. Do not use bullet lists or tables. Brevity is of the essence.
+5. Output the literal string "[[INSERT open_tickets_severity_level_breakdown_html_table]]", without the quotes as a placeholder.
+
+[AUTOREMEDIATIONS]
+1. Provide information about the total number of autoremediations this week and over how many accounts they were distributed, for example "This week, there were a total of N autoremediations distributed/spread over M accounts", or similar.
+2. Use the instructions under "Area Summaries" to analyze this_week.autoremediations_redux and summarize all general areas they pertain to in one sentence. Do not use bullet lists or tables. Brevity is of the essence.
+3. Output the literal string "[[INSERT autoremediations_severity_level_breakdown_html_table]]", without the quotes as a placeholder.
+
+[INCIDENTS]
+1. Provide information about the total number of incidents this week and over how many accounts they were distributed.
+2. Use the instructions under "Area Summaries" to analyze this_week.incidents_redux and summarize all general areas they pertain to in one sentence. Do not use bullet lists or tables. Brevity is of the essence. Make absolutely sure that you include the SOAR failure area if there are SOAR incidents.
+3. Output the literal string "[[INSERT incidents_severity_level_breakdown_html_table]]", without the quotes as a placeholder.
+
+[ACCOUNTS BREAKDOWN]
+- Output the literal string "[[INSERT accounts_breakdown_html_table]]", without the quotes as a placeholder. 

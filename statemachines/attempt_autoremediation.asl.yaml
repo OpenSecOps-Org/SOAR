@@ -1,0 +1,583 @@
+Comment: A state machine that tries to autoremediate a finding.
+StartAt: Match
+States:
+    Match:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: KMS.4
+                Next: 'KMS.4: Enable customer CMK key rotation'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: EC2.13
+                Next: 'EC2.13: World ingress to 22'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: EC2.14
+                Next: 'EC2.14: World ingress to 3389'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: DynamoDB.2
+                Next: >-
+                    DynamoDB.2: DynamoDB tables should have point-in-time
+                    recovery enabled
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: EC2.2
+                Next: 'EC2.2: VPC default SG should not allow traffic'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: EC2.4
+                Next: 'EC2.4: Terminate stopped instances'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: EC2.6
+                Next: 'EC2.6: Enable VPC Flow Logs'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: EC2.7
+                Next: 'EC2.7: Default EBS Encryption not enabled'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: EC2.15
+                Next: 'EC2.15: EC2 subnets should not automatically assign public IP addresses'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: EC2.22
+                Next: 'EC2.22: Delete unused SG'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: ECR.1 
+                Next: 'ECR.1: ECR private repositories should have image scanning configured'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: ECR.2 
+                Next: 'ECR.2: ECR private repositories should have tag immutability configured'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: ECR.3 
+                Next: 'ECR.3: ECR repositories should have at least one lifecycle policy configured'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: ECS.2
+                Next: 'ECS.2: ECS services should not have public IP addresses auto-assigned'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: ECS.12
+                Next: 'ECS.12: ECS clusters should use Container Insights'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: ELB.1
+                Next: 'ELB.1: ALB should be configured to redirect all HTTP requests to HTTPS'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: ELB.4
+                Next: 'ELB.4: Application Load Balancer should be configured to drop http headers'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: ELB.5
+                Next: 'ELB.5: Application and Classic Load Balancers logging should be enabled'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: IAM.8
+                Next: 'IAM.8: Unused IAM user credentials should be removed'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: EC2.12
+                Next: 'EC2.12: Release unused EIP'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: RDS.2
+                Next: 'RDS.2: Prohibit public RDS access'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: RDS.4
+                Next: 'RDS.4: RDS cluster snapshots and database snapshots should be encrypted at rest'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: RDS.6
+                Next: 'RDS.6: Enhanced monitoring should be configured for RDS DB instances'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: RDS.9
+                Next: 'RDS.9: Database logging should be enabled'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: RDS.11
+                Next: 'RDS.11: RDS instances should have automatic backups enabled'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: RDS.13
+                Next: 'RDS.13: RDS automatic minor version upgrades should be enabled'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: RDS.17
+                Next: 'RDS.17: RDS DB instances should be configured to copy tags to snapshots'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: S3.2
+                Next: 'S3.2: Fetch Bucket Tags'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: S3.3
+                Next: 'S3.3: Fetch Bucket Tags'
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                StringEquals: S3.10
+                Next: 'S3.10: Versioned buckets should have a lifecycle policy'
+        Default: No match
+
+    'S3.2: Fetch Bucket Tags':
+        Type: Task
+        Resource: '${FetchBucketTagsFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: 'S3.2: S3 bucket publicly readable'
+
+    'S3.2: S3 bucket publicly readable':
+        Type: Task
+        Resource: '${AutoRemediateS32FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'S3.3: Fetch Bucket Tags':
+        Type: Task
+        Resource: '${FetchBucketTagsFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: 'S3.3: S3 bucket publicly writable'
+
+    'S3.3: S3 bucket publicly writable':
+        Type: Task
+        Resource: '${AutoRemediateS33FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'S3.10: Versioned buckets should have a lifecycle policy':
+        Type: Task
+        Resource: '${AutoRemediateS310FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'EC2.7: Default EBS Encryption not enabled':
+        Type: Task
+        Resource: '${AutoRemediateEC27FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'EC2.15: EC2 subnets should not automatically assign public IP addresses':
+        Type: Task
+        Resource: '${AutoRemediateEC215FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'ECR.1: ECR private repositories should have image scanning configured':
+        Type: Task
+        Resource: '${AutoRemediateECR1FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'ECR.2: ECR private repositories should have tag immutability configured':
+        Type: Task
+        Resource: '${AutoRemediateECR2FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'ECR.3: ECR repositories should have at least one lifecycle policy configured':
+        Type: Task
+        Resource: '${AutoRemediateECR3FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'ECS.2: ECS services should not have public IP addresses auto-assigned':
+        Type: Task
+        Resource: '${AutoRemediateECS2FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'ECS.12: ECS clusters should use Container Insights':
+        Type: Task
+        Resource: '${AutoRemediateECS12FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+    
+    'IAM.8: Unused IAM user credentials should be removed':
+        Type: Task
+        Resource: '${AutoRemediateIAM8FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'RDS.2: Prohibit public RDS access':
+        Type: Task
+        Resource: '${AutoRemediateRDS2FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'RDS.4: RDS cluster snapshots and database snapshots should be encrypted at rest':
+        Type: Task
+        Resource: '${AutoRemediateRDS4FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'RDS.6: Enhanced monitoring should be configured for RDS DB instances':
+        Type: Task
+        Resource: '${AutoRemediateRDS6FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'RDS.9: Database logging should be enabled':
+        Type: Task
+        Resource: '${AutoRemediateRDS9FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'RDS.11: RDS instances should have automatic backups enabled':
+        Type: Task
+        Resource: '${AutoRemediateRDS11FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'RDS.13: RDS automatic minor version upgrades should be enabled':
+        Type: Task
+        Resource: '${AutoRemediateRDS13FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'RDS.17: RDS DB instances should be configured to copy tags to snapshots':
+        Type: Task
+        Resource: '${AutoRemediateRDS17FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'KMS.4: Enable customer CMK key rotation':
+        Type: Task
+        Resource: '${AutoRemediateKMS4FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'EC2.6: Enable VPC Flow Logs':
+        Type: Task
+        Resource: '${AutoRemediateEC26FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'EC2.13: World ingress to 22':
+        Type: Task
+        Resource: '${AutoRemediateEC213FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'EC2.14: World ingress to 3389':
+        Type: Task
+        Resource: '${AutoRemediateEC214FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'EC2.2: VPC default SG should not allow traffic':
+        Type: Task
+        Resource: '${AutoRemediateEC22FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'EC2.4: Terminate stopped instances':
+        Type: Task
+        Resource: '${AutoRemediateEC24FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'EC2.22: Delete unused SG':
+        Type: Task
+        Resource: '${AutoRemediateEC222FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'EC2.12: Release unused EIP':
+        Type: Task
+        Resource: '${AutoRemediateEC212FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'DynamoDB.2: DynamoDB tables should have point-in-time recovery enabled':
+        Type: Task
+        Resource: '${AutoRemediateDynamoDB2FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'ELB.1: ALB should be configured to redirect all HTTP requests to HTTPS':
+        Type: Task
+        Resource: '${AutoRemediateELB1FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'ELB.4: Application Load Balancer should be configured to drop http headers':
+        Type: Task
+        Resource: '${AutoRemediateELB4FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    'ELB.5: Application and Classic Load Balancers logging should be enabled':
+        Type: Task
+        Resource: '${AutoRemediateELB5FunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Done
+
+    Done:
+        Type: Succeed
+        
+    No match:
+        Type: Fail

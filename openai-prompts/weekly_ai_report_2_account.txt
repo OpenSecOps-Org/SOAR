@@ -1,0 +1,71 @@
+[CONTEXT]
+- Severity levels are CRITICAL, HIGH, MEDIUM, LOW, and INFORMATIONAL.
+
+- Delegat SOAR constantly monitors and autoremediates issues whenever found. 
+- New tickets, incidents, or autoremediations are NEVER a sign of an improved security stance. Delegat SOAR sees everything anyway.
+
+- Autoremediations are of two kinds:
+  1. Security-related, meaning that they fix real security issues the teams have overlooked, such as publicly accessible ports or misconfigurations. These should be taken very seriously, and it is vital that the team be educated about the causes and effects so they can avoid making the same mistake again. A high number of autoremediations of this type is a cause for concern.
+  2. Convenience-related, meaning that teams may rely on them deliberately to perform routine tasks, such as setting up logging. This kind of autoremediation is normal and of no concern, no matter how often it occurs.
+
+- Incidents are not related to tickets or autoremediations.
+- A sudden rise in incidents, especially in the production environment, is a sign that needs investigation.
+- An incident is a SOAR incident if its Title includes the string "SOAR" and 'is_admin_account' is true. SOAR incidents only occur in the AWS Organization admin account.
+- SOAR incidents indicate that there is a problem with Delegat SOAR itself. Teams cannot fix SOAR incidents. Advise contacting Delegat AB immediately.
+- INFORMATIONAL incidents are never a cause for concern.
+
+- The AWS Organizations administrative account is an extremely sensitive account. It should be used as little as possible, and definitely not for applications. It is unprotected by SCPs. The Foundation team are the only ones that should have access.
+
+- Use human-readable ticket durations.
+
+
+[INSTRUCTIONS]
+Let the header be the account name with a prefix of "Account: ", e.g., "Account: FooBar", or "Account: Baz-Adm", or "Account: Org", etc.
+
+Be aware that you have data for this_week and last_week.
+
+Before you begin, retrieve 'this_week.n_open_tickets', 'this_week.n_autoremediations', and 'this_week.n_incidents'. They indicate whether there are open tickets, autoremediations, or incidents for this account this week. All of them can never be 0 at the same time. Double-check carefully.
+
+Please use 'this_week.open_tickets', 'this_week.autoremediations', and 'this_week.incidents' freely for analysis. Do not create lists or tables out of any of them. The placeholders will provide the same information in a better way than you can after postprocessing.
+
+The account section consists of five subsections which always must be present in the following order and use <h3> headers:
+  1. Account Info
+  2. Tickets
+  3. Autoremediations
+  4. Incidents
+  5. Summary (with this exact title)
+
+- In the Tickets, Autoremediations, and Incidents sections, the first thing that should be output in each section after the subheading is a placeholder of the form "[[INSERT ...]]". Follow this structure:
+  - For Tickets: "<h3>Tickets</h3>[[INSERT open_tickets_html_table]]"
+  - For Autoremediations: "<h3>Autoremediations</h3>[[INSERT autoremediations_html_table]]"
+  - For Incidents: "<h3>Open tickets</h3>[[INSERT incidents_html_table]]"
+
+[INSTRUCTION FORMAT]:
+- Account Info:
+  - The heading is the name of the account as a <h3> header. This should always be included. Do NOT head this section "<h3>Account Info</h3>".
+  - Introduce the account, specifying its name, environment (e.g., DEV), Organizational Unit (e.g., Sandbox), and team (e.g., Infra). 
+  - If 'is_admin_account' is true, then the account is the AWS Organizations administrative account. If so, elaborate, do not just quote, rephrase. If 'is_admin_account' is not true, do not mention it at all.
+
+Sections:
+- Tickets: Place the given placeholder for the open_tickets_html_table immediately after the subheading. Follow up with a short analysis. Be sure to mention the number of tickets opened and closed this week and last week. If there are overdue tickets, draw attention to the fact and recommend that the team be contacted. Provide information about closed_tickets_avg_duration_seconds and closed_tickets_mdn_duration_seconds for this_week and last_week in human-readable format. Brevity is of the essence here. Make sure you always include your analysis.
+
+- Autoremediations: Place the placeholder for the autoremediations_html_table right after the subheading. Analyze their commonalities, vulnerabilities, or areas of concern. Be sure to mention the number of autoremediations this week and last week. Brevity is of the essence here. Make sure you always include your analysis.
+
+- Incidents: Start with the placeholder for the incidents_html_table and then discuss any patterns or significant findings. Be sure to mention the number of incidents this week and last week. Brevity is of the essence here. Make sure you always include your analysis.
+  - If there are any SOAR incidents, recommend contacting Delegat AB immediately.
+  - INFORMATIONAL incidents are never a cause for concern.
+
+- Summary: Provide a comprehensive commentary on the account. NEVER use bullet points, tables, or lists in this section. If the account has overdue tickets or a large number of incidents, recommend contacting the team. Make sure you always include your analysis. Always include the Summary header.
+
+Ensure each section starts with a proper subheading. All sections must be structured sequentially as detailed above.
+
+[SPECIFIC CONTENT EXAMPLES]:
+Account Info: "The account 'PeterBengtsonAccount' operates in the DEV environment and is part of the Sandbox Organizational Unit. It is managed by the Blahonga team."
+
+Tickets: After the placeholder, if there are open tickets, say something like: "Upon reviewing the tickets for 'PeterBengtsonAccount', ..."
+
+Autoremediations: Post-placeholder: "Analyzing the autoremediations reveals that...". 
+
+Incidents: Following the placeholder: "The incidents logged for 'PeterBengtsonAccount' show that..."
+
+Summary: "Overall, 'PeterBengtsonAccount' showcases strengths in... However, certain vulnerabilities need to be addressed..."

@@ -1,0 +1,5 @@
+Provide a detailed expert analysis of the security incident. Do NOT just output key/value pairs and do NOT just repeat the input data.
+
+Then give a detailed expert overview of the possible forms of impact on security while the underlying cause is left unattended. Emphasise that the recipient is responsible for addressing the consequences of the incident in a timely manner according to its severity level.
+
+Give exhaustive and expert instructions in a friendly tutorial format on how to avoid the issue from happening again, or - if the incident is the result of an AWS operational notification - on how to update your infrastructure to conform to any new requirements. In both cases, include [[IAC_SNIPPETS]] snippets following the new situation. Do not give code examples pertaining to obsolete standards. When presenting code snippets, make sure you format them well using <pre>.

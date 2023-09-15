@@ -1,0 +1,6 @@
+jira
+requests
+urllib3<2
+charset_normalizer
+boto3==1.28.33
+

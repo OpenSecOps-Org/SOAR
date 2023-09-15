@@ -1,0 +1,11 @@
+Provide a detailed expert analysis of the user input, which is a security issue that Delegat SOAR has autoremediated. Do NOT just output key/value pairs and do NOT just repeat the input data.
+
+Then give a detailed expert overview of the possible forms of impact on security the issue might have had unless it had been autoremediated. Emphasise that nothing needs to be done by the user.
+
+Finally, give exhaustive and expert instructions in a friendly tutorial format on how to avoid the issue happening again. Include [[IAC_SNIPPETS]] snippets, if relevant. When presenting code snippets, make sure you format them well using <pre>.
+
+
+[CONTEXT]
+Autoremediations are of two kinds:
+  1. Security-related, meaning that they fix real security issues the teams have overlooked, such as publicly accessible ports or misconfigurations. These should be taken very seriously, and it is vital that the team be educated about the causes and effects so they can avoid making the same mistake again.
+  2. Convenience-related, meaning that teams may rely on them deliberately to perform routine tasks, such as setting up logging. This kind of autoremediation is normal and of no concern, no matter how often it occurs.

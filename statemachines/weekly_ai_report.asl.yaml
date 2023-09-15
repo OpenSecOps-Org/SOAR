@@ -1,0 +1,360 @@
+Comment: A state machine to create the weekly AI report.
+StartAt: Set up Parameters
+States:
+  Set up Parameters:
+    Type: Pass
+    Parameters:
+      WeeklyReport: "${WeeklyReport}"
+      WeeklyReportIndividualAccounts: "${WeeklyReportIndividualAccounts}"
+      WeeklyReportEmailRecipients: "${WeeklyReportEmailRecipients}"
+      OpenAIReportTable: "${OpenAIReportTable}"
+      no_html_post_processing: "True"
+      bb: {}
+      html_substitutions: {}
+      model: "${WeeklyReportChatGPTDefaultModel}"
+      fallback_model: "${WeeklyReportChatGPTFallbackModel}"
+      temperature: 0.5
+      top_p: 0.3
+      frequency_penalty: 0.3
+      presence_penalty: 0
+      system: ""
+      user: ""
+
+    Next: Should We Do This?
+
+  Should We Do This?:
+    Type: Choice
+    Choices:
+      - Variable: "$.WeeklyReport"
+        StringEquals: "Yes"
+        Next: Clear Report Table
+    Default: Succeed
+
+  Clear Report Table:
+    Type: Task
+    Resource: '${ClearTableFunctionArn}'
+    ResultPath: null
+    Retry:
+      -
+        ErrorEquals:
+          - States.Timeout
+          - Lambda.ServiceException
+          - Lambda.AWSLambdaException
+          - Lambda.SdkClientException
+          - DynamoDB.SdkClientException
+          - DynamoDB.InternalServerErrorException
+        IntervalSeconds: 3
+        MaxAttempts: 10
+        BackoffRate: 3
+    Next: Setup Overview Section
+
+  Setup Overview Section:
+    Type: Task
+    Resource: '${SetupOverviewSectionFunctionArn}'
+    Retry:
+      -
+        ErrorEquals:
+          - States.Timeout
+          - Lambda.ServiceException
+          - Lambda.AWSLambdaException
+          - Lambda.SdkClientException
+          - DynamoDB.SdkClientException
+          - DynamoDB.InternalServerErrorException
+        IntervalSeconds: 3
+        MaxAttempts: 10
+        BackoffRate: 3
+    Next: Create Overview Section
+
+  Create Overview Section:
+    Type: Task
+    Resource: '${QueryChatGPTFunctionArn}'
+    TimeoutSeconds: 900
+    Retry:
+      -
+        ErrorEquals:
+          - Lambda.TooManyRequestsException
+          - Lambda.ServiceException
+        IntervalSeconds: 5
+        MaxAttempts: 5
+        BackoffRate: 2
+    Catch:
+      -   
+        ErrorEquals:
+          - States.Timeout
+        Next: Postprocess Overview Section
+      -   
+        ErrorEquals:
+          - Lambda.TooManyRequestsException
+          - Lambda.ServiceException
+        Next: Postprocess Overview Section
+      -   
+        ErrorEquals:
+          - States.ALL
+        ResultPath: "$.openai-error-info"
+        Next: OpenAiFailState
+    Next: Postprocess Overview Section
+
+  Postprocess Overview Section:
+    Type: Task
+    Resource: '${PostprocessHtmlFunctionArn}'
+    Next: Store Overview Segment
+
+  Store Overview Segment:
+    Type: Task
+    Resource: "arn:aws:states:::dynamodb:putItem"
+    Parameters:
+      TableName.$: $.OpenAIReportTable
+      Item:
+        id: 
+          S: "overview"
+        html:
+          S.$: "$.messages.report.html"
+    ResultPath: null
+    Next: Account Segments
+
+  Account Segments:
+    Type: Map
+    MaxConcurrency: 1
+    ItemsPath: $.bb.accounts_with_issues
+    ItemSelector:
+      account.$: "$$.Map.Item.Value"
+      input.$: "$"
+    ResultPath: null
+    Iterator:
+      StartAt: Setup Account Segment
+      States:
+      
+        Setup Account Segment:
+          Type: Task
+          Resource: '${SetupAccountFunctionArn}'
+          Retry:
+            -
+              ErrorEquals:
+                - States.Timeout
+                - Lambda.ServiceException
+                - Lambda.AWSLambdaException
+                - Lambda.SdkClientException
+                - DynamoDB.SdkClientException
+                - DynamoDB.InternalServerErrorException
+              IntervalSeconds: 3
+              MaxAttempts: 10
+              BackoffRate: 3
+          Next: Create Account Segment
+
+        Create Account Segment:
+          Type: Task
+          Resource: '${QueryChatGPTFunctionArn}'
+          TimeoutSeconds: 900
+          Retry:
+            -
+              ErrorEquals:
+                - Lambda.TooManyRequestsException
+                - Lambda.ServiceException
+              IntervalSeconds: 5
+              MaxAttempts: 5
+              BackoffRate: 2
+          Catch:
+            -   
+              ErrorEquals:
+                - States.Timeout
+              Next: Store Account Segment Summary
+            -   
+              ErrorEquals:
+                - Lambda.TooManyRequestsException
+                - Lambda.ServiceException
+              Next: Store Account Segment Summary
+            -   
+              ErrorEquals:
+                - States.ALL
+              ResultPath: "$.openai-error-info"
+              Next: OpenAiFailStateAccountSegment
+          Next: Store Account Segment Summary
+
+        Store Account Segment Summary:
+          Type: Task
+          Resource: '${StoreAccountSummaryFunctionArn}'
+          Parameters:
+            account.$: $.account
+            html.$: $.messages.ai.html
+          ResultPath: null
+          Retry:
+            -
+              ErrorEquals:
+                - States.Timeout
+                - Lambda.ServiceException
+                - Lambda.AWSLambdaException
+                - Lambda.SdkClientException
+                - DynamoDB.SdkClientException
+                - DynamoDB.InternalServerErrorException
+              IntervalSeconds: 3
+              MaxAttempts: 10
+              BackoffRate: 3
+          Next: Postprocess Account Segment
+
+        Postprocess Account Segment:
+          Type: Task
+          Resource: '${PostprocessHtmlFunctionArn}'
+          Next: Store Account Segment
+
+        Store Account Segment:
+          Type: Task
+          Resource: "arn:aws:states:::dynamodb:putItem"
+          Parameters:
+            TableName.$: $.OpenAIReportTable
+            Item:
+              id: 
+                S.$: "$.account"
+              html:
+                S.$: "$.messages.report.html"
+          ResultPath: null
+          Next: Send to Individual Account?
+
+        Send to Individual Account?:
+          Type: Choice
+          Choices:
+            - Variable: "$.WeeklyReportIndividualAccounts"
+              StringEquals: "Yes"
+              Next: Setup to Send to Account
+          Default: Account Done
+
+        Setup to Send to Account:
+          Type: Task
+          Resource: '${SetupToSendToAccountFunctionArn}'
+          Next: Send to Account
+
+        Send to Account:
+          Type: Task
+          Resource: '${SendEmailFunctionArn}'
+          Parameters:
+            Recipient.$: $.email_recipients
+            Subject.$: $.email_title
+            Html.$: $.email_html
+          ResultPath: null
+          Retry:
+            -
+              ErrorEquals:
+                - States.Timeout
+                - Lambda.ServiceException
+                - Lambda.AWSLambdaException
+                - Lambda.SdkClientException
+              IntervalSeconds: 3
+              MaxAttempts: 10
+              BackoffRate: 3
+          Next: Account Done
+
+        Account Done:
+          Type: Succeed
+
+        OpenAiFailStateAccountSegment:
+          Type: Fail
+          Cause: "The call to the OpenAI API failed. See $.openai-error-info for more details."
+
+    Next: Setup Recommendations Section
+
+  Setup Recommendations Section:
+    Type: Task
+    Resource: '${SetupRecommendationsSectionFunctionArn}'
+    Retry:
+      -
+        ErrorEquals:
+          - States.Timeout
+          - Lambda.ServiceException
+          - Lambda.AWSLambdaException
+          - Lambda.SdkClientException
+          - DynamoDB.SdkClientException
+          - DynamoDB.InternalServerErrorException
+        IntervalSeconds: 3
+        MaxAttempts: 10
+        BackoffRate: 3
+    Next: Create Recommendations Section
+
+  Create Recommendations Section:
+    Type: Task
+    Resource: '${QueryChatGPTFunctionArn}'
+    TimeoutSeconds: 900
+    Retry:
+      -
+        ErrorEquals:
+          - Lambda.TooManyRequestsException
+          - Lambda.ServiceException
+        IntervalSeconds: 5
+        MaxAttempts: 5
+        BackoffRate: 2
+    Catch:
+      -   
+        ErrorEquals:
+          - States.Timeout
+        Next: Postprocess Recommendations Section
+      -   
+        ErrorEquals:
+          - Lambda.TooManyRequestsException
+          - Lambda.ServiceException
+        Next: Postprocess Recommendations Section
+      -   
+        ErrorEquals:
+          - States.ALL
+        ResultPath: "$.openai-error-info"
+        Next: OpenAiFailState
+    Next: Postprocess Recommendations Section
+
+  Postprocess Recommendations Section:
+    Type: Task
+    Resource: '${PostprocessHtmlFunctionArn}'
+    Next: Store Recommendations Segment
+
+  Store Recommendations Segment:
+    Type: Task
+    Resource: "arn:aws:states:::dynamodb:putItem"
+    Parameters:
+      TableName.$: $.OpenAIReportTable
+      Item:
+        id: 
+          S: "recommendations"
+        html:
+          S.$: "$.messages.report.html"
+    ResultPath: null
+    Next: Stitch Together Segments
+
+  Stitch Together Segments:
+    Type: Task
+    Resource: '${StitchTogetherSegmentsFunctionArn}'
+    Retry:
+      -
+        ErrorEquals:
+          - States.Timeout
+          - Lambda.ServiceException
+          - Lambda.AWSLambdaException
+          - Lambda.SdkClientException
+          - DynamoDB.SdkClientException
+          - DynamoDB.InternalServerErrorException
+        IntervalSeconds: 3
+        MaxAttempts: 10
+        BackoffRate: 3
+    Next: Send email
+
+  Send email:
+    Type: Task
+    Resource: '${SendEmailFunctionArn}'
+    Parameters:
+      Recipient.$: $.WeeklyReportEmailRecipients
+      Subject: Delegat SOAR Weekly Security Report
+      HtmlArn.$: $.report_arn
+    ResultPath: null
+    Retry:
+      -
+        ErrorEquals:
+          - States.Timeout
+          - Lambda.ServiceException
+          - Lambda.AWSLambdaException
+          - Lambda.SdkClientException
+        IntervalSeconds: 3
+        MaxAttempts: 10
+        BackoffRate: 3
+    Next: Succeed
+
+  Succeed:
+    Type: Succeed
+
+  OpenAiFailState:
+    Type: Fail
+    Cause: "The call to the OpenAI API failed. See $.openai-error-info for more details."

@@ -1,0 +1,34 @@
+[INSTRUCTIONS]
+Generate recommendations and action points to security management based on the summaries provided.
+
+- Always consider the constraints and directions provided in the CONTEXT section.
+- Use your own words to convey the information, avoiding direct quotes.
+- Only include relevant information related to security risks.
+- Ensure that the name of the account is mentioned for each summary.
+- Avoid using phrases like "In the first summary..." to refer to specific summaries.
+- If there are issues pertaining to the SOAR system itself, ALWAYS recommend contacting Delegat AB. NB: SOAR incidents only occur in the AWS Organization admin account.
+- INFORMATIONAL incidents are never a cause for concern.
+
+For issues pertaining to the SOAR system itself:
+- If there are any issues related to the SOAR system mentioned in the summaries, ALWAYS recommend contacting Delegat AB for further investigation and resolution.
+- SOAR incidents only occur in the AWS Organization admin account.
+- Do not even mention SOAR incidents in any other account than the AWS Organization admin account.
+
+For other security-related issues:
+- Provide recommendations and action points based on the information provided in the summaries, addressing any vulnerabilities or incidents mentioned.
+- Ensure that appropriate teams are contacted for further investigation and resolution of these issues.
+
+- Do not end with a final section beginning "Remember, these recommendations are ..." or anything like it.
+
+[CONTEXT]
+- Delegat SOAR is an advanced system, NOT a person.
+- All tasks performed by Delegat SOAR, such as monitoring, autoremediations, ticket handling, etc., are known. Assume they are efficient and ongoing.
+
+- Individual teams manage accounts.
+- A team can manage more than one account.
+- An account is managed by exactly one team.
+
+- Issues pertaining to the SOAR are not the responsibility of the team for the account where they happen. They know nothing about how to fix SOAR issues. Instead, you must always recommend contacting Delegat AB for such issues.
+
+
+

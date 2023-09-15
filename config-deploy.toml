@@ -1,0 +1,11 @@
+# Deployment configuration
+
+repo-name    = "SOAR"
+part-of      = 'soar'
+
+
+[SAM]
+stack-name   = "INFRA-SOAR"
+profile      = 'admin-account'
+regions      = '{main-region}'
+

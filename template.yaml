@@ -1,0 +1,2836 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Runtime: python3.11
+    MemorySize: 128
+    Handler: app.lambda_handler
+    Timeout: 900
+
+Description:
+  This project contains nested state machines for Security Hub findings SOAR processing,
+  ticketing, auto-remediation, and the weekly AI report.
+
+
+Parameters:
+  ProductName:
+    Type: String
+    Description: The name of the product.
+    Default: 'Delegat SOAR'
+
+
+  OrgAccountId:
+    Type: String
+    Description: The id of the AWS Organizations admin account
+    Default: '000000000000'
+
+  SecurityAccountId:
+    Type: String
+    Description: The id of the Security account
+    Default: '111111111111'
+
+  LogArchiveAccountId:
+    Type: String
+    Description: The id of the Log Archive account if running under Control Tower, or blank if not
+    Default: '222222222222'
+
+  AFTManagementAccountId:
+    Type: String
+    Description: The id of the AFT-Management account if using AFT, or blank if not
+    Default: '333333333333'
+
+
+  CrossAccountRole:
+    Type: String
+    Description:
+      The role to assume in other organisation accounts. Must be SCP-exempt and give
+      full admin rights. Use AWSControlTowerExecution under Control Tower, 
+      OrganizationAccountAccessRole under AWS Organizations without Control Tower. 
+      Make sure this role also exists in the Organization account and can be assumed 
+      only from there. Define it manually if necessary.
+    AllowedValues: ['AWSControlTowerExecution', 'OrganizationAccountAccessRole']
+    Default: 'AWSControlTowerExecution'
+
+  MinAgeHours:
+    Type: Number
+    Description:
+      The number of hours during which a newly created account is given time to stabilise 
+      and get registered with all relevant AWS services. During this period, Delegat SOAR 
+      suppresses all issues for the account.
+    Default: 24
+
+  ClearAccountDataCacheRate:
+    Description: 
+      The rate at which to clear the account data cache. Must be grammatically correct; 
+      e.g. '1 hour', '2 hours', etc.
+    Type: String
+    Default: "6 hours"
+
+  CustomEventBusName:
+    Type: String
+    Description: The name of the custom event bus. There is no need to change this value.
+    Default: SOAR-events
+
+  DiskForensicsInvokeARN:
+    Type: String
+    Description:
+      If the SAM version of the Disk Forensics Collection project is installed,
+      enter the ARN of its invocation lambda which can be found as the output
+      DiskForensicsInvokeARN in the Security account. If this parameter is left blank,
+      rogue EC2 instances will simply be terminated. If the value of DiskForensicsInvokeARN
+      is entered here, the Disk Forensics Collection project will snapshot and terminate
+      them instead. Ticketing and emailing remains the same.
+    Default: ''
+
+  # Mail ----------------------------------------------------------------------------
+
+  SendEmail:
+    Type: String
+    Description: Yes if send email, No if not.
+    AllowedValues: ['Yes', 'No']
+    Default: 'Yes'
+
+  DefaultTeamEmail:
+    Type: String
+    Description: If given, a default address to use when team email isn't given.
+      If blank, the account email will be used instead.
+    Default: ''
+
+  EmailSender:
+    Type: String
+    Description: The sender to use for sending emails
+    Default: 'no-reply@example.com'
+
+  EmailCC:
+    Type: String
+    Description: CC of all mail to these comma-separated email addresses
+    Default: 'soc@example.com'
+
+  EmailBCC:
+    Type: String
+    Description: BCC of all mail to these comma-separated email addresses
+    Default: ''
+
+  EmailReturnPath:
+    Type: String
+    Description: The email return path
+    Default: 'soc@example.com'
+
+  # Ticketing -------------------------------------------------------------------------
+
+  TicketingSystem:
+    Type: String
+    Description: JIRA, ServiceNow, or None.
+    AllowedValues: ['JIRA', 'ServiceNow', 'None']
+    Default: 'JIRA'
+
+  JiraServerUrlParameterPath:
+    Type: String
+    Description: The SSM Parameter Store path for the JIRA server URL.
+    Default: '/soar/jira/server-url'
+
+  JiraBasicAuthUsernameParameterPath:
+    Type: String
+    Description: The SSM Parameter Store path for the JIRA username.
+    Default: '/soar/jira/basic-auth/username'
+
+  JiraBasicAuthTokenParameterPath:
+    Type: String
+    Description: The SSM Parameter Store path for the JIRA token.
+    Default: '/soar/jira/basic-auth/token'
+
+  JiraDefaultProjectKey:
+    Type: String
+    Description: The default Jira project's abbreviated key. Used when JiraProjectKeyTag isn't given for an account.
+    Default: 'XXX'
+
+  JiraIssueType:
+    Type: String
+    Description: The JIRA issue type to use. MUST be available in all projects.
+    Default: 'Task'
+
+  JiraPriorities:
+    Type: String
+    Description:
+      Comma-separated list of JIRA counterparts to Security Hub's severities (INFORMATIONAL,LOW,MEDIUM,HIGH,CRITICAL).
+      MUST be available in all projects.
+    Default: 'Lowest,Low,Medium,High,Highest'
+
+  JiraInitialStates:
+    Type: String
+    Description: Comma-separated list of initial states for a JIRA ticket. Tried in order.
+    Default: 'Selected for Development'
+
+  JiraFinalState:
+    Type: String
+    Description: The final state for a JIRA ticket. MUST be available in all projects.
+    Default: 'Done'
+
+  ServiceNowServerUrlParameterPath:
+    Type: String
+    Description: The SSM Parameter Store path for the ServiceNow server URL.
+    Default: '/soar/service-now/server-url'
+
+  ServiceNowBasicAuthUsernameParameterPath:
+    Type: String
+    Description: The SSM Parameter Store path for the ServiceNow username.
+    Default: '/soar/service-now/basic-auth/username'
+
+  ServiceNowBasicAuthPasswordParameterPath:
+    Type: String
+    Description: The SSM Parameter Store path for the ServiceNow password.
+    Default: '/soar/service-now/basic-auth/password'
+
+  ServiceNowTable:
+    Type: String
+    Description: The ServiceNow table to use
+    Default: 'incidents'
+
+  ServiceNowDefaultProjectQueue:
+    Type: String
+    Description: The default ServiceNow project's queue. Used when ServiceNowProjectQueueTag isn't given for an account.
+    Default: 'XXX'
+
+  ServiceNowIssueType:
+    Type: String
+    Description: The ServiceNow issue type to use. MUST be available in all projects.
+    Default: 'Incident'
+
+  ServiceNowFinalState:
+    Type: Number
+    Description: The final state for a ServiceNow ticket.
+    Default: 7
+
+  GuardDutyEc2TerminationSeverities:
+    Type: String
+    Description: List of comma-separated severities which cause termination and notification of misbehaving EC2 instances.
+    Default: 'MEDIUM,HIGH,CRITICAL'
+
+  GuardDutyEc2NotificationSeverities:
+    Type: String
+    Description:
+      List of comma-separated severities which cause notification of EC2 issues. Issues with a severity not on
+      this list, or on GuardDutyEc2TerminationSeverities, will be suppressed.
+    Default: 'INFORMATIONAL,LOW,MEDIUM,HIGH,CRITICAL'
+
+  GuardDutyIamUserNotificationSeverities:
+    Type: String
+    Description:
+      List of comma-separated severities which cause notification of IAMUser issues. Issues with a severity not on
+      this list will be suppressed.
+    Default: 'INFORMATIONAL,LOW,MEDIUM,HIGH,CRITICAL'
+
+  GuardDutyS3NotificationSeverities:
+    Type: String
+    Description:
+      List of comma-separated severities which cause notification of S3 issues. Issues with a severity not on
+      this list will be suppressed.
+    Default: 'INFORMATIONAL,LOW,MEDIUM,HIGH,CRITICAL'
+
+  GuardDutyEksNotificationSeverities:
+    Type: String
+    Description:
+      List of comma-separated severities which cause notification of EKS issues. Issues with a severity not on
+      this list will be suppressed.
+    Default: 'INFORMATIONAL,LOW,MEDIUM,HIGH,CRITICAL'
+
+  SocJiraProjectKeyOrServiceNowQueue:
+    Type: String
+    Description:
+      For issuing tickets to SOC. If using JIRA, a JIRA project key. If using ServiceNow, a queue name.
+      Set to blank to suppress SOC ticketing.
+    Default: 'SOC'
+
+  SocTicketSeverities:
+    Type: String
+    Description: Severity levels that cause tickets to SOC.
+    Default: 'LOW,MEDIUM,HIGH,CRITICAL'
+
+  GenericNotificationSeverities:
+    Type: String
+    Description:
+      List of comma-separated severities which cause notification of general incidents. Issues with a severity not on
+      this list will be suppressed.
+    Default: 'INFORMATIONAL,LOW,MEDIUM,HIGH,CRITICAL'
+
+  IgnoreProducts:
+    Type: String
+    Description: List of comma-separated Security Hub products to ignore when creating incidents.
+    Default: 'Inspector,Systems Manager Patch Manager,cis-alarms'
+
+  IncidentsToSoc:
+    Type: String
+    Description: Whether incidents should also generate tickets for SOC
+    AllowedValues:
+      - NONE      # No, they shouldn't
+      - INFRA     # Yes, but only the infrastructural ones (GuardDuty, etc)
+      - APP       # Yes, but only for application-generated incidents
+      - ALL       # Yes, all of them should
+    Default: INFRA
+
+  # Tag keys -------------------------------------------------------------------------
+
+  AccountTeamEmailTag:
+    Type: String
+    Description: The tag for tagging an account with a contact email address
+    Default: soar:team:email
+
+  AccountTeamEmailTagApp:
+    Type: String
+    Description: The tag for optionally tagging an account with a contact email address specifically for the application domain
+    Default: soar:team:email:app
+
+  JiraProjectKeyTag:
+    Type: String
+    Description: The tag giving the Jira Project Key for the account.
+    Default: soar:jira:project-key
+
+  JiraProjectKeyTagApp:
+    Type: String
+    Description: The tag for optionally tagging an account with a Jira Project Key to use specifically for the application domain
+    Default: soar:jira:project-key:app
+
+  ServiceNowProjectQueueTag:
+    Type: String
+    Description: The tag giving the ServiceNow Project Queue for the account.
+    Default: soar:service-now:project-queue
+
+  ServiceNowProjectQueueTagApp:
+    Type: String
+    Description: The tag for optionally tagging an account with a ServiceNow Project Queue to use specifically for the application domain
+    Default: soar:service-now:project-queue:app
+
+  ProjectTag:
+    Type: String
+    Description: The tag giving the project name for the account.
+    Default: soar:project
+
+  ClientTag:
+    Type: String
+    Description: The tag giving the client name for the account.
+    Default: soar:client
+
+  TeamTag:
+    Type: String
+    Description: The tag giving the team for the account.
+    Default: soar:team
+
+  EnvironmentTag:
+    Type: String
+    Description: The tag giving the environment name for the account.
+    Default: soar:environment
+
+  RequestPubliclyReadableBucketTag:
+    Type: String
+    Description: The S3 bucket tag used for requesting a publicly readable S3 bucket
+    Default: soar:s3:request-publicly-readable
+
+  RequestPubliclyWritableBucketTag:
+    Type: String
+    Description: The S3 bucket tag used for requesting a publicly writable S3 bucket
+    Default: soar:s3:request-publicly-writable
+
+  DynamoDbNoPitRecoveryTag:
+    Type: String
+    Description: The DynamoDB tag used for suppressing the PIT enabling auto-remediation
+    Default: soar:dynamodb:no-pit-recovery
+
+  # Overdue Ticket Limits ------------------------------------------------------
+  
+  SeverityAllowedAgeInHoursCritical:
+    Type: Number
+    Description: How many hours a CRITICAL ticket is allowed to be open before it is considered overdue.
+      Set to -1 for never.
+    Default: 4
+
+  SeverityAllowedAgeInHoursHigh:
+    Type: Number
+    Description: How many hours a HIGH ticket is allowed to be open before it is considered overdue
+      Set to -1 for never.
+    Default: 8
+
+  SeverityAllowedAgeInHoursMedium:
+    Type: Number
+    Description: How many hours a MEDIUM ticket is allowed to be open before it is considered overdue.
+      Set to -1 for never. The default value of 336 is 14 days.
+    Default: 336
+
+  SeverityAllowedAgeInHoursLow:
+    Type: Number
+    Description: How many hours a LOW ticket is allowed to be open before it is considered overdue.
+      Set to -1 for never. The default value of 672 is 28 days.
+    Default: 672
+
+  # Closed Ticket, Autoremediation, and Incident expiration times --------------
+
+  ClosedTicketExpirationInDays:
+    Type: Number
+    Description: How long closed tickets are remembered
+    Default: 365
+
+  AutoremediationExpirationInDays:
+    Type: Number
+    Description: How long autoremediations are remembered
+    Default: 365
+
+  IncidentExpirationInDays:
+    Type: Number
+    Description: How long incidents are remembered
+    Default: 365
+
+  # AI -------------------------------------------------------------------------
+
+  UseChatGPT:
+    Type: String
+    Description: Yes if use OpenAI's API for ChatGPT.
+    AllowedValues: ['Yes', 'No']
+    Default: 'Yes'
+
+  ChatGPTDefaultModel:
+    Type: String
+    Description: The GPT model to use by default.
+    AllowedValues:
+      - gpt-4
+      - gpt-3.5-turbo-16k
+    Default: 'gpt-4'
+
+  ChatGPTFallbackModel:
+    Type: String
+    Description: The fallback GPT model.
+    AllowedValues:
+      - gpt-3.5-turbo-16k
+      - gpt-4
+    Default: 'gpt-3.5-turbo-16k'
+
+  ChatGPTAPIKeyParameterPath:
+    Type: String
+    Description: The ChatGPT API key.
+    Default: '/soar/chatgpt/api-key'
+
+  ChatGPTIaCSnippets:
+    Type: String
+    Description: The IaC languages you want snippet suggestions for builders in.
+    Default: "Cloudformation YAML, Terraform, and Python CDK"
+
+  ChatGPTAnonymizeAccountNumbers:
+    Type: String
+    Description: Yes if all 12-digit numbers are to be replaced with 000000000000.
+    AllowedValues: ['Yes', 'No']
+    Default: 'Yes'
+
+  ChatGPTAnonymizeHexStrings:
+    Type: String
+    Description: Yes if all hex strings are to be replaced with zeros.
+    AllowedValues: ['Yes', 'No']
+    Default: 'Yes'
+
+  ChatGPTRemoveARNs:
+    Type: String
+    Description: Yes if all ARNs are to be removed.
+    AllowedValues: ['Yes', 'No']
+    Default: 'No'
+
+  ChatGPTRemoveEmailAddresses:
+    Type: String
+    Description: Yes if all email addresses are to be removed.
+    AllowedValues: ['Yes', 'No']
+    Default: 'Yes'
+
+  WeeklyReport:
+    Type: String
+    Description: Yes if send a weekly AI-based security report.
+    AllowedValues: ['Yes', 'No']
+    Default: 'No'
+
+  WeeklyReportIndividualAccounts:
+    Type: String
+    Description: Yes if also send the weekly AI-based security report to individual accounts.
+    AllowedValues: ['Yes', 'No']
+    Default: 'Yes'
+
+  WeeklyReportChatGPTDefaultModel:
+    Type: String
+    Description: The GPT model to use by default for the weekly AI-based security report.
+    AllowedValues:
+      - gpt-4
+      - gpt-3.5-turbo-16k
+    Default: 'gpt-4'
+
+  WeeklyReportChatGPTFallbackModel:
+    Type: String
+    Description: The GPT fallback model to use for the weekly AI-based security report.
+    AllowedValues:
+      - gpt-3.5-turbo-16k
+      - gpt-4
+    Default: 'gpt-3.5-turbo-16k'
+
+  WeeklyReportEmailRecipients:
+    Type: String
+    Description: The recipient or recipients of the weekly AI-based security report.
+    Default: ''
+
+
+#-------------------------------------------------------------------------------
+#
+# Conditions
+#
+#-------------------------------------------------------------------------------
+
+Conditions:
+  DiskForensicsInvokeARNBlank: !Equals
+    - !Ref DiskForensicsInvokeARN
+    - ''
+  InvokeDiskForensics: !Not
+    - !Condition DiskForensicsInvokeARNBlank
+
+
+Resources:
+  #-------------------------------------------------------------------------------
+  #
+  # Parameter Store for JIRA credentials
+  #
+  #-------------------------------------------------------------------------------
+
+  SoarJiraServerUrl:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref JiraServerUrlParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The JIRA server URL.
+
+  SoarJiraBasicAuthUsername:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref JiraBasicAuthUsernameParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The username of the JIRA user. Usually an email address.
+
+  SoarJiraBasicAuthToken:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref JiraBasicAuthTokenParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The security token. Generate in Jira.
+
+  #-------------------------------------------------------------------------------
+  #
+  # Parameter Store for ServiceNow credentials
+  #
+  #-------------------------------------------------------------------------------
+
+  SoarServiceNowServerUrl:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref ServiceNowServerUrlParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The server URL for ServiceNow.
+
+  SoarServiceNowBasicAuthUsername:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref ServiceNowBasicAuthUsernameParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The username of the ServiceNow user.
+
+  SoarServiceNowBasicAuthPassword:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref ServiceNowBasicAuthPasswordParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The ServiceNow password.
+
+  #-------------------------------------------------------------------------------
+  #
+  # Parameter Store for ChatGPT credentials
+  #
+  #-------------------------------------------------------------------------------
+
+  ChatGPTAPIKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref ChatGPTAPIKeyParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The ChatGPT API key.
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # Controls, mgmt tables
+  #
+  #-------------------------------------------------------------------------------
+
+  EnabledSecHubControls:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: enabled-sec-hub-controls
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
+  LocalControlSuppressions:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: local-control-suppressions
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
+  RemediatableSecHubControls:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: remediatable-sec-hub-controls
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
+  LocalControlAutoRemSuppressions:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: local-control-autoremediation-suppressions
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
+  #-------------------------------------------------------------------------------
+  #
+  # Incidents, mgmt tables
+  #
+  #-------------------------------------------------------------------------------
+
+  LocalIncidentSuppressions:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: local-incident-suppressions
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
+  LocalIncidentAutoRemSuppressions:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: local-incident-autoremediation-suppressions
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
+  #-------------------------------------------------------------------------------
+  #
+  # The DynamoDB table containing tickets
+  #
+  #-------------------------------------------------------------------------------
+
+  Tickets:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: tickets
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: opened_at
+          AttributeType: S
+        - AttributeName: closed_at
+          AttributeType: S
+        - AttributeName: dummy
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: dummy-opened_at-index
+          KeySchema:
+            - AttributeName: dummy
+              KeyType: HASH
+            - AttributeName: opened_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: dummy-closed_at-index
+          KeySchema:
+            - AttributeName: dummy
+              KeyType: HASH
+            - AttributeName: closed_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:       # Enable TTL
+        AttributeName: expire_at
+        Enabled: true
+      Tags:
+        - Key: "soar:dynamodb:no-pit-recovery"
+          Value: ""
+
+  #-------------------------------------------------------------------------------
+  #
+  # The DynamoDB table containing incidents
+  #
+  #-------------------------------------------------------------------------------
+
+  Incidents:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: incidents
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: opened_at
+          AttributeType: S
+        - AttributeName: dummy
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: dummy-opened_at-index
+          KeySchema:
+            - AttributeName: dummy
+              KeyType: HASH
+            - AttributeName: opened_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:       # Enable TTL
+        AttributeName: expire_at
+        Enabled: true
+      Tags:
+        - Key: "soar:dynamodb:no-pit-recovery"
+          Value: ""
+
+  #-------------------------------------------------------------------------------
+  #
+  # The DynamoDB table containing autoremediations done
+  #
+  #-------------------------------------------------------------------------------
+
+  AutoRemediations:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: autoremediations
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: opened_at
+          AttributeType: S
+        - AttributeName: dummy
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: dummy-opened_at-index
+          KeySchema:
+            - AttributeName: dummy
+              KeyType: HASH
+            - AttributeName: opened_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:       # Enable TTL
+        AttributeName: expire_at
+        Enabled: true
+      Tags:
+        - Key: "soar:dynamodb:no-pit-recovery"
+          Value: ""
+
+  #-------------------------------------------------------------------------------
+  #
+  # The DynamoDB table containing cached get_account_data
+  #
+  #-------------------------------------------------------------------------------
+
+  CachedAccountData:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: cached-account-data
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
+  #-------------------------------------------------------------------------------
+  #
+  # The DynamoDB table containing OpenAI API prompts
+  #
+  #-------------------------------------------------------------------------------
+
+  OpenAIPromptsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: openai-prompts
+      PrimaryKey:
+        Name: id
+        Type: String
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # The DynamoDB table containing OpenAI report segments during report generation
+  #
+  #-------------------------------------------------------------------------------
+
+  OpenAIReportTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: openai-report
+      PrimaryKey:
+        Name: id
+        Type: String
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # The bucket for storing finished weekly AI report email contents
+  #
+  #-------------------------------------------------------------------------------
+
+  SOARWeeklyAIReportBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      VersioningConfiguration:
+        Status: Suspended
+      LifecycleConfiguration:
+        Rules:
+          - Id: DataRetention
+            Status: Enabled
+            ExpirationInDays: 365
+          - Id: AbortIncompleteUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # Functions to record tickets, autoremediations, and incidents for statistical
+  # purposes
+  #
+  #-------------------------------------------------------------------------------
+
+  RememberIncidentOpenedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/statistics/remember_incident_opened/
+      Policies:
+        - Statement:
+            - Sid: TablePermissions
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt Incidents.Arn
+      Environment:
+        Variables:
+          INCIDENTS_TABLE_NAME: !Ref Incidents
+          EXPIRATION_DAYS: !Ref IncidentExpirationInDays
+
+  RememberAutoRemediationDoneFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/statistics/remember_autoremediation_done/
+      Policies:
+        - Statement:
+            - Sid: TablePermissions
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt AutoRemediations.Arn
+      Environment:
+        Variables:
+          AUTOREMEDIATIONS_TABLE_NAME: !Ref AutoRemediations
+          EXPIRATION_DAYS: !Ref AutoremediationExpirationInDays
+
+  RememberTicketOpenedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/statistics/remember_ticket_opened/
+      Policies:
+        - Statement:
+            - Sid: TablePermissions
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt Tickets.Arn
+      Environment:
+        Variables:
+          TICKETS_TABLE_NAME: !Ref Tickets
+
+  RememberTicketClosedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/statistics/remember_ticket_closed/
+      Policies:
+        - Statement:
+            - Sid: TablePermissions
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt Tickets.Arn
+      Environment:
+        Variables:
+          TICKETS_TABLE_NAME: !Ref Tickets
+          EXPIRATION_DAYS: !Ref ClosedTicketExpirationInDays
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # The main state machine
+  #
+  #-------------------------------------------------------------------------------
+
+  SOARSecHubFindingsProcessor:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachines/sec_hub_findings_processor.asl.yaml
+      DefinitionSubstitutions:
+        SuppressFindingFunctionArn: !GetAtt SuppressFindingFunction.Arn
+        UpdateRemediatedFindingFunctionArn: !GetAtt UpdateRemediatedFindingFunction.Arn
+        UpdateTicketedFindingFunctionArn: !GetAtt UpdateTicketedFindingFunction.Arn
+        UpdateClosedFindingFunctionArn: !GetAtt UpdateClosedFindingFunction.Arn
+        FormatRemediationMessageFunctionArn: !GetAtt FormatRemediationMessageFunction.Arn
+        FormatTicketingMessageFunctionArn: !GetAtt FormatTicketingMessageFunction.Arn
+        FormatTicketClosedMessageFunctionArn: !GetAtt FormatTicketClosedMessageFunction.Arn
+        GetAccountDataFunctionArn: !GetAtt GetAccountDataFunction.Arn
+        SendEmailFunctionArn: !GetAtt SendEmailFunction.Arn
+        OpenTicketFunctionArn: !GetAtt OpenTicketFunction.Arn
+        CloseTicketFunctionArn: !GetAtt CloseTicketFunction.Arn
+        ComputePenaltyScoreFunctionArn: !GetAtt ComputePenaltyScoreFunction.Arn
+        SuppressLocallyFunctionArn: !GetAtt SuppressLocallyFunction.Arn
+        QueryChatGPTFunctionArn: !GetAtt QueryChatGPTFunction.Arn
+        RememberTicketOpenedFunctionArn: !GetAtt RememberTicketOpenedFunction.Arn
+        RememberTicketClosedFunctionArn: !GetAtt RememberTicketClosedFunction.Arn
+        RememberAutoRemediationDoneFunctionArn: !GetAtt RememberAutoRemediationDoneFunction.Arn
+
+        EnabledSecHubControlsName: !Ref EnabledSecHubControls
+        RemediatableSecHubControlsName: !Ref RemediatableSecHubControls
+        LocalControlSuppressionsName: !Ref LocalControlSuppressions
+        LocalControlAutoRemSuppressionsName: !Ref LocalControlAutoRemSuppressions
+        TicketsName: !Ref Tickets
+        CachedAccountDataName: !Ref CachedAccountData
+        OpenAIPromptsTableName: !Ref OpenAIPromptsTable
+
+        AttemptAutoRemediationSMArn: !Ref SOARAttemptAutoRemediation
+        IncidentsSMArn: !Ref SOARIncidents
+
+      Events:
+        SecHubFindingImported:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref CustomEventBusName
+            Pattern:
+              source:
+                - aws.securityhub
+              detail-type:
+                - Security Hub Findings - Imported
+
+      Policies:
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - events:PutTargets
+                - events:PutRule
+                - events:DescribeRule
+              Resource:
+                - !Sub arn:${AWS::Partition}:events:${AWS::Region}:${AWS::AccountId}:rule/StepFunctionsGetEventsForStepFunctionsExecutionRule
+            - Effect: Allow
+              Action: states:StartExecution
+              Resource:
+                - !Ref SOARAttemptAutoRemediation
+                - !Ref SOARIncidents
+            - Effect: Allow
+              Action:
+                - states:DescribeExecution
+                - states:StopExecution
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - logs:*
+              Resource: '*'
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SuppressFindingFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UpdateRemediatedFindingFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UpdateTicketedFindingFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref UpdateClosedFindingFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FormatRemediationMessageFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FormatTicketingMessageFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FormatTicketClosedMessageFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref GetAccountDataFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SendEmailFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref OpenTicketFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref CloseTicketFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ComputePenaltyScoreFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SuppressLocallyFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref QueryChatGPTFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref RememberTicketOpenedFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref RememberTicketClosedFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref RememberAutoRemediationDoneFunction
+
+        - DynamoDBReadPolicy:
+            TableName: !Ref EnabledSecHubControls
+        - DynamoDBReadPolicy:
+            TableName: !Ref RemediatableSecHubControls
+        - DynamoDBReadPolicy:
+            TableName: !Ref LocalControlSuppressions
+        - DynamoDBReadPolicy:
+            TableName: !Ref LocalControlAutoRemSuppressions
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Tickets
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CachedAccountData
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OpenAIPromptsTable
+
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !Ref SOARAttemptAutoRemediation
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: !Ref SOARIncidents
+
+      Logging:
+        Destinations: 
+          - CloudWatchLogsLogGroup: 
+              LogGroupArn: !GetAtt SOARSecHubFindingsProcessorLogGroup.Arn
+        IncludeExecutionData: false
+        Level: ERROR
+
+  SOARSecHubFindingsProcessorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      RetentionInDays: 30
+
+
+  SuppressFindingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/suppress_finding/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:BatchUpdateFindings
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          PRODUCT_NAME: !Ref ProductName
+
+  UpdateRemediatedFindingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/update_remediated_finding/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:BatchUpdateFindings
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          PRODUCT_NAME: !Ref ProductName
+
+  UpdateTicketedFindingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/update_ticketed_finding/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:BatchUpdateFindings
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          PRODUCT_NAME: !Ref ProductName
+
+  UpdateClosedFindingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/update_closed_finding/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:BatchUpdateFindings
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          PRODUCT_NAME: !Ref ProductName
+
+  FormatRemediationMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/format_remediation_message/
+      Environment:
+        Variables:
+          PRODUCT_NAME: !Ref ProductName
+
+  FormatTicketingMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/format_ticketing_message/
+      Environment:
+        Variables:
+          PRODUCT_NAME: !Ref ProductName
+
+  FormatTicketClosedMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/format_ticket_closed_message/
+      Environment:
+        Variables:
+          PRODUCT_NAME: !Ref ProductName
+
+  GetAccountDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/account_data/get_account_data/
+      Policies:
+        - Statement:
+            - Sid: OrganizationsPermissions
+              Effect: Allow
+              Action:
+                - organizations:DescribeAccount
+                - organizations:ListTagsForResource
+                - organizations:ListParents
+                - organizations:DescribeOrganizationalUnit
+              Resource: '*'
+            - Sid: CacheTablePermissions
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+              Resource: !GetAtt CachedAccountData.Arn
+      Environment:
+        Variables:
+          ACCOUNT_TEAM_EMAIL_TAG: !Ref AccountTeamEmailTag
+          ACCOUNT_TEAM_EMAIL_TAG_APP: !Ref AccountTeamEmailTagApp
+          DEFAULT_TEAM_EMAIL: !Ref DefaultTeamEmail
+          PRODUCT_NAME: !Ref ProductName
+          CLIENT_TAG: !Ref ClientTag
+          PROJECT_TAG: !Ref ProjectTag
+          TEAM_TAG: !Ref TeamTag
+          ENVIRONMENT_TAG: !Ref EnvironmentTag
+          TICKETING_SYSTEM: !Ref TicketingSystem
+          JIRA_PROJECT_KEY_TAG: !Ref JiraProjectKeyTag
+          JIRA_PROJECT_KEY_TAG_APP: !Ref JiraProjectKeyTagApp
+          JIRA_DEFAULT_PROJECT_KEY: !Ref JiraDefaultProjectKey
+          SERVICE_NOW_PROJECT_QUEUE_TAG: !Ref ServiceNowProjectQueueTag
+          SERVICE_NOW_PROJECT_QUEUE_TAG_APP: !Ref ServiceNowProjectQueueTagApp
+          SERVICE_NOW_DEFAULT_PROJECT_QUEUE: !Ref ServiceNowDefaultProjectQueue
+          CACHED_ACCOUNT_DATA_TABLE_NAME: !Ref CachedAccountData
+          MIN_AGE_HOURS: !Ref MinAgeHours
+
+  SendEmailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/send_email/
+      Policies:
+        - Statement:
+            - Sid: SESPermissions
+              Effect: Allow
+              Action:
+                - ses:SendRawEmail
+              Resource: '*'
+            - Sid: S3BucketCRUDPermissions
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:ListBucket
+              Resource:
+                - !Sub arn:aws:s3:::${SOARWeeklyAIReportBucket}/*  # For object-level actions
+                - !Sub arn:aws:s3:::${SOARWeeklyAIReportBucket}    # For bucket-level actions like ListBucket
+      Environment:
+        Variables:
+          SEND_EMAIL: !Ref SendEmail
+          EMAIL_SENDER: !Ref EmailSender
+          EMAIL_CC: !Ref EmailCC
+          EMAIL_BCC: !Ref EmailBCC
+          EMAIL_RETURN_PATH: !Ref EmailReturnPath
+        
+
+  OpenTicketFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ticketing/open_ticket/
+      Policies:
+        - Statement:
+            - Sid: SSMParameterStore
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: '*'
+      Environment:
+        Variables:
+          TICKETING_SYSTEM: !Ref TicketingSystem
+          JIRA_SERVER_URL_PARAMETER_PATH: !Ref JiraServerUrlParameterPath
+          JIRA_BASIC_AUTH_USERNAME_PARAMETER_PATH: !Ref JiraBasicAuthUsernameParameterPath
+          JIRA_BASIC_AUTH_TOKEN_PARAMETER_PATH: !Ref JiraBasicAuthTokenParameterPath
+          JIRA_DEFAULT_PROJECT_KEY: !Ref JiraDefaultProjectKey
+          JIRA_ISSUE_TYPE: !Ref JiraIssueType
+          JIRA_PRIORITIES: !Ref JiraPriorities
+          JIRA_INITIAL_STATES: !Ref JiraInitialStates
+          SERVICE_NOW_URL_PARAMETER_PATH: !Ref ServiceNowServerUrlParameterPath
+          SERVICE_NOW_BASIC_AUTH_USERNAME_PARAMETER_PATH: !Ref ServiceNowBasicAuthUsernameParameterPath
+          SERVICE_NOW_BASIC_AUTH_PASSWORD_PARAMETER_PATH: !Ref ServiceNowBasicAuthPasswordParameterPath
+          SERVICE_NOW_TABLE: !Ref ServiceNowTable
+          SERVICE_NOW_DEFAULT_PROJECT_QUEUE: !Ref ServiceNowDefaultProjectQueue
+          SERVICE_NOW_ISSUE_TYPE: !Ref ServiceNowIssueType
+          SOC_JIRA_PROJECT_KEY_OR_SERVICE_NOW_QUEUE: !Ref SocJiraProjectKeyOrServiceNowQueue
+          INCIDENTS_TO_SOC: !Ref IncidentsToSoc
+
+  CloseTicketFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ticketing/close_ticket/
+      Policies:
+        - Statement:
+            - Sid: SSMParameterStore
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: '*'
+      Environment:
+        Variables:
+          TICKETING_SYSTEM: !Ref TicketingSystem
+          JIRA_SERVER_URL_PARAMETER_PATH: !Ref JiraServerUrlParameterPath
+          JIRA_BASIC_AUTH_USERNAME_PARAMETER_PATH: !Ref JiraBasicAuthUsernameParameterPath
+          JIRA_BASIC_AUTH_TOKEN_PARAMETER_PATH: !Ref JiraBasicAuthTokenParameterPath
+          JIRA_FINAL_STATE: !Ref JiraFinalState
+          SERVICE_NOW_URL_PARAMETER_PATH: !Ref ServiceNowServerUrlParameterPath
+          SERVICE_NOW_BASIC_AUTH_USERNAME_PARAMETER_PATH: !Ref ServiceNowBasicAuthUsernameParameterPath
+          SERVICE_NOW_BASIC_AUTH_PASSWORD_PARAMETER_PATH: !Ref ServiceNowBasicAuthPasswordParameterPath
+          SERVICE_NOW_TABLE: !Ref ServiceNowTable
+          SERVICE_NOW_FINAL_STATE: !Ref ServiceNowFinalState
+
+  ComputePenaltyScoreFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/compute_penalty_score/
+
+  SuppressLocallyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/controls/suppress_locally/
+
+  ClearAccountDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      MemorySize: 192
+      CodeUri: functions/account_data/clear_account_data/
+      Events:
+        EmptyOnSchedule:
+          Type: Schedule
+          Properties:
+            Schedule: !Sub 'rate(${ClearAccountDataCacheRate})'
+            Name: ClearAccountDataCache
+            Description: Clear account data cache every defined interval
+            Enabled: True
+    Policies:
+      - Statement:
+          - Sid: CacheTablePermissions
+            Effect: Allow
+            Action:
+              - dynamodb:Scan
+              - dynamodb:BatchWriteItem
+            Resource: !GetAtt CachedAccountData.Arn
+    Environment:
+      Variables:
+        CACHED_ACCOUNT_DATA_TABLE_NAME: !Ref CachedAccountData
+
+  QueryChatGPTFunction:
+    Type: AWS::Serverless::Function
+    MemorySize: 256
+    Properties:
+      CodeUri: functions/chatgpt/query_chatgpt/
+      Policies:
+        - Statement:
+            - Sid: SSMParameterStore
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: '*'
+      Environment:
+        Variables:
+          USE_CHATGPT: !Ref UseChatGPT
+          CHATGPT_DEFAULT_MODEL: !Ref ChatGPTDefaultModel
+          CHATGPT_FALLBACK_MODEL: !Ref ChatGPTFallbackModel
+          CHATGPT_API_KEY_PARAMETER_PATH: !Ref ChatGPTAPIKeyParameterPath
+          CHATGPT_IAC_SNIPPETS: !Ref ChatGPTIaCSnippets
+          CHATGPT_ANONYMIZE_ACCOUNT_NUMBERS: !Ref ChatGPTAnonymizeAccountNumbers
+          CHATGPT_ANONYMIZE_HEX_STRINGS: !Ref ChatGPTAnonymizeHexStrings
+          CHATGPT_REMOVE_ARNS: !Ref ChatGPTRemoveARNs
+          CHATGPT_REMOVE_EMAIL_ADDRESSES: !Ref ChatGPTRemoveEmailAddresses
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # The state machine for auto-remediation
+  #
+  #-------------------------------------------------------------------------------
+
+  SOARAttemptAutoRemediation:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachines/attempt_autoremediation.asl.yaml
+      DefinitionSubstitutions:
+        FetchBucketTagsFunctionArn: !GetAtt FetchBucketTagsFunction.Arn
+        AutoRemediateDynamoDB2FunctionArn: !GetAtt AutoRemediateDynamoDB2Function.Arn # DynamoDB.2
+        AutoRemediateEC22FunctionArn: !GetAtt AutoRemediateEC22Function.Arn     # EC2.2
+        AutoRemediateEC24FunctionArn: !GetAtt AutoRemediateEC24Function.Arn     # EC2.4
+        AutoRemediateEC26FunctionArn: !GetAtt AutoRemediateEC26Function.Arn     # EC2.6
+        AutoRemediateEC27FunctionArn: !GetAtt AutoRemediateEC27Function.Arn     # EC2.7
+        AutoRemediateEC212FunctionArn: !GetAtt AutoRemediateEC212Function.Arn   # EC2.12 rename
+        AutoRemediateEC213FunctionArn: !GetAtt AutoRemediateEC213Function.Arn   # EC2.13 rename
+        AutoRemediateEC214FunctionArn: !GetAtt AutoRemediateEC214Function.Arn   # EC2.14 rename
+        AutoRemediateEC215FunctionArn: !GetAtt AutoRemediateEC215Function.Arn   # EC2.15
+        AutoRemediateEC222FunctionArn: !GetAtt AutoRemediateEC222Function.Arn   # EC2.22
+        AutoRemediateECR1FunctionArn: !GetAtt AutoRemediateECR1Function.Arn     # ECR.1
+        AutoRemediateECR2FunctionArn: !GetAtt AutoRemediateECR2Function.Arn     # ECR.2
+        AutoRemediateECR3FunctionArn: !GetAtt AutoRemediateECR3Function.Arn     # ECR.3
+        AutoRemediateECS12FunctionArn: !GetAtt AutoRemediateECS12Function.Arn   # ECS.12
+        AutoRemediateECS2FunctionArn: !GetAtt AutoRemediateECS2Function.Arn     # ECS.2
+        AutoRemediateELB1FunctionArn: !GetAtt AutoRemediateELB1Function.Arn     # ELB.1
+        AutoRemediateELB4FunctionArn: !GetAtt AutoRemediateELB4Function.Arn     # ELB.4
+        AutoRemediateELB5FunctionArn: !GetAtt AutoRemediateELB5Function.Arn     # ELB.5
+        AutoRemediateIAM8FunctionArn: !GetAtt AutoRemediateIAM8Function.Arn     # IAM.8
+        AutoRemediateKMS4FunctionArn: !GetAtt AutoRemediateKMS4Function.Arn     # KMS.4 rename
+        AutoRemediateRDS11FunctionArn: !GetAtt AutoRemediateRDS11Function.Arn   # RDS.11
+        AutoRemediateRDS13FunctionArn: !GetAtt AutoRemediateRDS13Function.Arn   # RDS.13
+        AutoRemediateRDS17FunctionArn: !GetAtt AutoRemediateRDS17Function.Arn   # RDS.17
+        AutoRemediateRDS2FunctionArn: !GetAtt AutoRemediateRDS2Function.Arn     # RDS.2
+        AutoRemediateRDS4FunctionArn: !GetAtt AutoRemediateRDS4Function.Arn     # RDS.4
+        AutoRemediateRDS6FunctionArn: !GetAtt AutoRemediateRDS6Function.Arn     # RDS.6
+        AutoRemediateRDS9FunctionArn: !GetAtt AutoRemediateRDS9Function.Arn     # RDS.9
+        AutoRemediateS32FunctionArn: !GetAtt AutoRemediateS32Function.Arn       # S3.2
+        AutoRemediateS33FunctionArn: !GetAtt AutoRemediateS33Function.Arn       # S3.3
+        AutoRemediateS310FunctionArn: !GetAtt AutoRemediateS310Function.Arn     # S3.10
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FetchBucketTagsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateS32Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateS33Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateS310Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateEC24Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateEC22Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateEC27Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateEC215Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateECR1Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateECR2Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateECR3Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateECS2Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateECS12Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateIAM8Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateRDS2Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateRDS4Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateRDS6Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateRDS9Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateRDS11Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateRDS13Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateRDS17Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateKMS4Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateEC26Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateEC213Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateEC214Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateDynamoDB2Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateEC222Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateEC212Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateELB1Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateELB4Function
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AutoRemediateELB5Function
+
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - logs:*
+              Resource: '*'
+      Logging:
+        Destinations: 
+          - CloudWatchLogsLogGroup: 
+              LogGroupArn: !GetAtt SOARAttemptAutoRemediationLogGroup.Arn
+        IncludeExecutionData: false
+        Level: ERROR
+
+  SOARAttemptAutoRemediationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      RetentionInDays: 30
+
+  FetchBucketTagsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/fetch_bucket_tags/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: S3Permissions
+              Effect: Allow
+              Action:
+                - s3:GetBucketTagging
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateS32Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_s32/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: S3Permissions
+              Effect: Allow
+              Action:
+                - s3:PutPublicAccessBlock
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          TAG: !Ref RequestPubliclyReadableBucketTag
+
+  AutoRemediateS33Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_s33/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: S3Permissions
+              Effect: Allow
+              Action:
+                - s3:PutPublicAccessBlock
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          TAG: !Ref RequestPubliclyWritableBucketTag
+
+  AutoRemediateS310Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_s310/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: S3Permissions
+              Effect: Allow
+              Action:
+                - s3:PutBucketLifecycleConfiguration
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateEC22Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ec22/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: EC2Permissions
+              Effect: Allow
+              Action:
+                - ec2:RevokeSecurityGroupIngress
+                - ec2:RevokeSecurityGroupEgress
+                - ec2:DescribeSecurityGroups
+                - ec2:DescribeInstances
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateEC24Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ec24/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: EC2Permissions
+              Effect: Allow
+              Action:
+                - ec2:ModifyInstanceAttribute
+                - ec2:TerminateInstances
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateEC27Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ec27/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: EC2Permissions
+              Effect: Allow
+              Action:
+                - ec2:EnableEbsEncryptionByDefault
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateEC215Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ec215/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: EC2Permissions
+              Effect: Allow
+              Action:
+                - ec2:ModifySubnetAttribute
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateECR1Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ecr1/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: ECRPermissions
+              Effect: Allow
+              Action:
+                - ecr:PutRegistryScanningConfiguration
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateECR2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ecr2/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: ECRPermissions
+              Effect: Allow
+              Action:
+                - ecr:PutImageTagMutability
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateECR3Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ecr3/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: ECRPermissions
+              Effect: Allow
+              Action:
+                - ecr:PutLifecyclePolicy
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateECS2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ecs2/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: ECRPermissions
+              Effect: Allow
+              Action:
+                - ecs:UpdateService
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateECS12Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ecs12/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: ECRPermissions
+              Effect: Allow
+              Action:
+                - ecs:UpdateCluster
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateIAM8Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_iam8/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: IAMPermissions
+              Effect: Allow
+              Action:
+                - iam:DeleteLoginProfile
+                - iam:ListAccessKeys
+                - iam:DeleteAccessKeys
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateRDS2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_rds2/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: RDSPermissions
+              Effect: Allow
+              Action:
+                - rds:DescribeDBInstances
+                - rds:DescribeDBClusters
+                - rds:ModifyDBInstance
+                - rds:ModifyDBCluster
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateRDS4Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_rds4/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: RDSPermissions
+              Effect: Allow
+              Action:
+                - rds:CopyDBClusterSnapshot
+                - rds:DeleteDBClusterSnapshot
+                - rds:CopyDBSnapshot
+                - rds:DeleteDBSnapshot
+                - rds:Describe*
+                - rds:Get*
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateRDS6Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_rds6/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: IAMPermissions
+              Effect: Allow
+              Action:
+                - iam:CreateRole
+                - iam:AttachRolePolicy
+              Resource: '*'
+            - Sid: RDSPermissions
+              Effect: Allow
+              Action:
+                - rds:DescribeDBInstances
+                - rds:DescribeDBClusters
+                - rds:ModifyDBInstance
+                - rds:ModifyDBCluster
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateRDS9Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_rds9/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: RDSPermissions
+              Effect: Allow
+              Action:
+                - rds:CreateDBParameterGroup
+                - rds:ModifyDBParameterGroup
+                - rds:DescribeDBInstances
+                - rds:DescribeDBClusters
+                - rds:ModifyDBInstance
+                - rds:RebootDBInstance
+                - rds:CreateDBClusterParameterGroup
+                - rds:ModifyDBClusterParameterGroup
+                - rds:ModifyDBCluster
+                - rds:RebootDBCluster
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateRDS11Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_rds11/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: RDSPermissions
+              Effect: Allow
+              Action:
+                - rds:DescribeDBInstances
+                - rds:DescribeDBClusters
+                - rds:ModifyDBInstance
+                - rds:ModifyDBCluster
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateRDS13Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_rds13/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: RDSPermissions
+              Effect: Allow
+              Action:
+                - rds:DescribeDBInstances
+                - rds:DescribeDBClusters
+                - rds:ModifyDBInstance
+                - rds:ModifyDBCluster
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateRDS17Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_rds17/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: RDSPermissions
+              Effect: Allow
+              Action:
+                - rds:DescribeDBInstances
+                - rds:DescribeDBClusters
+                - rds:ModifyDBInstance
+                - rds:ModifyDBCluster
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateKMS4Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_kms4/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: KMSPermissions
+              Effect: Allow
+              Action:
+                - kms:EnableKeyRotation
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateEC26Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ec26/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: Permissions
+              Effect: Allow
+              Action:
+                - iam:CreateRole
+                - iam:CreatePolicy
+                - iam:AttachRolePolicy
+                - ec2:CreateFlowLogs
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateEC213Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ec213/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: EC2Permissions
+              Effect: Allow
+              Action:
+                - ec2:RevokeSecurityGroupIngress
+                - ec2:AuthorizeSecurityGroupIngress
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateEC214Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ec214/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: EC2Permissions
+              Effect: Allow
+              Action:
+                - ec2:RevokeSecurityGroupIngress
+                - ec2:AuthorizeSecurityGroupIngress
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateDynamoDB2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_dynamodb2/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:ListTagsOfResource
+                - dynamodb:UpdateContinuousBackups
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          DYNAMODB_NO_PIT_RECOVERY_TAG: !Ref DynamoDbNoPitRecoveryTag
+
+  AutoRemediateEC222Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ec222/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: EC2Permissions
+              Effect: Allow
+              Action:
+                - ec2:DeleteSecurityGroup
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  AutoRemediateEC212Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_ec212/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: EC2Permissions
+              Effect: Allow
+              Action:
+                - ec2:ReleaseAddress
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+
+  AutoRemediateELB1Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_elb1/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: ELBv2Permissions
+              Effect: Allow
+              Action:
+                - elbv2:DescribeLoadBalancers
+                - elbv2:DescribeListeners
+                - elbv2:ModifyListener
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+
+  AutoRemediateELB4Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_elb4/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: ELBv2Permissions
+              Effect: Allow
+              Action:
+                - elbv2:ModifyLoadBalancerAttributes
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+
+  AutoRemediateELB5Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/auto_remediations/auto_remediate_elb5/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: S3Permissions
+              Effect: Allow
+              Action:
+                - s3:CreateBucket
+                - s3:PutPublicAccessBlock
+                - s3:PutBucketEncryption
+                - s3:PutBucketEncryption
+              Resource: '*'
+            - Sid: ELBv2Permissions
+              Effect: Allow
+              Action:
+                - elbv2:ModifyLoadBalancerAttributes
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # Logic to update the regional EnabledSecHubControls DynamoDB table as soon as
+  # controls are enabled or disabled in the GUI or by other means.
+  #
+  #-------------------------------------------------------------------------------
+
+  SyncEnabledSecHubControlsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/controls/sync_enabled_sec_hub_controls_table/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt EnabledSecHubControls.Arn
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:GetEnabledStandards
+                - securityhub:ListSecurityControlDefinitions
+                - securityhub:ListStandardsControlAssociations
+              Resource: '*'
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref EnabledSecHubControls
+          SECURITY_ACCOUNT_ID: !Ref SecurityAccountId
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+      Events:
+        ControlChanged:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref CustomEventBusName
+            Pattern:
+              source:
+                - aws.securityhub
+              detail-type:
+                - AWS API Call via CloudTrail
+              detail:
+                eventSource:
+                  - securityhub.amazonaws.com
+                eventName:
+                  - BatchUpdateStandardsControlAssociations
+                userIdentity:
+                  accountId:
+                    - !Ref SecurityAccountId
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # The state machine for Incidents
+  #
+  #-------------------------------------------------------------------------------
+
+  SOARIncidents:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachines/incidents.asl.yaml
+      DefinitionSubstitutions:
+        CallDiskForensicsCollectionFunctionArn: !GetAtt CallDiskForensicsCollectionFunction.Arn
+        TerminateInstanceFunctionArn: !GetAtt TerminateInstanceFunction.Arn
+        DetermineTypeFunctionArn: !GetAtt DetermineTypeFunction.Arn
+        SuppressFindingFunctionArn: !GetAtt SuppressFindingFunction.Arn
+        FormatGuardDutyEc2MessageFunctionArn: !GetAtt FormatGuardDutyEc2MessageFunction.Arn
+        FormatGuardDutyIamUserMessageFunctionArn: !GetAtt FormatGuardDutyIamUserMessageFunction.Arn
+        FormatGuardDutyS3MessageFunctionArn: !GetAtt FormatGuardDutyS3MessageFunction.Arn
+        FormatGuardDutyEksMessageFunctionArn: !GetAtt FormatGuardDutyEksMessageFunction.Arn
+        FormatGenericMessageFunctionArn: !GetAtt FormatGenericMessageFunction.Arn
+        SendEmailFunctionArn: !GetAtt SendEmailFunction.Arn
+        OpenTicketFunctionArn: !GetAtt OpenTicketFunction.Arn
+        SuppressLocallyFunctionArn: !GetAtt SuppressLocallyFunction.Arn
+        QueryChatGPTFunctionArn: !GetAtt QueryChatGPTFunction.Arn
+        RememberIncidentOpenedFunctionArn: !GetAtt RememberIncidentOpenedFunction.Arn
+        ComputePenaltyScoreFunctionArn: !GetAtt ComputePenaltyScoreFunction.Arn
+
+
+        LocalIncidentSuppressionsName: !Ref LocalIncidentSuppressions
+        LocalIncidentAutoRemSuppressionsName: !Ref LocalIncidentAutoRemSuppressions
+        OpenAIPromptsTableName: !Ref OpenAIPromptsTable
+
+        DiskForensicsInvokeArn: !Ref DiskForensicsInvokeARN
+
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref CallDiskForensicsCollectionFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref TerminateInstanceFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref DetermineTypeFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SuppressFindingFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FormatGuardDutyEc2MessageFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FormatGuardDutyIamUserMessageFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FormatGuardDutyS3MessageFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FormatGuardDutyEksMessageFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FormatGenericMessageFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SendEmailFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref OpenTicketFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SuppressLocallyFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref QueryChatGPTFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref RememberIncidentOpenedFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ComputePenaltyScoreFunction
+
+        - DynamoDBReadPolicy:
+            TableName: !Ref LocalIncidentSuppressions
+        - DynamoDBReadPolicy:
+            TableName: !Ref LocalIncidentAutoRemSuppressions
+        - DynamoDBReadPolicy:
+            TableName: !Ref OpenAIPromptsTable
+            
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - logs:*
+              Resource: '*'
+
+      Logging:
+        Destinations: 
+          - CloudWatchLogsLogGroup: 
+              LogGroupArn: !GetAtt SOARIncidentsLogGroup.Arn
+        IncludeExecutionData: false
+        Level: ERROR
+
+  SOARIncidentsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      RetentionInDays: 30
+
+  CallDiskForensicsCollectionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/rogue_servers/call_disk_forensics_collection/
+      Policies:
+        - !If
+          - InvokeDiskForensics
+          - Statement:
+              - Sid: InvokeDiskForensicsCrossAccount
+                Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !Ref DiskForensicsInvokeARN
+          - !Ref 'AWS::NoValue'
+      Environment:
+        Variables:
+          FUNCTION_ARN: !Ref DiskForensicsInvokeARN
+
+  TerminateInstanceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/rogue_servers/terminate_instance/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: EC2Permissions
+              Effect: Allow
+              Action:
+                - ec2:ModifyInstanceAttribute
+                - ec2:TerminateInstances
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+
+  DetermineTypeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/determine_type/
+      Environment:
+        Variables:
+          GUARD_DUTY_EC2_TERMINATION_SEVERITIES: !Ref GuardDutyEc2TerminationSeverities
+          GUARD_DUTY_EC2_NOTIFICATION_SEVERITIES: !Ref GuardDutyEc2NotificationSeverities
+          GUARD_DUTY_IAM_USER_NOTIFICATION_SEVERITIES: !Ref GuardDutyIamUserNotificationSeverities
+          GUARD_DUTY_S3_NOTIFICATION_SEVERITIES: !Ref GuardDutyS3NotificationSeverities
+          GUARD_DUTY_EKS_NOTIFICATION_SEVERITIES: !Ref GuardDutyEksNotificationSeverities
+          GENERIC_NOTIFICATION_SEVERITIES: !Ref GenericNotificationSeverities
+          SOC_TICKET_SEVERITIES: !Ref SocTicketSeverities
+          IGNORE_PRODUCTS: !Ref IgnoreProducts
+
+  FormatGuardDutyEc2MessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/format_guard_duty_ec2_message/
+      Environment:
+        Variables:
+          PRODUCT_NAME: !Ref ProductName
+
+  FormatGuardDutyIamUserMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/format_guard_duty_iam_user_message/
+      Environment:
+        Variables:
+          PRODUCT_NAME: !Ref ProductName
+
+  FormatGuardDutyS3MessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/format_guard_duty_s3_message/
+      Environment:
+        Variables:
+          PRODUCT_NAME: !Ref ProductName
+
+  FormatGuardDutyEksMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/format_guard_duty_eks_message/
+      Environment:
+        Variables:
+          PRODUCT_NAME: !Ref ProductName
+
+  FormatGenericMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/format_generic_message/
+      Environment:
+        Variables:
+          PRODUCT_NAME: !Ref ProductName
+
+  SetToNotifiedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/update_as_notified_finding/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:BatchUpdateFindings
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          PRODUCT_NAME: !Ref ProductName
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # Weekly AI report using GPT
+  #
+  #-------------------------------------------------------------------------------
+
+  SOARWeeklyAIReport:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachines/weekly_ai_report.asl.yaml
+      DefinitionSubstitutions:
+        ClearTableFunctionArn: !GetAtt ClearTableFunction.Arn
+        SetupOverviewSectionFunctionArn: !GetAtt SetupOverviewSectionFunction.Arn
+        SetupAccountFunctionArn: !GetAtt SetupAccountFunction.Arn
+        StoreAccountSummaryFunctionArn: !GetAtt StoreAccountSummaryFunction.Arn
+        SetupRecommendationsSectionFunctionArn: !GetAtt SetupRecommendationsSectionFunction.Arn
+        QueryChatGPTFunctionArn: !GetAtt QueryChatGPTFunction.Arn
+        PostprocessHtmlFunctionArn: !GetAtt PostprocessHtmlFunction.Arn
+        StitchTogetherSegmentsFunctionArn: !GetAtt StitchTogetherSegmentsFunction.Arn
+        SendEmailFunctionArn: !GetAtt SendEmailFunction.Arn
+        SetupToSendToAccountFunctionArn: !GetAtt SetupToSendToAccountFunction.Arn
+
+        WeeklyReport: !Ref WeeklyReport
+        WeeklyReportIndividualAccounts: !Ref WeeklyReportIndividualAccounts
+        WeeklyReportEmailRecipients: !Ref WeeklyReportEmailRecipients
+        OpenAIReportTable: !Ref OpenAIReportTable
+        WeeklyReportChatGPTDefaultModel: !Ref WeeklyReportChatGPTDefaultModel
+        WeeklyReportChatGPTFallbackModel: !Ref WeeklyReportChatGPTFallbackModel
+
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ClearTableFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SetupOverviewSectionFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SetupAccountFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref StoreAccountSummaryFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SetupRecommendationsSectionFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref QueryChatGPTFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref PostprocessHtmlFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref StitchTogetherSegmentsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SendEmailFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SetupToSendToAccountFunction
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OpenAIReportTable
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - logs:*
+              Resource: '*'
+      Logging:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt SOARWeeklyAIReportLogGroup.Arn
+        IncludeExecutionData: false
+        Level: ERROR
+      Events:
+        WeeklyTrigger:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 1 ? * MON *)
+
+  SOARWeeklyAIReportLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+
+  ClearTableFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/reports/clear_table/
+      Policies:
+        - Statement:
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:DeleteItem
+              Resource: 
+                - !GetAtt OpenAIReportTable.Arn
+      Environment:
+        Variables:
+          OPENAI_REPORT_TABLE: !Ref OpenAIReportTable
+
+
+  SetupOverviewSectionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/reports/setup_overview_section/
+      Policies:
+        - Statement:
+            - Sid: OrganizationsPermissions
+              Effect: Allow
+              Action:
+                - organizations:DescribeAccount
+                - organizations:DescribeOrganization
+                - organizations:DescribeOrganizationalUnit
+                - organizations:ListAccounts
+                - organizations:ListParents
+                - organizations:ListTagsForResource
+              Resource: '*'
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource: 
+                - !GetAtt Tickets.Arn
+                - !Sub "${Tickets.Arn}/index/*"
+                - !GetAtt AutoRemediations.Arn
+                - !Sub "${AutoRemediations.Arn}/index/*"
+                - !GetAtt Incidents.Arn
+                - !Sub "${Incidents.Arn}/index/*"
+                - !GetAtt OpenAIPromptsTable.Arn
+            - Sid: SecurityHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:DescribeStandardsControls
+                - securityhub:BatchGetSecurityControls
+              Resource: '*'
+      Environment:
+        Variables:
+          ACCOUNT_TEAM_EMAIL_TAG_APP: !Ref AccountTeamEmailTagApp
+          ACCOUNT_TEAM_EMAIL_TAG: !Ref AccountTeamEmailTag
+          AUTOREMEDIATIONS_TABLE: !Ref AutoRemediations
+          CLIENT_TAG: !Ref ClientTag
+          PRODUCT_NAME: !Ref ProductName
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          DEFAULT_TEAM_EMAIL: !Ref DefaultTeamEmail
+          ENVIRONMENT_TAG: !Ref EnvironmentTag
+          INCIDENTS_TABLE: !Ref Incidents
+          JIRA_DEFAULT_PROJECT_KEY: !Ref JiraDefaultProjectKey
+          JIRA_PROJECT_KEY_TAG_APP: !Ref JiraProjectKeyTagApp
+          JIRA_PROJECT_KEY_TAG: !Ref JiraProjectKeyTag
+          OPENAI_PROMPTS_TABLE: !Ref OpenAIPromptsTable
+          PROJECT_TAG: !Ref ProjectTag
+          SERVICE_NOW_DEFAULT_PROJECT_QUEUE: !Ref ServiceNowDefaultProjectQueue
+          SERVICE_NOW_PROJECT_QUEUE_TAG_APP: !Ref ServiceNowProjectQueueTagApp
+          SERVICE_NOW_PROJECT_QUEUE_TAG: !Ref ServiceNowProjectQueueTag
+          SEVERITY_ALLOWED_AGE_IN_HOURS_CRITICAL: !Ref SeverityAllowedAgeInHoursCritical
+          SEVERITY_ALLOWED_AGE_IN_HOURS_HIGH: !Ref SeverityAllowedAgeInHoursHigh
+          SEVERITY_ALLOWED_AGE_IN_HOURS_LOW: !Ref SeverityAllowedAgeInHoursLow
+          SEVERITY_ALLOWED_AGE_IN_HOURS_MEDIUM: !Ref SeverityAllowedAgeInHoursMedium
+          TEAM_TAG: !Ref TeamTag
+          TICKETING_SYSTEM: !Ref TicketingSystem
+          TICKETS_TABLE: !Ref Tickets
+
+
+  SetupAccountFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/reports/setup_account/
+      Policies:
+        - Statement:
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource: 
+                - !GetAtt Tickets.Arn
+                - !Sub "${Tickets.Arn}/index/*"
+                - !GetAtt AutoRemediations.Arn
+                - !Sub "${AutoRemediations.Arn}/index/*"
+                - !GetAtt Incidents.Arn
+                - !Sub "${Incidents.Arn}/index/*"
+                - !GetAtt OpenAIPromptsTable.Arn
+      Environment:
+        Variables:
+          AUTOREMEDIATIONS_TABLE: !Ref AutoRemediations
+          INCIDENTS_TABLE: !Ref Incidents
+          OPENAI_PROMPTS_TABLE: !Ref OpenAIPromptsTable
+          SEVERITY_ALLOWED_AGE_IN_HOURS_CRITICAL: !Ref SeverityAllowedAgeInHoursCritical
+          SEVERITY_ALLOWED_AGE_IN_HOURS_HIGH: !Ref SeverityAllowedAgeInHoursHigh
+          SEVERITY_ALLOWED_AGE_IN_HOURS_LOW: !Ref SeverityAllowedAgeInHoursLow
+          SEVERITY_ALLOWED_AGE_IN_HOURS_MEDIUM: !Ref SeverityAllowedAgeInHoursMedium
+          TICKETS_TABLE: !Ref Tickets
+
+
+  StoreAccountSummaryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/reports/store_account_summary/
+      Policies:
+        - Statement:
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource: 
+                - !GetAtt OpenAIReportTable.Arn
+      Environment:
+        Variables:
+          OPENAI_REPORT_TABLE: !Ref OpenAIReportTable
+
+
+  SetupToSendToAccountFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/reports/setup_to_send_to_account/
+
+
+  SetupRecommendationsSectionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/reports/setup_recommendations_section/
+      Policies:
+        - Statement:
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource: 
+                - !GetAtt OpenAIPromptsTable.Arn
+                - !GetAtt OpenAIReportTable.Arn
+      Environment:
+        Variables:
+          OPENAI_PROMPTS_TABLE: !Ref OpenAIPromptsTable
+          OPENAI_REPORT_TABLE: !Ref OpenAIReportTable
+
+
+  PostprocessHtmlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/reports/postprocess_html/
+
+
+  StitchTogetherSegmentsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/reports/stitch_together_segments/
+      Policies:
+        - Statement:
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource: 
+                - !GetAtt OpenAIReportTable.Arn
+            - Sid: S3BucketCRUDPermissions
+              Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:ListBucket
+                - s3:DeleteObject
+              Resource:
+                - !Sub arn:aws:s3:::${SOARWeeklyAIReportBucket}/*  # For object-level actions
+                - !Sub arn:aws:s3:::${SOARWeeklyAIReportBucket}    # For bucket-level actions like ListBucket
+      Environment:
+        Variables:
+          OPENAI_REPORT_TABLE: !Ref OpenAIReportTable
+          BUCKET: !Ref SOARWeeklyAIReportBucket
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # Monitoring. Only the state machines should be monitored as they
+  # orchestrate the lambda functions which are expected to fail in certain
+  # circumstances without this generating an incident.
+  #
+  # These CloudWatch alarms conform to the naming conventions used by the
+  # logic defined in the "all-alarms-to-sec-hub" SAM project. This will
+  # automatically create incidents and tickets in ServiceNow or Jira.
+  #
+  #-------------------------------------------------------------------------------
+
+  AlarmSecHubFindingsProcessor:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: INFRA-SOAR-Failure-HIGH
+      AlarmDescription: The SOARSecHubFindingsProcessor state machine failed.
+      ActionsEnabled: true
+      OKActions: []
+      AlarmActions: []
+      InsufficientDataActions: []
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref SOARSecHubFindingsProcessor
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  AlarmAttemptAutoRemediation:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: INFRA-SOAR-AttemptAutoRemediation-Failure-HIGH
+      AlarmDescription: The SOARAttemptAutoRemediation state machine failed.
+      ActionsEnabled: true
+      OKActions: []
+      AlarmActions: []
+      InsufficientDataActions: []
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref SOARAttemptAutoRemediation
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  AlarmIncidents:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: INFRA-SOAR-Incidents-Failure-HIGH
+      AlarmDescription: The SOARIncidents state machine failed.
+      ActionsEnabled: true
+      OKActions: []
+      AlarmActions: []
+      InsufficientDataActions: []
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref SOARIncidents
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  AlarmWeeklyAIReport:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: INFRA-SOAR-WeeklyAIReport-Failure-HIGH
+      AlarmDescription: The SOARWeeklyAIReport state machine failed.
+      ActionsEnabled: true
+      OKActions: []
+      AlarmActions: []
+      InsufficientDataActions: []
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref SOARWeeklyAIReport
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # Custom resource to maintain the OpenAiPrompts table
+  #
+  #-------------------------------------------------------------------------------
+
+  OpenAIPromptsSyncerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/chatgpt/openai-prompts-syncer/
+      Handler: app.lambda_handler
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OpenAIPromptsTable
+
+  OpenAIPromptsSyncerCustomResource:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt OpenAIPromptsSyncerFunction.Arn
+      FunctionName: !Ref OpenAIPromptsSyncerFunction
+      DummyProperty: 'sdvsdff'  # Change this value whenever openai-prompts changes
+      
+
+  #-------------------------------------------------------------------------------
+  #
+  # Custom resource to set up the issue-related DynamoDB tables
+  #
+  #-------------------------------------------------------------------------------
+
+  IssueTablesSetupFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/setup/issue_tables_setup/
+      Handler: app.lambda_handler
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LocalControlAutoRemSuppressions
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LocalControlSuppressions
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LocalIncidentSuppressions
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RemediatableSecHubControls
+      Environment:
+        Variables:
+          LOCAL_CONTROL_AUTOREMEDIATION_SUPPRESSIONS_TABLE: !Ref LocalControlAutoRemSuppressions
+          LOCAL_CONTROL_SUPPRESSIONS_TABLE: !Ref LocalControlSuppressions
+          LOCAL_INCIDENTS_SUPPRESSIONS_TABLE: !Ref LocalIncidentSuppressions
+          REMEDIATABLE_SEC_HUB_CONTROLS_TABLE: !Ref RemediatableSecHubControls
+          SECURITY_ADM_ACCOUNT_ID: !Ref SecurityAccountId
+          ORG_ACCOUNT_ID: !Ref OrgAccountId
+          AFT_MANAGEMENT_ACCOUNT_ID: !Ref AFTManagementAccountId
+          LOG_ARCHIVE_ACCOUNT_ID: !Ref LogArchiveAccountId
+
+  IssueTablesSetupCustomResource:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt IssueTablesSetupFunction.Arn
+      FunctionName: !Ref IssueTablesSetupFunction
+
