@@ -12,6 +12,8 @@ from botocore.exceptions import ClientError
 from botocore.exceptions import WaiterError
 import time
 import shutil
+import argparse
+
 
 # Create an STS client
 STS_CLIENT = boto3.client('sts')
@@ -28,6 +30,7 @@ YELLOW = "\033[93m"
 LIGHT_BLUE = "\033[94m"
 GREEN = "\033[92m"
 RED = "\033[91m"
+GRAY = "\033[90m"
 END = "\033[0m"
 BOLD = "\033[1m"
 
@@ -144,15 +147,15 @@ def dereference(value, params):
 # 
 # ---------------------------------------------------------------------------------------
 
-def process_sam(sam, repo_name, params):
-    printc(LIGHT_BLUE, f"")
-    printc(LIGHT_BLUE, f"")
+def process_sam(sam, repo_name, params, dry_run, verbose):
+    printc(LIGHT_BLUE, "")
+    printc(LIGHT_BLUE, "")
     printc(LIGHT_BLUE, "================================================")
-    printc(LIGHT_BLUE, f"")
+    printc(LIGHT_BLUE, "")
     printc(LIGHT_BLUE, f"  {repo_name} (SAM)")
-    printc(LIGHT_BLUE, f"")
+    printc(LIGHT_BLUE, "")
     printc(LIGHT_BLUE, "------------------------------------------------")
-    printc(LIGHT_BLUE, f"")
+    printc(LIGHT_BLUE, "")
 
     sam_account = sam['profile']
     sam_regions = dereference(sam['regions'], params)
@@ -174,31 +177,36 @@ def process_sam(sam, repo_name, params):
         printc(LIGHT_BLUE, "Executing 'git pull'...")
         subprocess.run(['git', 'pull'], check=True)
 
+        printc(LIGHT_BLUE, "")
         printc(LIGHT_BLUE, "Executing 'sam build'...")
+    
+        args = ['sam', 'build', '--parallel', '--cached']
+
         try:
-            subprocess.run(['sam', 'build', '--parallel', '--cached'], check=True)
+            if verbose:
+                subprocess.run(args, check=True)
+            else:
+                subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         except subprocess.CalledProcessError:
             printc(RED, "An error occurred. Retrying after cleaning build directory...")
 
             # Remove the .aws-sam directory
             shutil.rmtree('.aws-sam', ignore_errors=True)
 
-            # Retry the build command
-            subprocess.run(['sam', 'build', '--parallel', '--cached'], check=True)
+            # Retry the build command, always verbosely
+            subprocess.run(args, check=True)
 
         for region in sam_regions:
-            printc(LIGHT_BLUE, f"")
-            printc(LIGHT_BLUE, f"")
+            printc(LIGHT_BLUE, "")
+            printc(LIGHT_BLUE, "")
             printc(LIGHT_BLUE, "================================================")
-            printc(LIGHT_BLUE, f"")
+            printc(LIGHT_BLUE, "")
             printc(LIGHT_BLUE, f"  Deploying {stack_name} to {region}...")
-            printc(LIGHT_BLUE, f"")
+            printc(LIGHT_BLUE, "")
             printc(LIGHT_BLUE, "------------------------------------------------")
-            printc(LIGHT_BLUE, f"")
+            printc(LIGHT_BLUE, "")
 
-            printc(LIGHT_BLUE, "Executing 'sam deploy'...")
-            subprocess.run(
-                [
+            args = [
                     'sam', 'deploy', 
                     '--stack-name', stack_name,
                     '--capabilities', capabilities,
@@ -208,12 +216,20 @@ def process_sam(sam, repo_name, params):
                     '--parameter-overrides', sam_parameter_overrides,
                     '--s3-prefix', s3_prefix,
                     '--tags', tags,
-                    #  '--no-execute-changeset', 
                     '--no-confirm-changeset', 
                     '--no-disable-rollback',
                     '--no-fail-on-empty-changeset', 
-                ],
-                check=True)
+            ]
+            if dry_run:
+                args.append('--no-execute-changeset')
+                printc(GREEN, "Executing 'sam deploy' with --no-execute-changeset...")
+            else:
+                printc(LIGHT_BLUE, "Executing 'sam deploy'...")
+
+            if verbose:
+                args.append('--debug')
+                
+            subprocess.run(args, check=True)
 
             printc(GREEN, "")
             printc(GREEN + BOLD, "Deployment completed successfully.")
@@ -317,208 +333,150 @@ def read_cloudformation_template(path):
         raise Exception(f"The specified CloudFormation template at path '{path}' was not found.")
 
 
-def update_stack(stack_name, template_body, parameters, capabilities, account_id, region, role):
+def process_stack(action, resource_type, name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose, **kwargs):
     """
-    Update an existing AWS CloudFormation stack using the provided template and parameters.
-    
-    Parameters:
-    - stack_name (str): Name of the CloudFormation stack to update.
-    - template_body (str): CloudFormation template as a string.
-    - parameters (list): List of parameters to override in the stack.   
-    - capabilities (str): CloudFormation capabilities
-    - account_id (str): AWS Account ID to assume the role from.
-    - region (str): AWS Region where the stack resides.
-    - role (str): IAM Role to assume for cross-account access.
-    
-    Returns:
-    - response (dict): Response from the CloudFormation API.
-    """
+    Create or update a CloudFormation stack or stack set.
 
-    printc(YELLOW, f"Updating stack {stack_name} in AWS account {account_id} in region {region}...")
-    
-    # Get the CloudFormation client using the get_client function
+    Parameters:
+    - action (str): The action to perform ('create' or 'update').
+    - resource_type (str): The type of resource ('stack' or 'stackset').
+    - name (str): The name of the stack or stack set.
+    - template_body (str): The CloudFormation template as a string.
+    - parameters (list): The parameters to override in the stack or stack set.
+    - capabilities (str): The CloudFormation capabilities.
+    - account_id (str): The AWS Account ID to assume the role from.
+    - region (str): The AWS Region where the stack or stack set resides.
+    - role (str): The IAM Role to assume for cross-account access.
+    - dry_run (bool): If True, only display the changes that would be made and do not execute them.
+    - verbose (bool): If True, print detailed output.
+    - kwargs (dict): Additional arguments specific to stack sets.
+    """
+    op = 'Creating' if action == 'create' else 'Updating'
+
+    printc(YELLOW, f"{op} {resource_type} {name} in AWS account {account_id} in region {region}...")
+
     cf_client = get_client('cloudformation', account_id, region, role)
 
-    # Standard tags
-    tags = [
-        {
-            'Key': 'infra:immutable',
-            'Value': 'true'
-        }
-    ]
+    tags = [{'Key': 'infra:immutable', 'Value': 'true'}]
 
     try:
-        # Update the stack
-        response = cf_client.update_stack(
-            StackName=stack_name,
-            TemplateBody=template_body,
-            Parameters=parameters,
-            Capabilities=[capabilities],
-            Tags=tags,
-        )
+        if resource_type == 'stack':
+            # Create a change set
+            printc(YELLOW, "Waiting for changeset to be created...")
+            change_set_name = 'ChangeSet-' + str(int(time.time()))
+            if action == 'create':
+                response = cf_client.create_change_set(
+                    StackName=name,
+                    TemplateBody=template_body,
+                    Parameters=parameters,
+                    Capabilities=[capabilities],
+                    Tags=tags,
+                    ChangeSetName=change_set_name,
+                )
+            elif action == 'update':
+                response = cf_client.create_change_set(
+                    StackName=name,
+                    TemplateBody=template_body,
+                    Parameters=parameters,
+                    Capabilities=[capabilities],
+                    Tags=tags,
+                    ChangeSetName=change_set_name,
+                )
+            # Display the changes
+            printc(YELLOW, "Displaying changes...")
+            response = cf_client.describe_change_set(
+                StackName=name,
+                ChangeSetName=change_set_name,
+            )
+            print_change_set(response)
+            if response['Status'] == 'FAILED' and "The submitted information didn't contain changes." in response['StatusReason']:
+                printc(GREEN, f"{resource_type.capitalize()} {action}: No changes are needed.")
+                return False
+            if dry_run:
+                return False
+            else:
+                # Execute the change set
+                printc(YELLOW, "Executing the changeset...")
+                cf_client.execute_change_set(
+                    StackName=name,
+                    ChangeSetName=change_set_name,
+                )
+        elif resource_type == 'stackset':
+            if dry_run:
+                return False
+            if action == 'create':
+                cf_client.create_stack_set(StackSetName=name, TemplateBody=template_body, Parameters=parameters, Capabilities=[capabilities], Tags=tags, **kwargs)
+            elif action == 'update':
+                cf_client.update_stack_set(StackSetName=name, TemplateBody=template_body, Parameters=parameters, Capabilities=[capabilities], Tags=tags, **kwargs)
+
         return True
+    
     except botocore.exceptions.ClientError as e:
         if "No updates are to be performed" in str(e):
-            printc(GREEN, "No changes.")
-            return False
-        else:
-            raise e
-        
-
-def create_stack(stack_name, template_body, parameters, capabilities, account_id, region, role):
-    """
-    Create a new AWS CloudFormation stack using the provided template and parameters.
-    
-    Parameters:
-    - stack_name (str): Name of the CloudFormation stack to update.
-    - template_body (str): CloudFormation template as a string.
-    - parameters (list): List of parameters to override in the stack.   
-    - capabilities (str): CloudFormation capabilities
-    - account_id (str): AWS Account ID to assume the role from.
-    - region (str): AWS Region where the stack resides.
-    - role (str): IAM Role to assume for cross-account access.
-    
-    Returns:
-    - response (dict): Response from the CloudFormation API.
-    """
-
-    printc(YELLOW, f"Creating stack {stack_name} in AWS account {account_id} in region {region}...")
-
-    # Get the CloudFormation client using the get_client function
-    cf_client = get_client('cloudformation', account_id, region, role)
-
-    # Standard tags
-    tags = [
-        {
-            'Key': 'infra:immutable',
-            'Value': 'true'
-        }
-    ]
-
-    try:
-        # Update the stack
-        response = cf_client.create_stack(
-            StackName=stack_name,
-            TemplateBody=template_body,
-            Parameters=parameters,
-            Capabilities=[capabilities],
-            Tags=tags,
-        )
-        return True
-    except botocore.exceptions.ClientError as e:
-        if "No updates are to be performed" in str(e):
-            printc(GREEN, "No changes.")
-            return False
-        else:
-            raise e
-        
-
-def update_stack_set(stack_set_name, template_body, parameters, capabilities, regions, account_id, region, role):
-    """
-    Update an existing AWS CloudFormation StackSet using the provided template and parameters.
-    
-    Parameters:
-    - stack_set_name (str): Name of the StackSet to update.
-    - template_body (str): CloudFormation template as a string.
-    - parameters (list): List of parameters to override in the StackSet.
-    - capabilities (str): CloudFormation capabilities.
-    - account_id (str): AWS Account ID to assume the role from.
-    - region (str): AWS Region where the StackSet resides.
-    - role (str): IAM Role to assume for cross-account access.
-    
-    Returns:
-    - response (dict): Response from the CloudFormation API.
-    """
-
-    printc(YELLOW, f"Updating stack set {stack_set_name} in AWS account {account_id} in region {region}...")
-
-    # Get the CloudFormation client using the get_client function
-    cf_client = get_client('cloudformation', account_id, region, role)
-
-    # Standard tags
-    tags = [
-        {
-            'Key': 'infra:immutable',
-            'Value': 'true'
-        }
-    ]
-
-    try:
-        # Update the StackSet
-        response = cf_client.update_stack_set(
-            StackSetName=stack_set_name,
-            TemplateBody=template_body,
-            Parameters=parameters,
-            Capabilities=[capabilities],
-            Tags=tags,
-            OperationPreferences={
-                'RegionConcurrencyType': 'PARALLEL',
-            #    'RegionOrder': regions,
-                'FailureTolerancePercentage': 0,
-                'MaxConcurrentPercentage': 100
-            },
-        )
-        return True
-    except botocore.exceptions.ClientError as e:
-        if "No updates are to be performed" in str(e):
-            printc(YELLOW, "StackSet update: No changes are needed.")
+            printc(GREEN, f"{resource_type.capitalize()} {action}: No changes are needed.")
             return False
         else:
             raise e
 
 
-def create_stack_set(stack_set_name, template_body, parameters, capabilities, root_ou, deployment_regions, account_id, region, role):
-    printc(YELLOW, f"Creating stack set {stack_set_name} in AWS account {account_id} in region {region}...")
+def print_change_set(change_set):
+    if change_set['Status'] == 'FAILED' and "The submitted information didn't contain changes." in change_set['StatusReason']:
+        printc(GREEN, "None.")
+    elif 'Changes' in change_set and change_set['Changes']:
+        printc(YELLOW, "Changes:")
 
-    cf_client = get_client('cloudformation', account_id, region, role)
+        # Calculate the maximum length of each column
+        max_resource_len = max(len(change['ResourceChange']['ResourceType']) for change in change_set['Changes'])
+        max_action_len = max(len(change['ResourceChange']['Action']) for change in change_set['Changes'])
+        max_id_len = max(len(change['ResourceChange']['LogicalResourceId']) for change in change_set['Changes'])
 
-    tags = [
-        {
-            'Key': 'infra:immutable',
-            'Value': 'true'
-        }
-    ]
+        # Print the changes in fixed-width columns
+        for change in change_set['Changes']:
+            resource = change['ResourceChange']['ResourceType']
+            action = change['ResourceChange']['Action']
+            logical_id = change['ResourceChange']['LogicalResourceId']
 
-    try:
-        response = cf_client.create_stack_set(
-            StackSetName=stack_set_name,
-            TemplateBody=template_body,
-            Parameters=parameters,
-            Capabilities=[capabilities],
-            PermissionModel='SERVICE_MANAGED',
-            AutoDeployment={
-                'Enabled': True,
-                'RetainStacksOnAccountRemoval': False
-            },
-            Tags=tags,
-            OperationPreferences={
-                'RegionConcurrencyType': 'PARALLEL',
-#                'RegionOrder': deployment_regions,
-                'FailureTolerancePercentage': 0,
-                'MaxConcurrentPercentage': 100
-            },
-        )
+            print(f"{resource:<{max_resource_len+1}} {action:<{max_action_len+1}} {logical_id:<{max_id_len+1}}")
 
-        monitor_stackset_until_complete(stack_set_name, account_id, region, role)
-
-        cf_client.create_stack_instances(
-            StackSetName=stack_set_name,
-            DeploymentTargets={
-                'OrganizationalUnitIds': [root_ou],
-            },
-            Regions=deployment_regions,
-        )
-        monitor_stackset_stacks_until_complete(stack_set_name, account_id, region, role)
-
-        return response
-    except botocore.exceptions.ClientError as e:
-        if "AlreadyExistsException" in str(e):
-            printc(RED, "StackSet already exists.")
-        else:
-            raise e
+            if 'Replacement' in change['ResourceChange']:
+                print(f"{'Replacement:':<{max_resource_len+1}} {change['ResourceChange']['Replacement']:<{max_action_len+1}}")
+            print()
+    else:
+        printc(YELLOW, "No changes detected.")
 
 
-def monitor_stack_until_complete(stack_name, account_id, region, role):
+def update_stack(stack_name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose):
+    return process_stack('update', 'stack', stack_name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose)
+
+
+def create_stack(stack_name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose):
+    return process_stack('create', 'stack', stack_name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose)
+                
+
+def update_stack_set(stack_set_name, template_body, parameters, capabilities, regions, account_id, region, role, dry_run, verbose):
+    return process_stack('update', 'stackset', stack_set_name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose,
+                         OperationPreferences={
+                             'RegionConcurrencyType': 'PARALLEL',
+                             'FailureTolerancePercentage': 0,
+                             'MaxConcurrentPercentage': 100
+                         })
+
+
+def create_stack_set(stack_set_name, template_body, parameters, capabilities, root_ou, deployment_regions, account_id, region, role, dry_run, verbose):
+    return process_stack('create', 'stackset', stack_set_name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose,
+                         PermissionModel='SERVICE_MANAGED',
+                         AutoDeployment={
+                             'Enabled': True,
+                             'RetainStacksOnAccountRemoval': False
+                         },
+                         OperationPreferences={
+                             'RegionConcurrencyType': 'PARALLEL',
+                             'FailureTolerancePercentage': 0,
+                             'MaxConcurrentPercentage': 100
+                         })
+
+
+def monitor_stack_until_complete(stack_name, account_id, region, role, dry_run, verbose):
     """
     Polls the specified CloudFormation stack until it reaches a terminal state.
     
@@ -528,7 +486,13 @@ def monitor_stack_until_complete(stack_name, account_id, region, role):
     - region (str): AWS Region where the stack resides.
     - role (str): IAM Role to assume for cross-account access.
     """
+
+    if dry_run:
+        return
     
+    if verbose:
+        printc(GRAY, "Waiting for the stack to complete.")
+
     # Get the CloudFormation client using the get_client function
     cf_client = get_client('cloudformation', account_id, region, role)
     
@@ -579,7 +543,7 @@ def monitor_stack_until_complete(stack_name, account_id, region, role):
             time.sleep(30)
 
 
-def monitor_stackset_until_complete(stackset_name, account_id, region, role):
+def monitor_stackset_until_complete(stackset_name, account_id, region, role, dry_run, verbose):
     """
     Polls the specified StackSet until it reaches a terminal state.
     
@@ -589,7 +553,13 @@ def monitor_stackset_until_complete(stackset_name, account_id, region, role):
     - region (str): AWS Region where the StackSet resides.
     - role (str): IAM Role to assume for cross-account access.
     """
-    
+
+    if dry_run:
+        return
+
+    if verbose:
+        printc(GRAY, "Waiting for the stackset to complete.")
+
     # Get the CloudFormation client using the get_client function
     cf_client = get_client('cloudformation', account_id, region, role)
     
@@ -641,7 +611,7 @@ def monitor_stackset_until_complete(stackset_name, account_id, region, role):
             time.sleep(30)
 
 
-def monitor_stackset_stacks_until_complete(stackset_name, account_id, region, role):
+def monitor_stackset_stacks_until_complete(stackset_name, account_id, region, role, dry_run, verbose):
     """
     Polls the specified StackSet's stacks until they reach a terminal state.
     
@@ -651,6 +621,12 @@ def monitor_stackset_stacks_until_complete(stackset_name, account_id, region, ro
     - region (str): AWS Region where the StackSet resides.
     - role (str): IAM Role to assume for cross-account access.
     """
+
+    if dry_run:
+        return
+
+    if verbose:
+        printc(GRAY, "Waiting for the stackset stacks to complete.")
     
     # Get the CloudFormation client using the get_client function
     cf_client = get_client('cloudformation', account_id, region, role)
@@ -709,7 +685,7 @@ def monitor_stackset_stacks_until_complete(stackset_name, account_id, region, ro
             time.sleep(30)
 
 
-def process_cloudformation(jobs, repo_name, params, cross_account_role):
+def process_cloudformation(jobs, repo_name, params, cross_account_role, dry_run, verbose):
     if not jobs:
         return
     
@@ -757,50 +733,56 @@ def process_cloudformation(jobs, repo_name, params, cross_account_role):
             for region in regions:
                 exists = does_stack_exist(stack_name, account, region, cross_account_role)
                 if exists:
-                    # printc(YELLOW, f"- Stack exists in {account} and {region}")
-                    monitor_stack_until_complete(stack_name, account, region, cross_account_role)
-                    changing = update_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role)
+                    if verbose:
+                        printc(GRAY, f"Stack exists in {account} and {region}")
+                    monitor_stack_until_complete(stack_name, account, region, cross_account_role, False, verbose)
+                    changing = update_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
                     if changing:
                         time.sleep(1)
-                        monitor_stack_until_complete(stack_name, account, region, cross_account_role)
+                        monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
                 else:
-                    # printc(YELLOW, f"- Stack does not exist in {account} and {region}")
-                    changing = create_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role)
+                    if verbose:
+                        printc(GRAY, f"Stack does not exist in {account} and {region}")
+                    changing = create_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
                     if changing:
                         time.sleep(1)
-                        monitor_stack_until_complete(stack_name, account, region, cross_account_role)
+                        monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
 
         else:
             exists = does_stackset_exist(stack_name, account, main_region, cross_account_role)
             if exists:
-                # printc(YELLOW, f"- StackSet exists in {account} and {main_region}")
-                monitor_stackset_until_complete(stack_name, account, main_region, cross_account_role)
-                monitor_stackset_stacks_until_complete(stack_name, account, main_region, cross_account_role)
-                changing = update_stack_set(stack_name, template_str, stack_parameters, capabilities, regions, account, main_region, cross_account_role)
+                if verbose:
+                    printc(GRAY, f"StackSet exists in {account} and {main_region}")
+                monitor_stackset_until_complete(stack_name, account, main_region, cross_account_role, False, verbose)
+                monitor_stackset_stacks_until_complete(stack_name, account, main_region, cross_account_role, False, verbose)
+                changing = update_stack_set(stack_name, template_str, stack_parameters, capabilities, regions, account, main_region, cross_account_role, dry_run, verbose)
                 if changing:
                     time.sleep(1)
-                    monitor_stackset_until_complete(stack_name, account, main_region, cross_account_role)
+                    monitor_stackset_until_complete(stack_name, account, main_region, cross_account_role, dry_run, verbose)
             else:
-                # printc(YELLOW, f"- StackSet does not exist in {account} and {main_region}")
-                create_stack_set(stack_name, template_str, stack_parameters, capabilities, root_ou, regions, account, main_region, cross_account_role)
-                monitor_stackset_stacks_until_complete(stack_name, account, main_region, cross_account_role)
+                if verbose:
+                    printc(GRAY, f"StackSet does not exist in {account} and {main_region}")
+                create_stack_set(stack_name, template_str, stack_parameters, capabilities, root_ou, regions, account, main_region, cross_account_role, dry_run, verbose)
+                monitor_stackset_stacks_until_complete(stack_name, account, main_region, cross_account_role, dry_run, verbose)
 
             # Check the Stack(s) in the admin account(s) as well
             for region in regions:
                 exists = does_stack_exist(stack_name, admin_account_id, region, cross_account_role)
                 if exists:
-                    # printc(YELLOW, f"- Also deployed as a single Stack in the AWS Organization admin account in {region}")
-                    monitor_stack_until_complete(stack_name, account, region, cross_account_role)
-                    changing = update_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role)
+                    if verbose:
+                        printc(GRAY, f"Also deployed as a single Stack in the AWS Organization admin account in {region}")
+                    monitor_stack_until_complete(stack_name, account, region, cross_account_role, False, verbose)
+                    changing = update_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
                     if changing:
                         time.sleep(1)
-                        monitor_stack_until_complete(stack_name, account, region, cross_account_role)
+                        monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
                 else:
-                    # printc(YELLOW, f"- Not deployed as a single Stack in the AWS Organization admin account in {region}")
-                    changing = create_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role)
+                    if verbose:
+                        printc(GRAY, f"Not deployed as a single Stack in the AWS Organization admin account in {region}")
+                    changing = create_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
                     if changing:
                         time.sleep(1)
-                        monitor_stack_until_complete(stack_name, account, region, cross_account_role)
+                        monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
 
 
 # ---------------------------------------------------------------------------------------
@@ -809,7 +791,7 @@ def process_cloudformation(jobs, repo_name, params, cross_account_role):
 # 
 # ---------------------------------------------------------------------------------------
 
-def deploy():
+def deploy(dry_run, verbose):
     # Check if 'config-deploy.toml' exists at the root of the repo
     if not os.path.exists('config-deploy.toml'):
         printc(RED, "Error: 'config-deploy.toml' is missing.")
@@ -833,12 +815,12 @@ def deploy():
 
     # Decide what to do
     if sam:
-        process_cloudformation(pre_sam, repo_name, params, cross_account_role)
-        process_sam(sam, repo_name, params)
-        process_cloudformation(post_sam, repo_name, params, cross_account_role)
+        process_cloudformation(pre_sam, repo_name, params, cross_account_role, dry_run, verbose)
+        process_sam(sam, repo_name, params, dry_run, verbose)
+        process_cloudformation(post_sam, repo_name, params, cross_account_role, dry_run, verbose)
 
     else:
-        process_cloudformation(cf, repo_name, params, cross_account_role)
+        process_cloudformation(cf, repo_name, params, cross_account_role, dry_run, verbose)
 
 
 def main():
@@ -846,7 +828,15 @@ def main():
     if not check_aws_sso_session():
         return
     
-    deploy()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dry-run', action='store_true', help='Perform a dry run of the deployments')
+    parser.add_argument('--verbose', action='store_true', help='Verbose mode')
+    args = parser.parse_args()
+
+    if args.dry_run:
+        printc(GREEN, "\nThis is a dry run. No changes will be made.")
+
+    deploy(args.dry_run, args.verbose)
 
 
 if __name__ == '__main__':
