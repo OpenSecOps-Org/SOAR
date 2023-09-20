@@ -334,23 +334,6 @@ def read_cloudformation_template(path):
 
 
 def process_stack(action, resource_type, name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose, **kwargs):
-    """
-    Create or update a CloudFormation stack or stack set.
-
-    Parameters:
-    - action (str): The action to perform ('create' or 'update').
-    - resource_type (str): The type of resource ('stack' or 'stackset').
-    - name (str): The name of the stack or stack set.
-    - template_body (str): The CloudFormation template as a string.
-    - parameters (list): The parameters to override in the stack or stack set.
-    - capabilities (str): The CloudFormation capabilities.
-    - account_id (str): The AWS Account ID to assume the role from.
-    - region (str): The AWS Region where the stack or stack set resides.
-    - role (str): The IAM Role to assume for cross-account access.
-    - dry_run (bool): If True, only display the changes that would be made and do not execute them.
-    - verbose (bool): If True, print detailed output.
-    - kwargs (dict): Additional arguments specific to stack sets.
-    """
     op = 'Creating' if action == 'create' else 'Updating'
 
     printc(YELLOW, f"{op} {resource_type} {name} in AWS account {account_id} in region {region}...")
@@ -362,7 +345,6 @@ def process_stack(action, resource_type, name, template_body, parameters, capabi
     try:
         if resource_type == 'stack':
             # Create a change set
-            printc(YELLOW, "Waiting for changeset to be created...")
             change_set_name = 'ChangeSet-' + str(int(time.time()))
             if action == 'create':
                 response = cf_client.create_change_set(
@@ -382,22 +364,34 @@ def process_stack(action, resource_type, name, template_body, parameters, capabi
                     Tags=tags,
                     ChangeSetName=change_set_name,
                 )
-            # Display the changes
-            printc(YELLOW, "Displaying changes...")
             response = cf_client.describe_change_set(
                 StackName=name,
                 ChangeSetName=change_set_name,
             )
-            print_change_set(response)
             if response['Status'] == 'FAILED' and "The submitted information didn't contain changes." in response['StatusReason']:
-                printc(GREEN, f"{resource_type.capitalize()} {action}: No changes are needed.")
-                return False
-            if dry_run:
+                printc(GREEN, f"No changes.")
                 return False
             else:
+                # Wait for the change set to be created
+                printc(YELLOW, "Waiting for changeset to be created...")
+                waiter = cf_client.get_waiter('change_set_create_complete')
+                waiter.wait(
+                    StackName=name,
+                    ChangeSetName=change_set_name,
+                )
+                # Display the changes
+                response = cf_client.describe_change_set(
+                    StackName=name,
+                    ChangeSetName=change_set_name,
+                )
+                print_change_set(response)
+
+                if dry_run:
+                    return False
+                
                 # Execute the change set
                 printc(YELLOW, "Executing the changeset...")
-                cf_client.execute_change_set(
+                return cf_client.execute_change_set(
                     StackName=name,
                     ChangeSetName=change_set_name,
                 )
@@ -405,9 +399,9 @@ def process_stack(action, resource_type, name, template_body, parameters, capabi
             if dry_run:
                 return False
             if action == 'create':
-                cf_client.create_stack_set(StackSetName=name, TemplateBody=template_body, Parameters=parameters, Capabilities=[capabilities], Tags=tags, **kwargs)
+                return cf_client.create_stack_set(StackSetName=name, TemplateBody=template_body, Parameters=parameters, Capabilities=[capabilities], Tags=tags, **kwargs)
             elif action == 'update':
-                cf_client.update_stack_set(StackSetName=name, TemplateBody=template_body, Parameters=parameters, Capabilities=[capabilities], Tags=tags, **kwargs)
+                return cf_client.update_stack_set(StackSetName=name, TemplateBody=template_body, Parameters=parameters, Capabilities=[capabilities], Tags=tags, **kwargs)
 
         return True
     
@@ -423,12 +417,14 @@ def print_change_set(change_set):
     if change_set['Status'] == 'FAILED' and "The submitted information didn't contain changes." in change_set['StatusReason']:
         printc(GREEN, "None.")
     elif 'Changes' in change_set and change_set['Changes']:
-        printc(YELLOW, "Changes:")
 
         # Calculate the maximum length of each column
         max_resource_len = max(len(change['ResourceChange']['ResourceType']) for change in change_set['Changes'])
         max_action_len = max(len(change['ResourceChange']['Action']) for change in change_set['Changes'])
         max_id_len = max(len(change['ResourceChange']['LogicalResourceId']) for change in change_set['Changes'])
+        dash_len = max_resource_len + max_action_len + max_id_len + 36
+
+        printc(YELLOW, "-" * dash_len)
 
         # Print the changes in fixed-width columns
         for change in change_set['Changes']:
@@ -436,13 +432,17 @@ def print_change_set(change_set):
             action = change['ResourceChange']['Action']
             logical_id = change['ResourceChange']['LogicalResourceId']
 
-            print(f"{resource:<{max_resource_len+1}} {action:<{max_action_len+1}} {logical_id:<{max_id_len+1}}")
-
+            replacement = ''
             if 'Replacement' in change['ResourceChange']:
-                print(f"{'Replacement:':<{max_resource_len+1}} {change['ResourceChange']['Replacement']:<{max_action_len+1}}")
-            print()
+                replacement = f"{GRAY}Replacement: {YELLOW}{change['ResourceChange']['Replacement']}"
+
+            printc(YELLOW, f"{resource:<{max_resource_len}}    {logical_id:<{max_id_len}}    {action:<{max_action_len}}    {replacement}")
+
+        printc(YELLOW, "-" * dash_len)
+        printc(YELLOW, '')
+
     else:
-        printc(YELLOW, "No changes detected.")
+        printc(GREEN, "No changes detected.")
 
 
 def update_stack(stack_name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose):
@@ -475,6 +475,43 @@ def create_stack_set(stack_set_name, template_body, parameters, capabilities, ro
                              'MaxConcurrentPercentage': 100
                          })
 
+
+def create_stack_set_instances(stack_set_name, template_body, parameters, capabilities, root_ou, except_account, deployment_regions, account_id, region, role, dry_run, verbose):
+
+    if dry_run:
+        printc(YELLOW, f"Dry run enabled. Would have created instances of stack set {stack_set_name} in OU {root_ou} in regions {deployment_regions}.")
+        return False
+
+    cf_client = get_client('cloudformation', account_id, region, role)
+
+    # Initialize args
+    args = {
+        'StackSetName': stack_set_name,
+        'OrganizationalUnitIds': [root_ou],
+        'Regions': deployment_regions,
+        'OperationPreferences': {
+            'RegionConcurrencyType': 'PARALLEL',
+            'FailureTolerancePercentage': 0,
+            'MaxConcurrentPercentage': 100
+        }
+    }
+
+    # Conditionally add DeploymentTargets if except_account is present
+    if except_account:
+        args['DeploymentTargets'] = {
+            'Accounts': [except_account],
+            'AccountFilterType': 'EXCLUDE'
+        }
+
+    try:
+        response = cf_client.create_stack_instances(**args)
+        printc(GREEN, f"Created instances of stack set {stack_set_name} in OU {root_ou} in regions {deployment_regions}.")
+        return True
+
+    except botocore.exceptions.ClientError as e:
+        printc(RED, f"Failed to create instances of stack set {stack_set_name} in OU {root_ou} in regions {deployment_regions}: {e}")
+        raise e
+    
 
 def monitor_stack_until_complete(stack_name, account_id, region, role, dry_run, verbose):
     """
@@ -699,7 +736,6 @@ def process_cloudformation(jobs, repo_name, params, cross_account_role, dry_run,
     printc(LIGHT_BLUE, f"")
 
     admin_account_id = get_account_data_from_toml('admin-account', 'id')
-    #org_id = params['org-id']
     root_ou = params['root-ou']
     main_region = params['main-region']
 
@@ -712,6 +748,8 @@ def process_cloudformation(jobs, repo_name, params, cross_account_role, dry_run,
         account = dereference(job.get('account'), params)
         regions = dereference(job.get('regions'), params)
         capabilities = job.get('capabilities', 'CAPABILITY_IAM')
+        except_account =  dereference(job.get('except-account'), params)
+        separate_regions =  job.get('separate-regions')
 
         if isinstance(regions, str):
             regions = [regions]
@@ -727,62 +765,86 @@ def process_cloudformation(jobs, repo_name, params, cross_account_role, dry_run,
         printc(YELLOW, '')
 
         template_str = read_cloudformation_template(template_path)
-        stack_parameters = parameters_to_cloudformation_json(params, repo_name, stack_name)
 
         if not stack_set:
-            for region in regions:
-                exists = does_stack_exist(stack_name, account, region, cross_account_role)
-                if exists:
-                    if verbose:
-                        printc(GRAY, f"Stack exists in {account} and {region}")
-                    monitor_stack_until_complete(stack_name, account, region, cross_account_role, False, verbose)
-                    changing = update_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
-                    if changing:
-                        time.sleep(1)
-                        monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
-                else:
-                    if verbose:
-                        printc(GRAY, f"Stack does not exist in {account} and {region}")
-                    changing = create_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
-                    if changing:
-                        time.sleep(1)
-                        monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
+            handle_stack(repo_name, stack_name, template_str, params, capabilities, account, regions, cross_account_role, dry_run, verbose)
 
+        elif not separate_regions:
+            handle_stack_set(repo_name, stack_name, template_str, params, capabilities, account, regions, cross_account_role, dry_run, verbose, 
+                             main_region, root_ou, except_account, admin_account_id)
         else:
-            exists = does_stackset_exist(stack_name, account, main_region, cross_account_role)
-            if exists:
-                if verbose:
-                    printc(GRAY, f"StackSet exists in {account} and {main_region}")
-                monitor_stackset_until_complete(stack_name, account, main_region, cross_account_role, False, verbose)
-                monitor_stackset_stacks_until_complete(stack_name, account, main_region, cross_account_role, False, verbose)
-                changing = update_stack_set(stack_name, template_str, stack_parameters, capabilities, regions, account, main_region, cross_account_role, dry_run, verbose)
-                if changing:
-                    time.sleep(1)
-                    monitor_stackset_until_complete(stack_name, account, main_region, cross_account_role, dry_run, verbose)
-            else:
-                if verbose:
-                    printc(GRAY, f"StackSet does not exist in {account} and {main_region}")
-                create_stack_set(stack_name, template_str, stack_parameters, capabilities, root_ou, regions, account, main_region, cross_account_role, dry_run, verbose)
-                monitor_stackset_stacks_until_complete(stack_name, account, main_region, cross_account_role, dry_run, verbose)
-
-            # Check the Stack(s) in the admin account(s) as well
             for region in regions:
-                exists = does_stack_exist(stack_name, admin_account_id, region, cross_account_role)
-                if exists:
-                    if verbose:
-                        printc(GRAY, f"Also deployed as a single Stack in the AWS Organization admin account in {region}")
-                    monitor_stack_until_complete(stack_name, account, region, cross_account_role, False, verbose)
-                    changing = update_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
-                    if changing:
-                        time.sleep(1)
-                        monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
-                else:
-                    if verbose:
-                        printc(GRAY, f"Not deployed as a single Stack in the AWS Organization admin account in {region}")
-                    changing = create_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
-                    if changing:
-                        time.sleep(1)
-                        monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
+                params['region'] = region
+                handle_stack_set(repo_name, stack_name, template_str, params, capabilities, account, [region], cross_account_role, dry_run, verbose, 
+                                 region, root_ou, except_account, admin_account_id)
+
+
+
+def handle_stack(repo_name, stack_name, template_str, params, capabilities, account, regions, cross_account_role, dry_run, verbose):
+    stack_parameters = parameters_to_cloudformation_json(params, repo_name, stack_name)
+
+    for region in regions:
+        exists = does_stack_exist(stack_name, account, region, cross_account_role)
+        if exists:
+            if verbose:
+                printc(GRAY, f"Stack exists in {account} and {region}")
+            monitor_stack_until_complete(stack_name, account, region, cross_account_role, False, verbose)
+            changing = update_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
+            if changing:
+                time.sleep(1)
+                monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
+        else:
+            if verbose:
+                printc(GRAY, f"Stack does not exist in {account} and {region}")
+            changing = create_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
+            if changing:
+                time.sleep(1)
+                monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
+
+
+def handle_stack_set(repo_name, stack_name, template_str, params, capabilities, account, regions, cross_account_role, dry_run, verbose, 
+                      main_region, root_ou, except_account, admin_account_id):
+    stack_parameters = parameters_to_cloudformation_json(params, repo_name, stack_name)
+
+    exists = does_stackset_exist(stack_name, account, main_region, cross_account_role)
+    if exists:
+        if verbose:
+            printc(GRAY, f"StackSet exists in {account} and {main_region}")
+        monitor_stackset_until_complete(stack_name, account, main_region, cross_account_role, False, verbose)
+        monitor_stackset_stacks_until_complete(stack_name, account, main_region, cross_account_role, False, verbose)
+        changing = update_stack_set(stack_name, template_str, stack_parameters, capabilities, regions, account, main_region, cross_account_role, dry_run, verbose)
+        if changing:
+            time.sleep(1)
+            monitor_stackset_until_complete(stack_name, account, main_region, cross_account_role, dry_run, verbose)
+    else:
+        if verbose:
+            printc(GRAY, f"StackSet does not exist in {account} and {main_region}")
+        create_stack_set(stack_name, template_str, stack_parameters, capabilities, root_ou, regions, account, main_region, cross_account_role, dry_run, verbose)
+        monitor_stackset_until_complete(stack_name, account, main_region, cross_account_role, dry_run, verbose)
+        create_stack_set_instances(stack_name, template_str, stack_parameters, capabilities, root_ou, except_account, regions, account, region, cross_account_role, dry_run, verbose)
+        monitor_stackset_stacks_until_complete(stack_name, account, main_region, cross_account_role, dry_run, verbose)
+
+    if except_account == admin_account_id:
+        return
+
+    # Check the Stack(s) in the admin account(s) as well
+    for region in regions:
+        exists = does_stack_exist(stack_name, admin_account_id, region, cross_account_role)
+        if exists:
+            if verbose:
+                printc(GRAY, f"Also deployed as a single Stack in the AWS Organization admin account in {region}")
+            monitor_stack_until_complete(stack_name, account, region, cross_account_role, False, verbose)
+            changing = update_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
+            if changing:
+                time.sleep(1)
+                monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
+        else:
+            if verbose:
+                printc(GRAY, f"Not deployed as a single Stack in the AWS Organization admin account in {region}")
+            changing = create_stack(stack_name, template_str, stack_parameters, capabilities, account, region, cross_account_role, dry_run, verbose)
+            if changing:
+                time.sleep(1)
+                monitor_stack_until_complete(stack_name, account, region, cross_account_role, dry_run, verbose)
 
 
 # ---------------------------------------------------------------------------------------

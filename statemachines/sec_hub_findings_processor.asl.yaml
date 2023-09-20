@@ -55,6 +55,7 @@ States:
                     - States.Timeout
                     - DynamoDB.AmazonDynamoDBException
                     - DynamoDB.InternalServerErrorException
+                    - DynamoDB.SdkClientException
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
@@ -385,6 +386,7 @@ States:
                 ErrorEquals:
                     - States.Timeout
                     - DynamoDB.AmazonDynamoDBException
+                    - DynamoDB.SdkClientException
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
@@ -416,6 +418,7 @@ States:
                 ErrorEquals:
                     - States.Timeout
                     - DynamoDB.AmazonDynamoDBException
+                    - DynamoDB.SdkClientException
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
@@ -484,6 +487,7 @@ States:
                 ErrorEquals:
                     - States.Timeout
                     - DynamoDB.AmazonDynamoDBException
+                    - DynamoDB.SdkClientException
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
@@ -515,6 +519,7 @@ States:
                 ErrorEquals:
                     - States.Timeout
                     - DynamoDB.AmazonDynamoDBException
+                    - DynamoDB.SdkClientException
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
