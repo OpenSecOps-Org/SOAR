@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.1.0
+    * Updated SOAR to support Security Hub Global Configuration - removed the DynamoDB table for active controls.
+
 ## v1.0.3
     * Open-source credits and URLs
     * Fixed installer initial stackset creation.

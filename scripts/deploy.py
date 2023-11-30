@@ -63,7 +63,7 @@ def load_toml(toml_file):
 
 
 def get_account_data_from_toml(account_key, id_or_profile):
-    toml_file = '../Delegat-Install/accounts.toml'
+    toml_file = '../Delegat-Install/apps/accounts.toml'
     # Load the TOML file
     config = load_toml(toml_file)
 
@@ -105,6 +105,15 @@ def parameters_to_cloudformation_json(params, repo_name, template_name):
     return cf_params
 
 
+def script_parameters_to_dictionary(script_name, params, repo_name):
+    section = params[repo_name][script_name]
+    result = {}
+    for k, v in section.items():
+        v = dereference(v, params)
+        result[k] = v
+    return result
+
+
 def dereference(value, params):
     # If not a string, just return
     if not isinstance(value, str):
@@ -140,6 +149,8 @@ def dereference(value, params):
         value = re.sub(r'\{(.+?)\}', substitute, value)
 
     return value
+
+
 
 # ---------------------------------------------------------------------------------------
 # 
@@ -199,7 +210,7 @@ def process_sam(sam, repo_name, params, dry_run, verbose):
         for region in sam_regions:
             printc(LIGHT_BLUE, "")
             printc(LIGHT_BLUE, "")
-            printc(LIGHT_BLUE, "================================================")
+            printc(LIGHT_BLUE, "------------------------------------------------")
             printc(LIGHT_BLUE, "")
             printc(LIGHT_BLUE, f"  Deploying {stack_name} to {region}...")
             printc(LIGHT_BLUE, "")
@@ -238,6 +249,95 @@ def process_sam(sam, repo_name, params, dry_run, verbose):
         printc(RED, f"An error occurred while executing the command: {str(e)}")
 
     printc(GREEN, "")
+
+
+
+# ---------------------------------------------------------------------------------------
+# 
+# Scripts
+# 
+# ---------------------------------------------------------------------------------------
+
+def process_scripts(scripts, repo_name, params, dry_run, verbose):
+    printc(LIGHT_BLUE, "")
+    printc(LIGHT_BLUE, "")
+    printc(LIGHT_BLUE, "=================================================")
+    printc(LIGHT_BLUE, "")
+    printc(LIGHT_BLUE, f"  {repo_name} (Scripts)")
+    printc(LIGHT_BLUE, "")
+    printc(LIGHT_BLUE, "-------------------------------------------------")
+    printc(LIGHT_BLUE, "")
+
+    for script in scripts:
+        regions = script.get('regions', '{main-region}')
+        regions = dereference(regions, params)
+        if isinstance(regions, str):
+            regions = [regions]
+
+        account_str = script.get('account', '{admin-account}')
+        account_id = dereference(account_str, params)
+        if verbose:
+            printc(GRAY, f"account_id:  {account_id}")
+
+        profile = script.get('profile', 'admin-account')
+        profile = get_account_data_from_toml(profile, 'profile')
+        if verbose:
+            printc(GRAY, f"profile:     {profile}")
+
+        if verbose:
+            printc(GRAY, f"script:      {script}")
+
+        name = script['name']
+
+        our_params = script_parameters_to_dictionary(name, params, repo_name)
+        if verbose:
+            printc(GRAY, f"our_params:  {our_params}")
+
+        cmd = ['./' + name]
+
+        if dry_run:
+            cmd.append('--dry-run')
+
+        for k, v in script.get('args', []):
+            cmd.append(k)
+            
+            if isinstance(v, str) and v.endswith('.toml'):
+                try:
+                    # Read the TOML file
+                    with open(v, 'r') as toml_file:
+                        toml_data = toml.load(toml_file)
+
+                    # Convert the TOML data to JSON
+                    json_string = json.dumps(toml_data)
+
+                except FileNotFoundError:
+                    print(f"The file {v} does not exist.")
+                except Exception as e:
+                    print(f"An error occurred: {e}")
+                cmd.append(json_string)
+            
+            else:
+                cmd.append(dereference(v, our_params))
+
+        if verbose:
+            printc(GRAY, '')
+            printc(GRAY, f"cmd: {cmd}")
+
+        for region in regions:
+            printc(LIGHT_BLUE, "")
+            printc(LIGHT_BLUE, "")
+            printc(LIGHT_BLUE, "------------------------------------------------")
+            printc(LIGHT_BLUE, "")
+            printc(LIGHT_BLUE, f"  Running script ./{name} in {region}...")
+            printc(LIGHT_BLUE, "")
+            printc(LIGHT_BLUE, "------------------------------------------------")
+            printc(LIGHT_BLUE, "")
+
+            try:
+                subprocess.run(cmd, check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Command '{e.cmd}' returned non-zero exit status {e.returncode}.")
+
 
 
 # ---------------------------------------------------------------------------------------
@@ -536,8 +636,6 @@ def parse_yaml_template(template):
     return resource_list
 
 
-
-
 def update_stack(stack_name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose):
     return process_stack('update', 'stack', stack_name, template_body, parameters, capabilities, account_id, region, role, dry_run, verbose)
 
@@ -551,7 +649,8 @@ def update_stack_set(stack_set_name, template_body, parameters, capabilities, re
                          OperationPreferences={
                              'RegionConcurrencyType': 'PARALLEL',
                              'FailureTolerancePercentage': 0,
-                             'MaxConcurrentPercentage': 100
+                             'MaxConcurrentPercentage': 100,
+                             'ConcurrencyMode': 'SOFT_FAILURE_TOLERANCE'
                          })
 
 
@@ -561,11 +660,6 @@ def create_stack_set(stack_set_name, template_body, parameters, capabilities, ro
                          AutoDeployment={
                              'Enabled': True,
                              'RetainStacksOnAccountRemoval': False
-                         },
-                         OperationPreferences={
-                             'RegionConcurrencyType': 'PARALLEL',
-                             'FailureTolerancePercentage': 0,
-                             'MaxConcurrentPercentage': 100
                          })
 
 
@@ -578,23 +672,26 @@ def create_stack_set_instances(stack_set_name, template_body, parameters, capabi
     cf_client = get_client('cloudformation', account_id, region, role)
 
     # Initialize args
+    deployment_targets = {
+        'OrganizationalUnitIds':[root_ou]
+    }
+
+    # Filter away an account if except_account is present
+    if except_account:
+        deployment_targets['Accounts'] = [except_account]
+        deployment_targets['AccountFilterType'] = 'DIFFERENCE'
+
     args = {
         'StackSetName': stack_set_name,
-        'OrganizationalUnitIds': [root_ou],
+        'DeploymentTargets': deployment_targets,
         'Regions': deployment_regions,
         'OperationPreferences': {
             'RegionConcurrencyType': 'PARALLEL',
             'FailureTolerancePercentage': 0,
-            'MaxConcurrentPercentage': 100
+            'MaxConcurrentPercentage': 100,
+            'ConcurrencyMode': 'SOFT_FAILURE_TOLERANCE'
         }
     }
-
-    # Conditionally add DeploymentTargets if except_account is present
-    if except_account:
-        args['DeploymentTargets'] = {
-            'Accounts': [except_account],
-            'AccountFilterType': 'EXCLUDE'
-        }
 
     try:
         response = cf_client.create_stack_instances(**args)
@@ -967,6 +1064,7 @@ def deploy(dry_run, verbose):
     pre_sam = dpcf.get('pre-SAM-CloudFormation') or dpcf.get('pre-SAM')
     post_sam = dpcf.get('post-SAM-CloudFormation') or dpcf.get('post-SAM')
     cf = dpcf.get('CloudFormation')
+    scripts = dpcf.get('Script')
 
     # Decide what to do
     if sam:
@@ -974,8 +1072,14 @@ def deploy(dry_run, verbose):
         process_sam(sam, repo_name, params, dry_run, verbose)
         process_cloudformation(post_sam, repo_name, params, cross_account_role, dry_run, verbose)
 
-    else:
+    elif cf:
         process_cloudformation(cf, repo_name, params, cross_account_role, dry_run, verbose)
+
+    elif scripts:
+        process_scripts(scripts, repo_name, params, dry_run, verbose)
+
+    else:
+        printc(RED, "\nNo SAM, CloudFormation or script specs found.")
 
 
 def main():

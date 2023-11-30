@@ -370,39 +370,40 @@ States:
                 Variable: $.db.tickets.Item
                 IsPresent: true
                 Next: Suppress Finding
-        Default: Get Enabled Controls Table Entry
-
-    Get Enabled Controls Table Entry:
-        Type: Task
-        Resource: 'arn:aws:states:::dynamodb:getItem'
-        Parameters:
-            TableName: '${EnabledSecHubControlsName}'
-            Key:
-                id:
-                    S.$: $.finding.Compliance.SecurityControlId
-        ResultPath: $.db.enabled_sec_hub_controls
-        Retry:
-            -
-                ErrorEquals:
-                    - States.Timeout
-                    - DynamoDB.AmazonDynamoDBException
-                    - DynamoDB.SdkClientException
-                    - Lambda.ServiceException
-                    - Lambda.AWSLambdaException
-                    - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
-        Next: Is the control enabled?
-
-    Is the control enabled?:
-        Type: Choice
-        Choices:
-            -
-                Variable: $.db.enabled_sec_hub_controls.Item
-                IsPresent: false
-                Next: Suppress Finding
         Default: Get Enabled Controls Local Suppressions Table Entry
+#        Default: Get Enabled Controls Table Entry
+#
+#    Get Enabled Controls Table Entry:
+#        Type: Task
+#        Resource: 'arn:aws:states:::dynamodb:getItem'
+#        Parameters:
+#            TableName: '${EnabledSecHubControlsName}'
+#            Key:
+#                id:
+#                    S.$: $.finding.Compliance.SecurityControlId
+#        ResultPath: $.db.enabled_sec_hub_controls
+#        Retry:
+#            -
+#                ErrorEquals:
+#                    - States.Timeout
+#                    - DynamoDB.AmazonDynamoDBException
+#                    - DynamoDB.SdkClientException
+#                    - Lambda.ServiceException
+#                    - Lambda.AWSLambdaException
+#                    - Lambda.SdkClientException
+#                IntervalSeconds: 3
+#                MaxAttempts: 100
+#                BackoffRate: 3
+#        Next: Is the control enabled?
+#
+#    Is the control enabled?:
+#        Type: Choice
+#        Choices:
+#            -
+#                Variable: $.db.enabled_sec_hub_controls.Item
+#                IsPresent: false
+#                Next: Suppress Finding
+#        Default: Get Enabled Controls Local Suppressions Table Entry
 
     Get Enabled Controls Local Suppressions Table Entry:
         Type: Task
