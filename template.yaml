@@ -57,7 +57,7 @@ Parameters:
     Description:
       The number of hours during which a newly created account is given time to stabilise 
       and get registered with all relevant AWS services. During this period, Delegat SOAR 
-      suppresses all issues for the account.
+      ignores all issues for the account, deferring processing of them until later.
     Default: 24
 
   ClearAccountDataCacheRate:
@@ -82,6 +82,13 @@ Parameters:
       is entered here, the Disk Forensics Collection project will snapshot and terminate
       them instead. Ticketing and emailing remains the same.
     Default: ''
+
+  DeferTeamFixes:
+    Type: String
+    Description: Yes if only do incidents and autoremediations.
+    AllowedValues: ['Yes', 'No']
+    Default: 'No'
+
 
   # Mail ----------------------------------------------------------------------------
 
@@ -933,6 +940,7 @@ Resources:
         TicketsName: !Ref Tickets
         CachedAccountDataName: !Ref CachedAccountData
         OpenAIPromptsTableName: !Ref OpenAIPromptsTable
+        DeferTeamFixes: !Ref DeferTeamFixes
 
         AttemptAutoRemediationSMArn: !Ref SOARAttemptAutoRemediation
         IncidentsSMArn: !Ref SOARIncidents

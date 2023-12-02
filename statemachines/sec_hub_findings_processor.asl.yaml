@@ -20,6 +20,8 @@ States:
                     plaintext: ''
                     html: ''
             db: {}
+            DeferTeamFixes: '${DeferTeamFixes}'
+            
         Next: Get Account Data
 
     Get Account Data:
@@ -284,8 +286,7 @@ States:
         Default: Compliance Evaluation Error?
 
     Do Nothing:
-        Type: Pass
-        End: true
+        Type: Succeed
 
     Compliance Evaluation Error?:
         Type: Choice
@@ -351,7 +352,7 @@ States:
                     -
                         Variable: $.account.AccountNew
                         StringEquals: 'Yes'
-                Next: Suppress Finding
+                Next: Do Nothing
         Default: Already Has or Has Had Ticket?
 
     Already Has or Has Had Ticket?:
@@ -503,7 +504,7 @@ States:
             -
                 Variable: $.db.remediatable-sec-hub-controls.Item
                 IsPresent: false
-                Next: Format Ticketing Message
+                Next: Ticket the Team
         Default: Get Enabled Controls Local AutoRem Suppressions Table Entry
 
     Get Enabled Controls Local AutoRem Suppressions Table Entry:
@@ -557,7 +558,7 @@ States:
                 Variable: $.suppress_locally
                 BooleanEquals: false
                 Next: Attempt AutoRemediation
-        Default: Format Ticketing Message
+        Default: Ticket the Team
 
     Attempt AutoRemediation:
         Type: Task
@@ -607,8 +608,20 @@ States:
             -
                 Variable: $.actions.autoremediation_not_done
                 BooleanEquals: true
-                Next: Format Ticketing Message
+                Next: Ticket the Team
         Default: Format Remediation Message
+
+    Ticket the Team:
+        Type: Pass
+        Next: Defer Team fixes?
+
+    Defer Team fixes?:
+        Type: Choice
+        Choices:
+        - Variable: "$.DeferTeamFixes"
+          StringEquals: "Yes"
+          Next: Keep as NEW
+        Default: Format Ticketing Message
 
     Format Ticketing Message:
         Type: Task
@@ -639,10 +652,6 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
-        Next: Remember Issue
-
-    Remember Issue:
-        Type: Pass
         Next: Remember Ticket Opened
 
     Remember Ticket Opened:

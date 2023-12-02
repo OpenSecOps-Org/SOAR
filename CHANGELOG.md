@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.1.1
+    * Team fixes can now be deferred, making the SOAR process only autoremediations and incidents.
+      This is sometimes useful during initial setup.
+
 ## v1.1.0
     * Updated SOAR to support Security Hub Global Configuration - removed the DynamoDB table for active controls.
 
