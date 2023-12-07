@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.2.1
+    * Local control suppressions now accept 'policy_name' to compare IAM policy names for IAM.21 and similar.
+
 ## v1.1.1
     * Team fixes can now be deferred, making the SOAR process only autoremediations and incidents.
       This is sometimes useful during initial setup.

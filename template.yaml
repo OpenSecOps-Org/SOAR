@@ -574,15 +574,6 @@ Resources:
   #
   #-------------------------------------------------------------------------------
 
-  # EnabledSecHubControls:
-  #   Type: AWS::Serverless::SimpleTable
-  #   Properties:
-  #     SSESpecification:
-  #       SSEEnabled: true
-  #     TableName: enabled-sec-hub-controls
-  #     Tags:
-  #       "soar:dynamodb:no-pit-recovery": ""
-
   LocalControlSuppressions:
     Type: AWS::Serverless::SimpleTable
     Properties:
@@ -933,7 +924,6 @@ Resources:
         RememberTicketClosedFunctionArn: !GetAtt RememberTicketClosedFunction.Arn
         RememberAutoRemediationDoneFunctionArn: !GetAtt RememberAutoRemediationDoneFunction.Arn
 
-        # EnabledSecHubControlsName: !Ref EnabledSecHubControls
         RemediatableSecHubControlsName: !Ref RemediatableSecHubControls
         LocalControlSuppressionsName: !Ref LocalControlSuppressions
         LocalControlAutoRemSuppressionsName: !Ref LocalControlAutoRemSuppressions
@@ -1015,8 +1005,6 @@ Resources:
         - LambdaInvokePolicy:
             FunctionName: !Ref RememberAutoRemediationDoneFunction
 
-        # - DynamoDBReadPolicy:
-        #     TableName: !Ref EnabledSecHubControls
         - DynamoDBReadPolicy:
             TableName: !Ref RemediatableSecHubControls
         - DynamoDBReadPolicy:
@@ -2144,62 +2132,6 @@ Resources:
       Environment:
         Variables:
           CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
-
-
-  #-------------------------------------------------------------------------------
-  #
-  # Logic to update the regional EnabledSecHubControls DynamoDB table as soon as
-  # controls are enabled or disabled in the GUI or by other means.
-  #
-  #-------------------------------------------------------------------------------
-
-  # SyncEnabledSecHubControlsFunction:
-  #   Type: AWS::Serverless::Function
-  #   Properties:
-  #     CodeUri: functions/controls/sync_enabled_sec_hub_controls_table/
-  #     Policies:
-  #       - Statement:
-  #           - Sid: AssumeTheRole
-  #             Effect: Allow
-  #             Action:
-  #               - sts:AssumeRole
-  #             Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
-  #           - Sid: DynamoDBPermissions
-  #             Effect: Allow
-  #             Action:
-  #               - dynamodb:PutItem
-  #               - dynamodb:DeleteItem
-  #             Resource: !GetAtt EnabledSecHubControls.Arn
-  #           - Sid: SecHubPermissions
-  #             Effect: Allow
-  #             Action:
-  #               - securityhub:GetEnabledStandards
-  #               - securityhub:ListSecurityControlDefinitions
-  #               - securityhub:ListStandardsControlAssociations
-  #             Resource: '*'
-  #     Environment:
-  #       Variables:
-  #         TABLE_NAME: !Ref EnabledSecHubControls
-  #         SECURITY_ACCOUNT_ID: !Ref SecurityAccountId
-  #         CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
-  #     Events:
-  #       ControlChanged:
-  #         Type: EventBridgeRule
-  #         Properties:
-  #           EventBusName: !Ref CustomEventBusName
-  #           Pattern:
-  #             source:
-  #               - aws.securityhub
-  #             detail-type:
-  #               - AWS API Call via CloudTrail
-  #             detail:
-  #               eventSource:
-  #                 - securityhub.amazonaws.com
-  #               eventName:
-  #                 - BatchUpdateStandardsControlAssociations
-  #               userIdentity:
-  #                 accountId:
-  #                   - !Ref SecurityAccountId
 
 
   #-------------------------------------------------------------------------------

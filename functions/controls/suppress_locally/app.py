@@ -11,6 +11,9 @@ The conditions can be built on the following account properties:
   * project_name        - the name of the project to which the account belongs
   * team                - the team/squad/group working in the account
 
+As well as the following resource properties:
+  * policy_name         - The value of Resources.[0].Details.AwsIamPolicy.PolicyName, if available, otherwise null
+
 The syntax for a condition line is as follows:
 
   <property> <operator> <value>
@@ -60,6 +63,10 @@ def lambda_handler(data, _context):
     table = data['table']
     control = data['db'][table].get('Item', False)
 
+    # Get the first resource, if it exists
+    resources = data.get('Resources', [])
+    resource = resources[0] if resources else {}
+
     # If control is not found, return False
     if not control:
         return False
@@ -74,16 +81,19 @@ def lambda_handler(data, _context):
     # Get the region from input data
     region = data['region']
 
+    # Get the policy name, if it exists
+    policy_name = resource.get('Details', {}).get('AwsIamPolicy', {}).get('PolicyName', None)
+
     # Process each line in 'disable_when' value
     for line in disable_when['S'].strip().splitlines():
         # Check if the line satisfies the conditions
-        if process_line(line.strip(), account_data, region):
+        if process_line(line.strip(), account_data, region, policy_name):
             return True
 
     return False
 
 
-def process_line(line, account_data, region):
+def process_line(line, account_data, region, policy_name):
     if line == '':
         return False
 
@@ -93,7 +103,7 @@ def process_line(line, account_data, region):
     # Check if each clause is true
     for clause in clauses:
         clause = clause.strip()
-        if not clause_true(clause, account_data, region):
+        if not clause_true(clause, account_data, region, policy_name):
             print(f"Clause '{clause}' was False")
             return False
         print(f"Clause '{clause}' was True")
@@ -101,7 +111,7 @@ def process_line(line, account_data, region):
     return True
 
 
-def clause_true(clause, account_data, region):
+def clause_true(clause, account_data, region, policy_name):
     # Split the clause into parts using '=' or '!=' as the separator
     parts = re.split(r'(=|!=)', clause)
 
@@ -130,6 +140,8 @@ def clause_true(clause, account_data, region):
         value = account_data['ProjectName']
     elif key == 'team':
         value = account_data['Team']
+    elif key == 'policy_name':
+        value = policy_name
     else:
         print(
             f"Error: Unrecognised key in disabled_when clause: '{clause}'. Disregarded.")

@@ -129,6 +129,7 @@ def setup_local_control_suppressions(table_resource):
         {'id': 'RDS.7', 'disable_when': 'environment != PROD'},
         {'id': 'RDS.8', 'disable_when': 'environment != PROD'},
         {'id': 'RDS.15', 'disable_when': 'environment != PROD'},
+        {'id': 'IAM.21', 'disable_when': 'policy_name = developer-permission-boundary-policy, network-administrator-permission-boundary-policy, security-administrator-permission-boundary-policy'},
     ]
 
     if AFT_MANAGEMENT_ACCOUNT_ID or SECURITY_ADM_ACCOUNT_ID:
