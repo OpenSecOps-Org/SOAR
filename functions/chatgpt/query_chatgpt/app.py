@@ -18,7 +18,10 @@ logger.setLevel(logging.INFO)
 USE_CHATGPT = os.environ['USE_CHATGPT']
 CHATGPT_DEFAULT_MODEL = os.environ['CHATGPT_DEFAULT_MODEL']
 CHATGPT_FALLBACK_MODEL = os.environ['CHATGPT_FALLBACK_MODEL']
+
+CHATGPT_ORGANIZATION_ID_PARAMETER_PATH = os.environ['CHATGPT_ORGANIZATION_ID_PARAMETER_PATH']
 CHATGPT_API_KEY_PARAMETER_PATH = os.environ['CHATGPT_API_KEY_PARAMETER_PATH']
+
 CHATGPT_IAC_SNIPPETS = os.environ['CHATGPT_IAC_SNIPPETS']
 
 CHATGPT_ANONYMIZE_ACCOUNT_NUMBERS = os.environ['CHATGPT_ANONYMIZE_ACCOUNT_NUMBERS']
@@ -29,11 +32,13 @@ CHATGPT_REMOVE_EMAIL_ADDRESSES = os.environ['CHATGPT_REMOVE_EMAIL_ADDRESSES']
 # Create a boto3 client for SSM
 client = boto3.client('ssm')
 
-# Get the ChatGPT API key from SSM
-api_key = client.get_parameter(Name=CHATGPT_API_KEY_PARAMETER_PATH)['Parameter']['Value']
+# Get the OpenAI parameters from SSM
+openai_organization = client.get_parameter(Name=CHATGPT_ORGANIZATION_ID_PARAMETER_PATH)['Parameter']['Value']
+openai_api_key = client.get_parameter(Name=CHATGPT_API_KEY_PARAMETER_PATH)['Parameter']['Value']
 
-# Set the OpenAI API key
-openai.api_key = api_key
+# Set the OpenAI parameters
+openai.organization = openai_organization
+openai.api_key = openai_api_key
 
 
 # Define the lambda_handler function

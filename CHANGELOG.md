@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.4.0
+    * Added support for the OpenAI organization parameter.
+
 ## v1.3.1
     * Removed now obsolete local control suppressions.
 

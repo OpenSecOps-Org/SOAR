@@ -410,6 +410,11 @@ Parameters:
       - gpt-4
     Default: 'gpt-3.5-turbo-16k'
 
+  ChatGPTOrganizationIdParameterPath:
+    Type: String
+    Description: The ChatGPT Organization ID.
+    Default: '/soar/chatgpt/organization-id'
+
   ChatGPTAPIKeyParameterPath:
     Type: String
     Description: The ChatGPT API key.
@@ -558,6 +563,14 @@ Resources:
   # Parameter Store for ChatGPT credentials
   #
   #-------------------------------------------------------------------------------
+  
+  ChatGPTOrganizationId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref ChatGPTOrganizationIdParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The ChatGPT Organization ID.
 
   ChatGPTAPIKey:
     Type: AWS::SSM::Parameter
@@ -1318,6 +1331,7 @@ Resources:
           USE_CHATGPT: !Ref UseChatGPT
           CHATGPT_DEFAULT_MODEL: !Ref ChatGPTDefaultModel
           CHATGPT_FALLBACK_MODEL: !Ref ChatGPTFallbackModel
+          CHATGPT_ORGANIZATION_ID_PARAMETER_PATH: !Ref ChatGPTOrganizationIdParameterPath
           CHATGPT_API_KEY_PARAMETER_PATH: !Ref ChatGPTAPIKeyParameterPath
           CHATGPT_IAC_SNIPPETS: !Ref ChatGPTIaCSnippets
           CHATGPT_ANONYMIZE_ACCOUNT_NUMBERS: !Ref ChatGPTAnonymizeAccountNumbers
