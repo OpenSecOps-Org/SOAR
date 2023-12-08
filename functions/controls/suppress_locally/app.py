@@ -1,5 +1,5 @@
 '''
-This lambda function is used to check whether a DynamoDB entry for the SecHub control has an additional column called 'disable_when'. If this column is not present or its string value is empty, the function returns False, indicating that the control should not be suppressed. If the string in 'disable_when' specifies a set of conditions that match the finding's account properties, then the function returns True, indicating that the finding should be suppressed. If none of the conditions are met, the function returns False.
+This lambda function is used to check whether a DynamoDB entry for the SecHub control has an additional column called 'suppress_when'. If this column is not present or its string value is empty, the function returns False, indicating that the control should not be suppressed. If the string in 'suppress_when' specifies a set of conditions that match the finding's account properties, then the function returns True, indicating that the finding should be suppressed. If none of the conditions are met, the function returns False.
 
 The conditions can be built on the following account properties:
 
@@ -42,7 +42,7 @@ It is also possible to combine conditions using AND:
 
 which means, "suppress the finding in the DEV environment of the Platform team".
 
-The value of 'disable_when' can be multiline. The lines form a logical OR: if any of them evaluate to True, True is returned, else False.
+The value of 'suppress_when' can be multiline. The lines form a logical OR: if any of them evaluate to True, True is returned, else False.
 
 Examples:
 
@@ -71,11 +71,11 @@ def lambda_handler(data, _context):
     if not control:
         return False
 
-    # Get the value of 'disable_when' column
-    disable_when = control.get('disable_when', False)
+    # Get the value of 'suppress_when' column
+    suppress_when = control.get('suppress_when', False)
 
-    # If 'disable_when' is not present or its value is not a string, return False
-    if not disable_when or not isinstance(disable_when.get('S', False), str):
+    # If 'suppress_when' is not present or its value is not a string, return False
+    if not suppress_when or not isinstance(suppress_when.get('S', False), str):
         return False
 
     # Get the region from input data
@@ -84,8 +84,8 @@ def lambda_handler(data, _context):
     # Get the policy name, if it exists
     policy_name = resource.get('Details', {}).get('AwsIamPolicy', {}).get('PolicyName', None)
 
-    # Process each line in 'disable_when' value
-    for line in disable_when['S'].strip().splitlines():
+    # Process each line in 'suppress_when' value
+    for line in suppress_when['S'].strip().splitlines():
         # Check if the line satisfies the conditions
         if process_line(line.strip(), account_data, region, policy_name):
             return True

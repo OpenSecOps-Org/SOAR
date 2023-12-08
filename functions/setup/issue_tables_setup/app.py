@@ -101,7 +101,7 @@ def setup_local_incidents_suppressions(table_resource):
     proposed_changes = [
         {
             'id': 'Effects/Data Exposure/Policy:S3-BucketBlockPublicAccessDisabled',
-            'disable_when': 'account_id != 1'
+            'suppress_when': 'account_id != 1'
         }
     ]
 
@@ -119,17 +119,17 @@ def setup_local_control_suppressions(table_resource):
     logger.info('Setting up Local Control Suppressions table')
 
     proposed_changes = [
-        {'id': 'ELB.6', 'disable_when': 'environment != PROD'},
-        {'id': 'ELB.10', 'disable_when': 'environment != PROD'},
-        {'id': 'ES.6', 'disable_when': 'environment != PROD'},
-        {'id': 'ES.7', 'disable_when': 'environment != PROD'},
-        {'id': 'KMS.3', 'disable_when': 'environment != PROD'},
-        {'id': 'Opensearch.6', 'disable_when': 'environment != PROD'},
-        {'id': 'RDS.5', 'disable_when': 'environment != PROD'},
-        {'id': 'RDS.7', 'disable_when': 'environment != PROD'},
-        {'id': 'RDS.8', 'disable_when': 'environment != PROD'},
-        {'id': 'RDS.15', 'disable_when': 'environment != PROD'},
-        {'id': 'IAM.21', 'disable_when': 'policy_name = developer-permission-boundary-policy, network-administrator-permission-boundary-policy, security-administrator-permission-boundary-policy'},
+        {'id': 'ELB.6', 'suppress_when': 'environment != PROD'},
+        {'id': 'ELB.10', 'suppress_when': 'environment != PROD'},
+        {'id': 'ES.6', 'suppress_when': 'environment != PROD'},
+        {'id': 'ES.7', 'suppress_when': 'environment != PROD'},
+        {'id': 'KMS.3', 'suppress_when': 'environment != PROD'},
+        {'id': 'Opensearch.6', 'suppress_when': 'environment != PROD'},
+        {'id': 'RDS.5', 'suppress_when': 'environment != PROD'},
+        {'id': 'RDS.7', 'suppress_when': 'environment != PROD'},
+        {'id': 'RDS.8', 'suppress_when': 'environment != PROD'},
+        {'id': 'RDS.15', 'suppress_when': 'environment != PROD'},
+        {'id': 'IAM.21', 'suppress_when': 'policy_name = developer-permission-boundary-policy, network-administrator-permission-boundary-policy, security-administrator-permission-boundary-policy'},
     ]
 
     if AFT_MANAGEMENT_ACCOUNT_ID or SECURITY_ADM_ACCOUNT_ID:
@@ -139,8 +139,8 @@ def setup_local_control_suppressions(table_resource):
         if SECURITY_ADM_ACCOUNT_ID:
             account_ids.append(SECURITY_ADM_ACCOUNT_ID)
 
-        disable_when = f"account_id = {','.join(account_ids)}"
-        proposed_changes.append({'id': 'EC2.22', 'disable_when': disable_when})
+        suppress_when = f"account_id = {','.join(account_ids)}"
+        proposed_changes.append({'id': 'EC2.22', 'suppress_when': suppress_when})
 
     if LOG_ARCHIVE_ACCOUNT_ID or ORG_ACCOUNT_ID:
         account_ids = []
@@ -149,8 +149,8 @@ def setup_local_control_suppressions(table_resource):
         if ORG_ACCOUNT_ID:
             account_ids.append(ORG_ACCOUNT_ID)
 
-        disable_when = f"account_id = {','.join(account_ids)}"
-        proposed_changes.append({'id': 'Kinesis.1', 'disable_when': disable_when})
+        suppress_when = f"account_id = {','.join(account_ids)}"
+        proposed_changes.append({'id': 'Kinesis.1', 'suppress_when': suppress_when})
 
     logger.info('Proposed changes: %s', proposed_changes)
 
@@ -174,8 +174,8 @@ def setup_local_control_autoremediation_suppressions(table_resource):
         if SECURITY_ADM_ACCOUNT_ID:
             account_ids.append(SECURITY_ADM_ACCOUNT_ID)
 
-        disable_when = f"account_id = {','.join(account_ids)}"
-        proposed_changes.append({'id': 'EC2.22', 'disable_when': disable_when})
+        suppress_when = f"account_id = {','.join(account_ids)}"
+        proposed_changes.append({'id': 'EC2.22', 'suppress_when': suppress_when})
 
     logger.info('Proposed changes: %s', proposed_changes)
 

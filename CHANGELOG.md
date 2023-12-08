@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.3.0
+    * Renamed `disable_when` to `suppress_when`.
+
 ## v1.2.1
     * Local control suppressions now accept 'policy_name' to compare IAM policy names for IAM.21 and similar.
 
