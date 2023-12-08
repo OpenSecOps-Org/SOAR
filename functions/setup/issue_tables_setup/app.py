@@ -119,28 +119,8 @@ def setup_local_control_suppressions(table_resource):
     logger.info('Setting up Local Control Suppressions table')
 
     proposed_changes = [
-        {'id': 'ELB.6', 'suppress_when': 'environment != PROD'},
-        {'id': 'ELB.10', 'suppress_when': 'environment != PROD'},
-        {'id': 'ES.6', 'suppress_when': 'environment != PROD'},
-        {'id': 'ES.7', 'suppress_when': 'environment != PROD'},
-        {'id': 'KMS.3', 'suppress_when': 'environment != PROD'},
-        {'id': 'Opensearch.6', 'suppress_when': 'environment != PROD'},
-        {'id': 'RDS.5', 'suppress_when': 'environment != PROD'},
-        {'id': 'RDS.7', 'suppress_when': 'environment != PROD'},
-        {'id': 'RDS.8', 'suppress_when': 'environment != PROD'},
-        {'id': 'RDS.15', 'suppress_when': 'environment != PROD'},
-        {'id': 'IAM.21', 'suppress_when': 'policy_name = developer-permission-boundary-policy, network-administrator-permission-boundary-policy, security-administrator-permission-boundary-policy'},
+        {'id': 'IAM.21', 'suppress_when': 'policy_name = developer-permission-boundary-policy, network-administrator-permission-boundary-policy, security-administrator-permission-boundary-policy'}
     ]
-
-    if AFT_MANAGEMENT_ACCOUNT_ID or SECURITY_ADM_ACCOUNT_ID:
-        account_ids = []
-        if AFT_MANAGEMENT_ACCOUNT_ID:
-            account_ids.append(AFT_MANAGEMENT_ACCOUNT_ID)
-        if SECURITY_ADM_ACCOUNT_ID:
-            account_ids.append(SECURITY_ADM_ACCOUNT_ID)
-
-        suppress_when = f"account_id = {','.join(account_ids)}"
-        proposed_changes.append({'id': 'EC2.22', 'suppress_when': suppress_when})
 
     if LOG_ARCHIVE_ACCOUNT_ID or ORG_ACCOUNT_ID:
         account_ids = []

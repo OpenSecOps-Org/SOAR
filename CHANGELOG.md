@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.3.1
+    * Removed now obsolete local control suppressions.
+
 ## v1.3.0
     * Renamed `disable_when` to `suppress_when`.
 
