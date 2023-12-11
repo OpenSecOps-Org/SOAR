@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.5.2
+    * Removed EC2.22 local suppression because of its obsolescence.
+
 ## v1.5.1
     * Improved initial setup of DynamoDB tables.
     * Bugfix for policy_name local control suppression logic.

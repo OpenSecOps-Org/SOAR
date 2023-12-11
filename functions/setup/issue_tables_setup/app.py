@@ -165,20 +165,22 @@ def setup_local_control_suppressions(table_resource):
 def setup_local_control_autoremediation_suppressions(table_resource):
     logger.info('Setting up Local Control Autoremediation Suppressions table')
 
-    proposed_changes = []
+    return
 
-    account_ids = [SECURITY_ADM_ACCOUNT_ID]
-    if AFT_MANAGEMENT_ACCOUNT_ID:
-        account_ids.append(AFT_MANAGEMENT_ACCOUNT_ID)
-    proposed_changes.append({'id': 'EC2.22', 
-                             'suppress_when': f"account_id = {','.join(account_ids)}"})
+    # proposed_changes = []
 
-    logger.info('Proposed changes: %s', proposed_changes)
+    # account_ids = [SECURITY_ADM_ACCOUNT_ID]
+    # if AFT_MANAGEMENT_ACCOUNT_ID:
+    #     account_ids.append(AFT_MANAGEMENT_ACCOUNT_ID)
+    # proposed_changes.append({'id': 'EC2.22', 
+    #                          'suppress_when': f"account_id = {','.join(account_ids)}"})
 
-    if has_existing_items(table_resource):
-        logger.info('Table already has existing items. Skipping setup.')
-        return
-    else:
-        write_items_to_table(table_resource, proposed_changes)
-        logger.info('Setup completed for Local Control Autoremediation Suppressions table')
+    # logger.info('Proposed changes: %s', proposed_changes)
+
+    # if has_existing_items(table_resource):
+    #     logger.info('Table already has existing items. Skipping setup.')
+    #     return
+    # else:
+    #     write_items_to_table(table_resource, proposed_changes)
+    #     logger.info('Setup completed for Local Control Autoremediation Suppressions table')
 
