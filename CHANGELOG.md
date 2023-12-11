@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.5.3
+    * Corrected typo.
+
 ## v1.5.2
     * Removed EC2.22 local suppression because of its obsolescence.
 

@@ -31,7 +31,7 @@ def lambda_handler(event, context):
             setup_remediatable_sec_hub_controls(REMEDIATABLE_SEC_HUB_CONTROLS_RESOURCE)
             setup_local_incidents_suppressions(LOCAL_INCIDENTS_SUPPRESSIONS_RESOURCE)
             setup_local_control_suppressions(LOCAL_CONTROL_SUPPRESSIONS_RESOURCE)
-            setup_local_control_autoremediation_suppressions(LOCAL_CONTROL_AUTOREMEDIATION_SUPPRESSIONS_RESOURCE)
+            # setup_local_control_autoremediation_suppressions(LOCAL_CONTROL_AUTOREMEDIATION_SUPPRESSIONS_RESOURCE)
 
         # Succeed for Create, Update, Delete (but we only do things at Create time)
         cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
@@ -149,7 +149,7 @@ def setup_local_control_suppressions(table_resource):
     if LOG_ARCHIVE_ACCOUNT_ID:
         account_ids.append(LOG_ARCHIVE_ACCOUNT_ID)
     proposed_changes.append({'id': 'Kinesis.1', 
-                             'suppress_when': f"account_id = {','.join(account_ids)}})
+                             'suppress_when': f"account_id = {','.join(account_ids)}"})
 
     logger.info('Proposed changes: %s', proposed_changes)
 
@@ -162,10 +162,8 @@ def setup_local_control_suppressions(table_resource):
 
         
 
-def setup_local_control_autoremediation_suppressions(table_resource):
-    logger.info('Setting up Local Control Autoremediation Suppressions table')
-
-    return
+# def setup_local_control_autoremediation_suppressions(table_resource):
+#     logger.info('Setting up Local Control Autoremediation Suppressions table')
 
     # proposed_changes = []
 
