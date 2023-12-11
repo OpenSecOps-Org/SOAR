@@ -46,6 +46,23 @@ def lambda_handler(event, context):
 
 # ----------------------------------------------------------------
 #
+# Helper functions
+#
+# ----------------------------------------------------------------
+
+def write_items_to_table(table_resource, items):
+    for item in items:
+        table_resource.put_item(Item=item)
+
+
+def has_existing_items(table_resource):
+    response = table_resource.scan()
+    items = response.get('Items', [])
+    return len(items) > 0
+
+
+# ----------------------------------------------------------------
+#
 # Setup functions for individual tables
 #
 # ----------------------------------------------------------------
@@ -95,6 +112,7 @@ def setup_remediatable_sec_hub_controls(table_resource):
         logger.info('Setup completed for Remediatable Security Hub Controls table')
 
 
+
 def setup_local_incidents_suppressions(table_resource):
     logger.info('Setting up Local Incidents Suppressions table')
 
@@ -115,6 +133,7 @@ def setup_local_incidents_suppressions(table_resource):
         logger.info('Setup completed for Local Incidents Suppressions table')
 
 
+
 def setup_local_control_suppressions(table_resource):
     logger.info('Setting up Local Control Suppressions table')
 
@@ -122,15 +141,15 @@ def setup_local_control_suppressions(table_resource):
         {'id': 'IAM.21', 'suppress_when': 'policy_name = developer-permission-boundary-policy, network-administrator-permission-boundary-policy, security-administrator-permission-boundary-policy'}
     ]
 
-    if LOG_ARCHIVE_ACCOUNT_ID or ORG_ACCOUNT_ID:
-        account_ids = []
-        if LOG_ARCHIVE_ACCOUNT_ID:
-            account_ids.append(LOG_ARCHIVE_ACCOUNT_ID)
-        if ORG_ACCOUNT_ID:
-            account_ids.append(ORG_ACCOUNT_ID)
+    if AFT_MANAGEMENT_ACCOUNT_ID:
+        proposed_changes.append({'id': 'DynamoDB.1', 
+                                 'suppress_when': f"{AFT_MANAGEMENT_ACCOUNT_ID}"})
 
-        suppress_when = f"account_id = {','.join(account_ids)}"
-        proposed_changes.append({'id': 'Kinesis.1', 'suppress_when': suppress_when})
+    account_ids = [ORG_ACCOUNT_ID]
+    if LOG_ARCHIVE_ACCOUNT_ID:
+        account_ids.append(LOG_ARCHIVE_ACCOUNT_ID)
+    proposed_changes.append({'id': 'Kinesis.1', 
+                             'suppress_when': f"account_id = {','.join(account_ids)}})
 
     logger.info('Proposed changes: %s', proposed_changes)
 
@@ -141,21 +160,18 @@ def setup_local_control_suppressions(table_resource):
         write_items_to_table(table_resource, proposed_changes)
         logger.info('Setup completed for Local Control Suppressions table')
 
+        
 
 def setup_local_control_autoremediation_suppressions(table_resource):
     logger.info('Setting up Local Control Autoremediation Suppressions table')
 
     proposed_changes = []
 
-    if AFT_MANAGEMENT_ACCOUNT_ID or SECURITY_ADM_ACCOUNT_ID:
-        account_ids = []
-        if AFT_MANAGEMENT_ACCOUNT_ID:
-            account_ids.append(AFT_MANAGEMENT_ACCOUNT_ID)
-        if SECURITY_ADM_ACCOUNT_ID:
-            account_ids.append(SECURITY_ADM_ACCOUNT_ID)
-
-        suppress_when = f"account_id = {','.join(account_ids)}"
-        proposed_changes.append({'id': 'EC2.22', 'suppress_when': suppress_when})
+    account_ids = [SECURITY_ADM_ACCOUNT_ID]
+    if AFT_MANAGEMENT_ACCOUNT_ID:
+        account_ids.append(AFT_MANAGEMENT_ACCOUNT_ID)
+    proposed_changes.append({'id': 'EC2.22', 
+                             'suppress_when': f"account_id = {','.join(account_ids)}"})
 
     logger.info('Proposed changes: %s', proposed_changes)
 
@@ -165,21 +181,4 @@ def setup_local_control_autoremediation_suppressions(table_resource):
     else:
         write_items_to_table(table_resource, proposed_changes)
         logger.info('Setup completed for Local Control Autoremediation Suppressions table')
-
-
-# ----------------------------------------------------------------
-#
-# Helper functions
-#
-# ----------------------------------------------------------------
-
-def write_items_to_table(table_resource, items):
-    for item in items:
-        table_resource.put_item(Item=item)
-
-
-def has_existing_items(table_resource):
-    response = table_resource.scan()
-    items = response.get('Items', [])
-    return len(items) > 0
 

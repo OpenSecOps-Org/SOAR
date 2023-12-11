@@ -1,7 +1,7 @@
 Comment: A state machine that processes Security Hub findings.
-StartAt: Isolate Finding
+StartAt: Setup
 States:
-    Isolate Finding:
+    Setup:
         Type: Pass
         Parameters:
             account: {}
@@ -20,9 +20,18 @@ States:
                     plaintext: ''
                     html: ''
             db: {}
+            SOAREnabled: '${SOAREnabled}'
             DeferTeamFixes: '${DeferTeamFixes}'
-            
-        Next: Get Account Data
+        Next: SOAR Enabled?
+
+    SOAR Enabled?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.SOAREnabled
+                StringEquals: 'No'
+                Next: Do Nothing
+        Default: Get Account Data
 
     Get Account Data:
         Type: Task
@@ -404,6 +413,7 @@ States:
             table: local-control-suppressions
             db.$: $.db
             region.$: $.finding.Resources[0].Region
+            resource.$: $.finding.Resources[0]
         ResultPath: $.suppress_locally
         Retry:
             -

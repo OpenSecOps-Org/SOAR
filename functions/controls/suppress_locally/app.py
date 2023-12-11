@@ -63,10 +63,6 @@ def lambda_handler(data, _context):
     table = data['table']
     control = data['db'][table].get('Item', False)
 
-    # Get the first resource, if it exists
-    resources = data.get('Resources', [])
-    resource = resources[0] if resources else {}
-
     # If control is not found, return False
     if not control:
         return False
@@ -82,6 +78,7 @@ def lambda_handler(data, _context):
     region = data['region']
 
     # Get the policy name, if it exists
+    resource = data['resource'] if data['resource'] else {}
     policy_name = resource.get('Details', {}).get('AwsIamPolicy', {}).get('PolicyName', None)
 
     # Process each line in 'suppress_when' value
@@ -118,12 +115,14 @@ def clause_true(clause, account_data, region, policy_name):
     # If the clause is not in the correct format, return False
     if len(parts) != 3 or parts[2] == '':
         print(
-            f"Error: Malformed disabled_when clause: '{clause}'. Disregarded.")
+            f"Error: Malformed suppress_when clause: '{clause}'. Disregarded.")
         return False
 
     key = parts[0].strip()
     operator = parts[1].strip()
     values = [s.strip() for s in parts[2].split(',')]
+
+    print(f"Key: {key}, Op: {operator}, Values: {values}, Policy: {policy_name}")
 
     # Get the value corresponding to the key from account_data
     if key == 'account_id':
@@ -144,7 +143,7 @@ def clause_true(clause, account_data, region, policy_name):
         value = policy_name
     else:
         print(
-            f"Error: Unrecognised key in disabled_when clause: '{clause}'. Disregarded.")
+            f"Error: Unrecognised key in suppress_when clause: '{clause}'. Disregarded.")
         return False
 
     # Check if the value satisfies the condition
@@ -153,5 +152,5 @@ def clause_true(clause, account_data, region, policy_name):
     if operator == '!=':
         return value not in values
     print(
-        f"Error: Unrecognised operator in disabled_when clause: '{clause}'. Disregarded.")
+        f"Error: Unrecognised operator in suppress_when clause: '{clause}'. Disregarded.")
     return False

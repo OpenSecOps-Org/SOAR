@@ -1,5 +1,13 @@
 # Change Log
 
+## v1.5.1
+    * Improved initial setup of DynamoDB tables.
+    * Bugfix for policy_name local control suppression logic.
+    * Prompt engineering to clarify SOAR incidents.
+
+## v1.5.0
+    * Added a switch (SOAREnabled) to enable and disable the SOAR functionality.
+
 ## v1.4.0
     * Added support for the OpenAI organization parameter.
 

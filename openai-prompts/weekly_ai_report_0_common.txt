@@ -14,6 +14,7 @@ The output is HTML.
 - Use <h3> as your highest level header and <h4> and <h5> if you need to. 
 - Never use <h2> or <h1>.
 - Do not add any plaintext comments. 
+- Never wrap anything in ```html and ``` - everything is already HTML.
 
 [INPUT]
 The user input is a JSON structure containing the information you need. 

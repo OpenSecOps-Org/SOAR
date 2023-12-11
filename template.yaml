@@ -14,11 +14,16 @@ Description:
 
 
 Parameters:
+  SOAREnabled:
+    Type: String
+    Description: Yes to enable the SOAR, No to disable it
+    AllowedValues: ['Yes', 'No']
+    Default: 'Yes'
+
   ProductName:
     Type: String
     Description: The name of the product.
     Default: 'Delegat SOAR'
-
 
   OrgAccountId:
     Type: String
@@ -353,20 +358,20 @@ Parameters:
 
   SeverityAllowedAgeInHoursHigh:
     Type: Number
-    Description: How many hours a HIGH ticket is allowed to be open before it is considered overdue
+    Description: How many hours a HIGH ticket is allowed to be open before it is considered overdue.
       Set to -1 for never.
     Default: 8
 
   SeverityAllowedAgeInHoursMedium:
     Type: Number
     Description: How many hours a MEDIUM ticket is allowed to be open before it is considered overdue.
-      Set to -1 for never. The default value of 336 is 14 days.
+      Set to -1 for never. The default value of 336 is equal to 14 days.
     Default: 336
 
   SeverityAllowedAgeInHoursLow:
     Type: Number
     Description: How many hours a LOW ticket is allowed to be open before it is considered overdue.
-      Set to -1 for never. The default value of 672 is 28 days.
+      Set to -1 for never. The default value of 672 is equal to 28 days.
     Default: 672
 
   # Closed Ticket, Autoremediation, and Incident expiration times --------------
@@ -397,17 +402,11 @@ Parameters:
   ChatGPTDefaultModel:
     Type: String
     Description: The GPT model to use by default.
-    AllowedValues:
-      - gpt-4
-      - gpt-3.5-turbo-16k
     Default: 'gpt-4'
 
   ChatGPTFallbackModel:
     Type: String
     Description: The fallback GPT model.
-    AllowedValues:
-      - gpt-3.5-turbo-16k
-      - gpt-4
     Default: 'gpt-3.5-turbo-16k'
 
   ChatGPTOrganizationIdParameterPath:
@@ -464,17 +463,11 @@ Parameters:
   WeeklyReportChatGPTDefaultModel:
     Type: String
     Description: The GPT model to use by default for the weekly AI-based security report.
-    AllowedValues:
-      - gpt-4
-      - gpt-3.5-turbo-16k
     Default: 'gpt-4'
 
   WeeklyReportChatGPTFallbackModel:
     Type: String
     Description: The GPT fallback model to use for the weekly AI-based security report.
-    AllowedValues:
-      - gpt-3.5-turbo-16k
-      - gpt-4
     Default: 'gpt-3.5-turbo-16k'
 
   WeeklyReportEmailRecipients:
@@ -943,6 +936,7 @@ Resources:
         TicketsName: !Ref Tickets
         CachedAccountDataName: !Ref CachedAccountData
         OpenAIPromptsTableName: !Ref OpenAIPromptsTable
+        SOAREnabled: !Ref SOAREnabled
         DeferTeamFixes: !Ref DeferTeamFixes
 
         AttemptAutoRemediationSMArn: !Ref SOARAttemptAutoRemediation
@@ -2747,7 +2741,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt OpenAIPromptsSyncerFunction.Arn
       FunctionName: !Ref OpenAIPromptsSyncerFunction
-      DummyProperty: 'sdvsdff'  # Change this value whenever openai-prompts changes
+      DummyProperty: 'jgfdcf'  # Change this value whenever openai-prompts changes
       
 
   #-------------------------------------------------------------------------------

@@ -10,8 +10,9 @@
 
 - Incidents are not related to tickets or autoremediations.
 - A sudden rise in incidents, especially in the production environment, is a sign that needs investigation.
-- An incident is a SOAR incident if its Title includes the string "SOAR" and 'is_admin_account' is true. SOAR incidents only occur in the AWS Organization admin account.
+- An incident is a SOAR incident if its Title includes the string "SOAR", 'is_admin_account' is true, and the incident is not about Stack or StackSet drift. SOAR incidents only occur in the AWS Organization admin account.
 - SOAR incidents indicate that there is a problem with Delegat SOAR itself. Teams cannot fix SOAR incidents. Advise contacting Delegat AB immediately.
+- Never advise contacting Delegat AB for Stack or StackSet drift, as this is not Delegat AB's responsibility and can only be fixed locally.
 - INFORMATIONAL incidents are never a cause for concern.
 
 - The AWS Organizations administrative account is an extremely sensitive account. It should be used as little as possible, and definitely not for applications. It is unprotected by SCPs. The Foundation team are the only ones that should have access.
