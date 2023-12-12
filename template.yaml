@@ -14,11 +14,31 @@ Description:
 
 
 Parameters:
+
   SOAREnabled:
     Type: String
     Description: Yes to enable the SOAR, No to disable it
     AllowedValues: ['Yes', 'No']
     Default: 'Yes'
+
+  DeferIncidents:
+    Type: String
+    Description: Yes if defer processing of incidents.
+    AllowedValues: ['Yes', 'No']
+    Default: 'No'
+
+  DeferAutoRemediations:
+    Type: String
+    Description: Yes if defer all autoremediations.
+    AllowedValues: ['Yes', 'No']
+    Default: 'No'
+
+  DeferTeamFixes:
+    Type: String
+    Description: Yes if defer issuing of TEAMFIX tickets.
+    AllowedValues: ['Yes', 'No']
+    Default: 'No'
+
 
   ProductName:
     Type: String
@@ -87,13 +107,6 @@ Parameters:
       is entered here, the Disk Forensics Collection project will snapshot and terminate
       them instead. Ticketing and emailing remains the same.
     Default: ''
-
-  DeferTeamFixes:
-    Type: String
-    Description: Yes if only do incidents and autoremediations.
-    AllowedValues: ['Yes', 'No']
-    Default: 'No'
-
 
   # Mail ----------------------------------------------------------------------------
 
@@ -936,7 +949,10 @@ Resources:
         TicketsName: !Ref Tickets
         CachedAccountDataName: !Ref CachedAccountData
         OpenAIPromptsTableName: !Ref OpenAIPromptsTable
+
         SOAREnabled: !Ref SOAREnabled
+        DeferIncidents: !Ref DeferIncidents
+        DeferAutoRemediations: !Ref DeferAutoRemediations
         DeferTeamFixes: !Ref DeferTeamFixes
 
         AttemptAutoRemediationSMArn: !Ref SOARAttemptAutoRemediation

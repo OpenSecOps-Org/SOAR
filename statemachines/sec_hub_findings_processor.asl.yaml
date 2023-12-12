@@ -21,6 +21,8 @@ States:
                     html: ''
             db: {}
             SOAREnabled: '${SOAREnabled}'
+            DeferIncidents: '${DeferIncidents}'
+            DeferAutoRemediations: '${DeferAutoRemediations}'
             DeferTeamFixes: '${DeferTeamFixes}'
         Next: SOAR Enabled?
 
@@ -294,9 +296,6 @@ States:
                 Next: Do Nothing
         Default: Compliance Evaluation Error?
 
-    Do Nothing:
-        Type: Succeed
-
     Compliance Evaluation Error?:
         Type: Choice
         Choices:
@@ -338,8 +337,16 @@ States:
             -
                 Variable: $.finding.Compliance.SecurityControlId
                 IsPresent: true
-                Next: PASSED?
+                Next: It's a Control
+            -
+                Variable: $.DeferIncidents
+                StringEquals: 'Yes'
+                Next: Do Nothing
         Default: Handle Incident
+
+    It's a Control:
+        Type: Pass
+        Next: PASSED?
 
     PASSED?:
         Type: Choice
@@ -534,8 +541,17 @@ States:
             -
                 Variable: $.suppress_locally
                 BooleanEquals: false
-                Next: Attempt AutoRemediation
+                Next: Defer All AutoRemediations?
         Default: Ticket the Team
+
+    Defer All AutoRemediations?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.DeferAutoRemediations
+                StringEquals: 'Yes'
+                Next: Do Nothing
+        Default: Attempt AutoRemediation
 
     Attempt AutoRemediation:
         Type: Task
@@ -564,11 +580,8 @@ States:
             -
                 Variable: $.actions.reconsider_later
                 BooleanEquals: true
-                Next: Keep as NEW
+                Next: Do Nothing
         Default: Suppress finding?
-
-    Keep as NEW:
-        Type: Succeed
 
     Suppress finding?:
         Type: Choice
@@ -597,7 +610,7 @@ States:
         Choices:
         - Variable: "$.DeferTeamFixes"
           StringEquals: "Yes"
-          Next: Keep as NEW
+          Next: Do Nothing
         Default: Format Ticketing Message
 
     Format Ticketing Message:
@@ -925,3 +938,7 @@ States:
     OpenAiFailState:
         Type: Fail
         Cause: "The call to the OpenAI API failed. See $.openai-error-info for more details."
+
+    Do Nothing:
+        Type: Succeed
+

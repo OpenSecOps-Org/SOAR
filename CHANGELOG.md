@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.6.0
+    * Added features to defer processing of incidents and auto-remediations.
+
 ## v1.5.4
     * Upgraded boto3 to 1.28.33
 
