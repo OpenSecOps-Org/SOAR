@@ -4,13 +4,8 @@
 
 samconfig*
 !samconfig*.example
-accounts.toml
-parameters.toml
-repos-local.toml
-sso-config
-!sso-config.example
-SCPs
-!SCPs.example
+
+/apps/
 
 
 # Created by https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode

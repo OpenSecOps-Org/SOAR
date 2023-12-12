@@ -1,2 +1,2 @@
 beautifulsoup4
-boto3==1.28.33
+boto3==1.33.12

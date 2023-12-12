@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.5.4
+    * Upgraded boto3 to 1.28.33
+
 ## v1.5.3
     * Corrected typo.
 
