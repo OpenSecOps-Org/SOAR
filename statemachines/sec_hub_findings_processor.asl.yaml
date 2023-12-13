@@ -222,7 +222,7 @@ States:
     AddAiDataForClosedTickets:
         Type: Task
         Resource: '${QueryChatGPTFunctionArn}'
-        TimeoutSeconds: 120
+        TimeoutSeconds: 600
         Retry:
             -
                 ErrorEquals:
@@ -697,7 +697,7 @@ States:
     AddAiDataForOpenedTickets:
         Type: Task
         Resource: '${QueryChatGPTFunctionArn}'
-        TimeoutSeconds: 120
+        TimeoutSeconds: 600
         Retry:
             -
                 ErrorEquals:
@@ -848,7 +848,7 @@ States:
     AddAiDataForAutoremediation:
         Type: Task
         Resource: '${QueryChatGPTFunctionArn}'
-        TimeoutSeconds: 120
+        TimeoutSeconds: 600
         Retry:
             -
                 ErrorEquals:

@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.6.1
+    * Converted OpenAI interface code to >v1.0.0. Increased timeout to 600 seconds for non-report calls.
+
 ## v1.6.0
     * Added features to defer processing of incidents and auto-remediations.
 

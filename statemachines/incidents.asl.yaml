@@ -374,7 +374,7 @@ States:
     AddAiDataForAppIncident:
         Type: Task
         Resource: '${QueryChatGPTFunctionArn}'
-        TimeoutSeconds: 120
+        TimeoutSeconds: 600
         Retry:
             -
                 ErrorEquals:
@@ -450,7 +450,7 @@ States:
     AddAiDataForInfraIncident:
         Type: Task
         Resource: '${QueryChatGPTFunctionArn}'
-        TimeoutSeconds: 120
+        TimeoutSeconds: 600
         Retry:
             -
                 ErrorEquals:
