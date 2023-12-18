@@ -368,7 +368,7 @@ States:
                     -
                         Variable: $.account.AccountNew
                         StringEquals: 'Yes'
-                Next: Do Nothing
+                Next: Suppress Finding
         Default: Already Has or Has Had Ticket?
 
     Already Has or Has Had Ticket?:

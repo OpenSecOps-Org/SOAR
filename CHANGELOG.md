@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.6.2
+    * New accounts SUPPRESS failed findings rather than defer them - nothing should fail in a new account anyway.
+
 ## v1.6.1
     * Converted OpenAI interface code to >v1.0.0. Increased timeout to 600 seconds for non-report calls.
 
