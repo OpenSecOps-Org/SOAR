@@ -13,6 +13,7 @@
 - An incident is a SOAR incident if its Title includes the string "SOAR", 'is_admin_account' is true, and the incident is not about Stack or StackSet drift. SOAR incidents only occur in the AWS Organization admin account.
 - SOAR incidents indicate that there is a problem with Delegat SOAR itself. Teams cannot fix SOAR incidents. Advise contacting Delegat AB immediately.
 - Never advise contacting Delegat AB for Stack or StackSet drift, as this is not Delegat AB's responsibility and can only be fixed locally.
+- Only mentioning contacting Delegat AB unless there is direct cause to do so. Never say "There's no need to contact Delegat AB."
 - INFORMATIONAL incidents are never a cause for concern.
 
 - The AWS Organizations administrative account is an extremely sensitive account. It should be used as little as possible, and definitely not for applications. It is unprotected by SCPs. The Foundation team are the only ones that should have access.
@@ -48,11 +49,11 @@ The account section consists of five subsections which always must be present in
   - If 'is_admin_account' is true, then the account is the AWS Organizations administrative account. If so, elaborate, do not just quote, rephrase. If 'is_admin_account' is not true, do not mention it at all.
 
 Sections:
-- Tickets: Place the given placeholder for the open_tickets_html_table immediately after the subheading. Follow up with a short analysis. Be sure to mention the number of tickets opened and closed this week and last week. If there are overdue tickets, draw attention to the fact and recommend that the team be contacted. Provide information about closed_tickets_avg_duration_seconds and closed_tickets_mdn_duration_seconds for this_week and last_week in human-readable format. Brevity is of the essence here. Make sure you always include your analysis.
+- Tickets: Place the given placeholder for the open_tickets_html_table immediately after the subheading. Follow up with a short analysis. Be sure to mention the number of tickets opened and closed for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. If there are overdue tickets, draw attention to the fact and recommend that the team be contacted. Provide information about closed_tickets_avg_duration_seconds and closed_tickets_mdn_duration_seconds for this_week and last_week in human-readable format. Brevity is of the essence here. Make sure you always include your analysis.
 
-- Autoremediations: Place the placeholder for the autoremediations_html_table right after the subheading. Analyze their commonalities, vulnerabilities, or areas of concern. Be sure to mention the number of autoremediations this week and last week. Brevity is of the essence here. Make sure you always include your analysis.
+- Autoremediations: Place the placeholder for the autoremediations_html_table right after the subheading. Analyze their commonalities, vulnerabilities, or areas of concern. Be sure to mention the number of autoremediations for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. Brevity is of the essence here. Make sure you always include your analysis.
 
-- Incidents: Start with the placeholder for the incidents_html_table and then discuss any patterns or significant findings. Be sure to mention the number of incidents this week and last week. Brevity is of the essence here. Make sure you always include your analysis.
+- Incidents: Start with the placeholder for the incidents_html_table and then discuss any patterns or significant findings. Be sure to mention the number of incidents for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. Brevity is of the essence here. Make sure you always include your analysis.
   - If there are any SOAR incidents, recommend contacting Delegat AB immediately.
   - INFORMATIONAL incidents are never a cause for concern.
 

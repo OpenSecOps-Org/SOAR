@@ -534,6 +534,7 @@ Resources:
       Value: REPLACE_ME # Don't replace here, use the console or the CLI
       Description: The security token. Generate in Jira.
 
+
   #-------------------------------------------------------------------------------
   #
   # Parameter Store for ServiceNow credentials
@@ -563,6 +564,7 @@ Resources:
       Type: String
       Value: REPLACE_ME # Don't replace here, use the console or the CLI
       Description: The ServiceNow password.
+
 
   #-------------------------------------------------------------------------------
   #
@@ -620,6 +622,7 @@ Resources:
       Tags:
         "soar:dynamodb:no-pit-recovery": ""
 
+
   #-------------------------------------------------------------------------------
   #
   # Incidents, mgmt tables
@@ -643,6 +646,7 @@ Resources:
       TableName: local-incident-autoremediation-suppressions
       Tags:
         "soar:dynamodb:no-pit-recovery": ""
+
 
   #-------------------------------------------------------------------------------
   #
@@ -691,6 +695,7 @@ Resources:
         - Key: "soar:dynamodb:no-pit-recovery"
           Value: ""
 
+
   #-------------------------------------------------------------------------------
   #
   # The DynamoDB table containing incidents
@@ -727,6 +732,7 @@ Resources:
       Tags:
         - Key: "soar:dynamodb:no-pit-recovery"
           Value: ""
+
 
   #-------------------------------------------------------------------------------
   #
@@ -765,6 +771,7 @@ Resources:
         - Key: "soar:dynamodb:no-pit-recovery"
           Value: ""
 
+
   #-------------------------------------------------------------------------------
   #
   # The DynamoDB table containing cached get_account_data
@@ -779,6 +786,24 @@ Resources:
       TableName: cached-account-data
       Tags:
         "soar:dynamodb:no-pit-recovery": ""
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # The DynamoDB table containing each account's enabled Security Hub controls in
+  # the format "<account-number>#<control-id>".
+  #
+  #-------------------------------------------------------------------------------
+
+  EnabledControls:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      SSESpecification:
+        SSEEnabled: true
+      TableName: enabled-controls
+      Tags:
+        "soar:dynamodb:no-pit-recovery": ""
+
 
   #-------------------------------------------------------------------------------
   #
@@ -913,6 +938,44 @@ Resources:
           TICKETS_TABLE_NAME: !Ref Tickets
           EXPIRATION_DAYS: !Ref ClosedTicketExpirationInDays
 
+
+  #-------------------------------------------------------------------------------
+  #
+  # The function to sync the enabled controls per account table, so we can use it
+  # for looking up findings that should be suppressed as soon as we encounter
+  # them.
+  #
+  #-------------------------------------------------------------------------------
+
+  SyncEnabledControlsTableFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/controls/sync_enabled_controls_table/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:GetEnabledStandards
+                - securityhub:ListSecurityControlDefinitions
+                - securityhub:ListStandardsControlAssociations
+              Resource: '*'
+            - Sid: TablePermissions
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt EnabledControls.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref EnabledControls
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+      
 
   #-------------------------------------------------------------------------------
   #
@@ -2757,7 +2820,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt OpenAIPromptsSyncerFunction.Arn
       FunctionName: !Ref OpenAIPromptsSyncerFunction
-      DummyProperty: 'jgfdcf'  # Change this value whenever openai-prompts changes
+      DummyProperty: 'ytfv'  # Change this value whenever openai-prompts changes
       
 
   #-------------------------------------------------------------------------------

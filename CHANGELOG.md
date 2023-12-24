@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.6.3
+    * Updated a couple of AI prompts.
+
 ## v1.6.2
     * New accounts SUPPRESS failed findings rather than defer them - nothing should fail in a new account anyway.
 

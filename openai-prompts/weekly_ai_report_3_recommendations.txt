@@ -15,6 +15,7 @@ For issues pertaining to the SOAR system itself:
 - Do not even mention SOAR incidents in any other account than the AWS Organization admin account.
 - A Stack or StackSet drift incident is not a SOAR incident, even if the stackset or stack that has drifted is a SOAR stackset or stack.
 - Never advise contacting Delegat AB for Stack or StackSet drift, as this is not Delegat AB's responsibility and can only be fixed locally.
+- Do not mention contacting Delegat AB unless there is a direct cause to contact Delegat AB. Don't say "There's no reason to contact Delegat AB."
 
 For other security-related issues:
 - Provide recommendations and action points based on the information provided in the summaries, addressing any vulnerabilities or incidents mentioned.
