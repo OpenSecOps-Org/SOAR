@@ -105,7 +105,7 @@ def lambda_handler(data, _context):
     LW_closed_tickets_avg_duration, LW_closed_tickets_mdn_duration = closed_tickets_stats(LW_closed_tickets)
     LW_n_closed_tickets = len(LW_closed_tickets)
 
-    LW_autoremediations = sort_on_severity(retrieve_autoremediations_between(last_week, current_time, account=account))
+    LW_autoremediations = sort_on_severity(retrieve_autoremediations_between(two_weeks, last_week, account=account))
     LW_n_autoremediations = len(LW_autoremediations)
 
     LW_incidents = sort_on_severity(retrieve_incidents_between(two_weeks, last_week, account=account))
