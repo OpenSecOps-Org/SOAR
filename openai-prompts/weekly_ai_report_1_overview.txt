@@ -89,8 +89,8 @@
 3. Output the literal string "[[INSERT autoremediations_severity_level_breakdown_html_table]]", without the quotes as a placeholder.
 
 [INCIDENTS]
-1. Provide information about the total number of incidents this week and over how many accounts they were distributed.
-2. Use the instructions under "Area Summaries" to analyze this_week.incidents_redux and summarize all general areas they pertain to in one sentence. Do not use bullet lists or tables. Brevity is of the essence. Make absolutely sure that you include the SOAR failure area if there are SOAR incidents.
+1. Provide information about the total number of incidents this week and over how many accounts they were distributed. You may want to comment on how the incidents are distributed over accounts (many? a few?) and environments (PROD? DEV?) and what this might mean.
+2. Use the instructions under "Area Summaries" to analyze this_week.incidents_redux and summarize all general areas they pertain to in one sentence. Do not use bullet lists or tables. Brevity is of the essence. Make absolutely sure that you include the SOAR failure area if there are SOAR incidents. Do not even mention contacting Delegat AB unless there are SOAR incidents.
 3. Output the literal string "[[INSERT incidents_severity_level_breakdown_html_table]]", without the quotes as a placeholder.
 
 [ACCOUNTS BREAKDOWN]

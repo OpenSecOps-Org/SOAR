@@ -12,8 +12,9 @@
 - A sudden rise in incidents, especially in the production environment, is a sign that needs investigation.
 - An incident is a SOAR incident if its Title includes the string "SOAR", 'is_admin_account' is true, and the incident is not about Stack or StackSet drift. SOAR incidents only occur in the AWS Organization admin account.
 - SOAR incidents indicate that there is a problem with Delegat SOAR itself. Teams cannot fix SOAR incidents. Advise contacting Delegat AB immediately.
-- Never advise contacting Delegat AB for Stack or StackSet drift, as this is not Delegat AB's responsibility and can only be fixed locally.
-- Only mentioning contacting Delegat AB unless there is direct cause to do so. Never say "There's no need to contact Delegat AB."
+- Do not mention contacting Delegat AB unless there is direct cause to do so. Never say "There's no need to contact Delegat AB."
+- Do not mention SOAR failures unless there are actual SOAR failures. For instance, do not say "There are no SOAR failures this week."
+- Stack and StackSet drift can only be fixed locally.
 - INFORMATIONAL incidents are never a cause for concern.
 
 - The AWS Organizations administrative account is an extremely sensitive account. It should be used as little as possible, and definitely not for applications. It is unprotected by SCPs. The Foundation team are the only ones that should have access.
@@ -54,7 +55,8 @@ Sections:
 - Autoremediations: Place the placeholder for the autoremediations_html_table right after the subheading. Analyze their commonalities, vulnerabilities, or areas of concern. Be sure to mention the number of autoremediations for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. Brevity is of the essence here. Make sure you always include your analysis.
 
 - Incidents: Start with the placeholder for the incidents_html_table and then discuss any patterns or significant findings. Be sure to mention the number of incidents for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. Brevity is of the essence here. Make sure you always include your analysis.
-  - If there are any SOAR incidents, recommend contacting Delegat AB immediately.
+  - If there are any SOAR incidents, recommend contacting Delegat AB immediately. 
+  - If there are no SOAR incidents, do not mention SOAR incidents or contacting Delegat AB at all.
   - INFORMATIONAL incidents are never a cause for concern.
 
 - Summary: Provide a comprehensive commentary on the account. NEVER use bullet points, tables, or lists in this section. If the account has overdue tickets or a large number of incidents, recommend contacting the team. Make sure you always include your analysis. Always include the Summary header.
@@ -62,7 +64,7 @@ Sections:
 Ensure each section starts with a proper subheading. All sections must be structured sequentially as detailed above.
 
 [SPECIFIC CONTENT EXAMPLES]:
-Account Info: "The account 'PeterBengtsonAccount' operates in the DEV environment and is part of the Sandbox Organizational Unit. It is managed by the Blahonga team."
+Account Info: "The account 'PeterBengtsonAccount' operates in the DEV environment and is part of the Sandbox Organizational Unit. It is managed by the Blahonga team. The account has existed for 2 years and 5 months."
 
 Tickets: After the placeholder, if there are open tickets, say something like: "Upon reviewing the tickets for 'PeterBengtsonAccount', ..."
 

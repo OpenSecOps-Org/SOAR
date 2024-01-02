@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.6.5
+    * Modified weekly AI report prompts.
+
 ## v1.6.4
     * Corrected autoremediation count for last week: was always the same as this week.
 

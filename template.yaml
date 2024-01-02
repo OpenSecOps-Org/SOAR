@@ -2248,7 +2248,6 @@ Resources:
         RememberIncidentOpenedFunctionArn: !GetAtt RememberIncidentOpenedFunction.Arn
         ComputePenaltyScoreFunctionArn: !GetAtt ComputePenaltyScoreFunction.Arn
 
-
         LocalIncidentSuppressionsName: !Ref LocalIncidentSuppressions
         LocalIncidentAutoRemSuppressionsName: !Ref LocalIncidentAutoRemSuppressions
         OpenAIPromptsTableName: !Ref OpenAIPromptsTable
@@ -2820,7 +2819,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt OpenAIPromptsSyncerFunction.Arn
       FunctionName: !Ref OpenAIPromptsSyncerFunction
-      DummyProperty: 'ytfv'  # Change this value whenever openai-prompts changes
+      DummyProperty: 'zzzesw'  # Change this value whenever openai-prompts changes
       
 
   #-------------------------------------------------------------------------------
