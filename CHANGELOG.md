@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.7.2
+    * Fixed permission for table.
+
 ## v1.7.1
     * Recreated Delegat repo.
 

@@ -1066,6 +1066,8 @@ Resources:
             TableName: !Ref CachedAccountData
         - DynamoDBCrudPolicy:
             TableName: !Ref OpenAIPromptsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref EnabledControls
 
         - StepFunctionsExecutionPolicy:
             StateMachineName: !Ref SOARAttemptAutoRemediation
