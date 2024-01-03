@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.7.1
+    * Recreated Delegat repo.
+
 ## v1.7.0
     * Each control failed finding is now checked against the cached set of Security Hub controls active in
       the specific account. This means that all accounts now can have different Security Hub control profiles
