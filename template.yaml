@@ -1337,17 +1337,17 @@ Resources:
             Name: ClearAccountDataCache
             Description: Clear account data cache every defined interval
             Enabled: True
-    Policies:
-      - Statement:
-          - Sid: CacheTablePermissions
-            Effect: Allow
-            Action:
-              - dynamodb:Scan
-              - dynamodb:BatchWriteItem
-            Resource: !GetAtt CachedAccountData.Arn
-    Environment:
-      Variables:
-        CACHED_ACCOUNT_DATA_TABLE_NAME: !Ref CachedAccountData
+      Policies:
+        - Statement:
+            - Sid: CacheTablePermissions
+              Effect: Allow
+              Action:
+                - dynamodb:Scan
+                - dynamodb:BatchWriteItem
+              Resource: !GetAtt CachedAccountData.Arn
+      Environment:
+        Variables:
+          CACHED_ACCOUNT_DATA_TABLE_NAME: !Ref CachedAccountData
 
   QueryChatGPTFunction:
     Type: AWS::Serverless::Function
