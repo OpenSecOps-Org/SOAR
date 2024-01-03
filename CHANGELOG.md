@@ -1,5 +1,10 @@
 # Change Log
 
+## v1.7.0
+    * Each control failed finding is now checked against the cached set of Security Hub controls active in
+      the specific account. This means that all accounts now can have different Security Hub control profiles
+      active, to fully support the new centralised configuration in Security Hub.
+
 ## v1.6.7
     * Corrected cache emptying bug.
 

@@ -974,6 +974,7 @@ Resources:
         TicketsName: !Ref Tickets
         CachedAccountDataName: !Ref CachedAccountData
         OpenAIPromptsTableName: !Ref OpenAIPromptsTable
+        EnabledControlsName: !Ref EnabledControls
 
         SOAREnabled: !Ref SOAREnabled
         DeferIncidents: !Ref DeferIncidents
@@ -2694,7 +2695,7 @@ Resources:
         SyncControlsEvent:
           Type: Schedule
           Properties:
-            Schedule: cron(0 */3 * * ? *)  # Scheduled to run every three hours
+            Schedule: cron(0 * * * ? *)  # Scheduled to run every hour
 
   SOARSyncEnabledControlsTableLogGroup:
     Type: AWS::Logs::LogGroup

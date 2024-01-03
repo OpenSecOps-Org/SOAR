@@ -369,6 +369,37 @@ States:
                         Variable: $.account.AccountNew
                         StringEquals: 'Yes'
                 Next: Suppress Finding
+        Default: Get Control Enabled Status In Account
+
+    Get Control Enabled Status In Account:
+        Type: Task
+        Resource: 'arn:aws:states:::dynamodb:getItem'
+        Parameters:
+            TableName: '${EnabledControlsName}'
+            Key:
+                id:
+                    S.$: "States.Format('{}#{}', $.finding.AwsAccountId, $.finding.Id)"
+        ResultPath: $.db.enabled_controls
+        Retry:
+            - ErrorEquals:
+                - States.Timeout
+                - DynamoDB.AmazonDynamoDBException
+                - DynamoDB.InternalServerErrorException
+                - DynamoDB.SdkClientException
+                - Lambda.ServiceException
+                - Lambda.AWSLambdaException
+                - Lambda.SdkClientException
+              IntervalSeconds: 3
+              MaxAttempts: 100
+              BackoffRate: 3
+        Next: Is the Control Enabled In This Account?
+
+    Is the Control Enabled In This Account?:
+        Type: Choice
+        Choices:
+            - Variable: "$.db.enabled_controls.Item"
+              IsPresent: false
+              Next: Suppress Finding
         Default: Already Has or Has Had Ticket?
 
     Already Has or Has Had Ticket?:
