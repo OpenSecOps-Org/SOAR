@@ -941,44 +941,6 @@ Resources:
 
   #-------------------------------------------------------------------------------
   #
-  # The function to sync the enabled controls per account table, so we can use it
-  # for looking up findings that should be suppressed as soon as we encounter
-  # them.
-  #
-  #-------------------------------------------------------------------------------
-
-  SyncEnabledControlsTableFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: functions/controls/sync_enabled_controls_table/
-      Policies:
-        - Statement:
-            - Sid: AssumeTheRole
-              Effect: Allow
-              Action:
-                - sts:AssumeRole
-              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
-            - Sid: SecHubPermissions
-              Effect: Allow
-              Action:
-                - securityhub:GetEnabledStandards
-                - securityhub:ListSecurityControlDefinitions
-                - securityhub:ListStandardsControlAssociations
-              Resource: '*'
-            - Sid: TablePermissions
-              Effect: Allow
-              Action:
-                - dynamodb:PutItem
-                - dynamodb:DeleteItem
-              Resource: !GetAtt EnabledControls.Arn
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref EnabledControls
-          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
-      
-
-  #-------------------------------------------------------------------------------
-  #
   # The main state machine
   #
   #-------------------------------------------------------------------------------
@@ -1233,7 +1195,7 @@ Resources:
   GetAccountDataFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/account_data/get_account_data/
+      CodeUri: functions/accounts/get_account_data/
       Policies:
         - Statement:
             - Sid: OrganizationsPermissions
@@ -1366,7 +1328,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       MemorySize: 192
-      CodeUri: functions/account_data/clear_account_data/
+      CodeUri: functions/accounts/clear_account_data/
       Events:
         EmptyOnSchedule:
           Type: Schedule
@@ -2699,6 +2661,101 @@ Resources:
 
   #-------------------------------------------------------------------------------
   #
+  # State machine and functions to sync all enabled controls to the appropriate
+  # DynamoDB table.
+  #
+  #-------------------------------------------------------------------------------
+
+  SOARSyncEnabledControlsTable:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachines/sync_enabled_controls_table.asl.yaml
+      DefinitionSubstitutions:
+        ListAccountsFunctionArn: !GetAtt ListAccountsFunction.Arn
+        SyncEnabledControlsTableFunctionArn: !GetAtt SyncEnabledControlsTableFunction.Arn
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ListAccountsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SyncEnabledControlsTableFunction
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - logs:*
+              Resource: '*'
+      Logging:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt SOARSyncEnabledControlsTableLogGroup.Arn
+        IncludeExecutionData: false
+        Level: ERROR
+      Events:
+        SyncControlsEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 */3 * * ? *)  # Scheduled to run every three hours
+
+  SOARSyncEnabledControlsTableLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+
+  ListAccountsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/accounts/list_accounts/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:ListMembers
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          SECURITY_ACCOUNT_ID: !Ref SecurityAccountId
+
+
+  SyncEnabledControlsTableFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/controls/sync_enabled_controls_table/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:GetEnabledStandards
+                - securityhub:ListSecurityControlDefinitions
+                - securityhub:ListStandardsControlAssociations
+              Resource: '*'
+            - Sid: TablePermissions
+              Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt EnabledControls.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref EnabledControls
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+      
+
+  #-------------------------------------------------------------------------------
+  #
   # Monitoring. Only the state machines should be monitored as they
   # orchestrate the lambda functions which are expected to fail in certain
   # circumstances without this generating an incident.
@@ -2790,6 +2847,28 @@ Resources:
       Dimensions:
         - Name: StateMachineArn
           Value: !Ref SOARWeeklyAIReport
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  AlarmSyncEnabledControlsTable:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: INFRA-SOAR-SyncEnabledControlsTable-Failure-HIGH
+      AlarmDescription: The SOARSyncEnabledControlsTable state machine failed.
+      ActionsEnabled: true
+      OKActions: []
+      AlarmActions: []
+      InsufficientDataActions: []
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref SOARSyncEnabledControlsTable
       Period: 60
       EvaluationPeriods: 1
       DatapointsToAlarm: 1

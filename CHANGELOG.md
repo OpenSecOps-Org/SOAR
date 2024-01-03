@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.6.6
+    * The DynamoDB table `enabled_controls` now contains the enabled Security Hub controls for each individual
+      account. This is maintained through a Step Function executing every three hours.
+
 ## v1.6.5
     * Modified weekly AI report prompts.
 

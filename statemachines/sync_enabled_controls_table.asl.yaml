@@ -1,0 +1,42 @@
+Comment: "A state machine that syncs Security Hub controls for all accounts where Security Hub is enabled."
+StartAt: ListAccounts
+States:
+    ListAccounts:
+        Type: Task
+        Resource: "${ListAccountsFunctionArn}"
+        ResultPath: "$.account_ids"
+        Retry:
+            - ErrorEquals:
+                  - States.Timeout
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+              IntervalSeconds: 3
+              MaxAttempts: 10
+              BackoffRate: 3
+        Next: MapSyncTasks
+
+    MapSyncTasks:
+        Type: Map
+        InputPath: $
+        ItemsPath: "$.account_ids"
+        MaxConcurrency: 0
+        Iterator:
+            StartAt: SyncSecurityHubControls
+            States:
+                SyncSecurityHubControls:
+                    Type: Task
+                    Resource: "${SyncEnabledControlsTableFunctionArn}"
+                    Parameters:
+                        "account_id.$": "$"
+                    Retry:
+                        - ErrorEquals:
+                              - States.Timeout
+                              - Lambda.ServiceException
+                              - Lambda.AWSLambdaException
+                              - Lambda.SdkClientException
+                          IntervalSeconds: 3
+                          MaxAttempts: 10
+                          BackoffRate: 3
+                    End: true
+        End: true
