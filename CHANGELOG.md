@@ -1,5 +1,10 @@
 # Change Log
 
+
+## v1.7.3
+    * Fixed key composition error causing all controls to be suppressed. Active controls per account
+      now work as intended.
+
 ## v1.7.2
     * Fixed permission for table.
 

@@ -378,7 +378,7 @@ States:
             TableName: '${EnabledControlsName}'
             Key:
                 id:
-                    S.$: "States.Format('{}#{}', $.finding.AwsAccountId, $.finding.Id)"
+                    S.$: "States.Format('{}#{}', $.finding.AwsAccountId, $.finding.Compliance.SecurityControlId)"
         ResultPath: $.db.enabled_controls
         Retry:
             - ErrorEquals:
