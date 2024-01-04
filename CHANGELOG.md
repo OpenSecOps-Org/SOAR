@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.7.4
+    * State machine and event renames.
+    * Removed the suppression checks for duplicate issues. Not needed anymore.
 
 ## v1.7.3
     * Fixed key composition error causing all controls to be suppressed. Active controls per account

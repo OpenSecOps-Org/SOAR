@@ -945,10 +945,10 @@ Resources:
   #
   #-------------------------------------------------------------------------------
 
-  SOARSecHubFindingsProcessor:
+  SOARASFFProcessor:
     Type: AWS::Serverless::StateMachine
     Properties:
-      DefinitionUri: statemachines/sec_hub_findings_processor.asl.yaml
+      DefinitionUri: statemachines/asff_processor.asl.yaml
       DefinitionSubstitutions:
         SuppressFindingFunctionArn: !GetAtt SuppressFindingFunction.Arn
         UpdateRemediatedFindingFunctionArn: !GetAtt UpdateRemediatedFindingFunction.Arn
@@ -981,11 +981,11 @@ Resources:
         DeferAutoRemediations: !Ref DeferAutoRemediations
         DeferTeamFixes: !Ref DeferTeamFixes
 
-        AttemptAutoRemediationSMArn: !Ref SOARAttemptAutoRemediation
+        AutoRemediationsSMArn: !Ref SOARAutoRemediations
         IncidentsSMArn: !Ref SOARIncidents
 
       Events:
-        SecHubFindingImported:
+        ASFFFindingImported:
           Type: EventBridgeRule
           Properties:
             EventBusName: !Ref CustomEventBusName
@@ -1008,7 +1008,7 @@ Resources:
             - Effect: Allow
               Action: states:StartExecution
               Resource:
-                - !Ref SOARAttemptAutoRemediation
+                - !Ref SOARAutoRemediations
                 - !Ref SOARIncidents
             - Effect: Allow
               Action:
@@ -1070,18 +1070,18 @@ Resources:
             TableName: !Ref EnabledControls
 
         - StepFunctionsExecutionPolicy:
-            StateMachineName: !Ref SOARAttemptAutoRemediation
+            StateMachineName: !Ref SOARAutoRemediations
         - StepFunctionsExecutionPolicy:
             StateMachineName: !Ref SOARIncidents
 
       Logging:
         Destinations: 
           - CloudWatchLogsLogGroup: 
-              LogGroupArn: !GetAtt SOARSecHubFindingsProcessorLogGroup.Arn
+              LogGroupArn: !GetAtt SOARASFFProcessorLogGroup.Arn
         IncludeExecutionData: false
         Level: ERROR
 
-  SOARSecHubFindingsProcessorLogGroup:
+  SOARASFFProcessorLogGroup:
     Type: AWS::Logs::LogGroup
     Properties: 
       RetentionInDays: 30
@@ -1384,10 +1384,10 @@ Resources:
   #
   #-------------------------------------------------------------------------------
 
-  SOARAttemptAutoRemediation:
+  SOARAutoRemediations:
     Type: AWS::Serverless::StateMachine
     Properties:
-      DefinitionUri: statemachines/attempt_autoremediation.asl.yaml
+      DefinitionUri: statemachines/autoremediations.asl.yaml
       DefinitionSubstitutions:
         FetchBucketTagsFunctionArn: !GetAtt FetchBucketTagsFunction.Arn
         AutoRemediateDynamoDB2FunctionArn: !GetAtt AutoRemediateDynamoDB2Function.Arn # DynamoDB.2
@@ -1493,11 +1493,11 @@ Resources:
       Logging:
         Destinations: 
           - CloudWatchLogsLogGroup: 
-              LogGroupArn: !GetAtt SOARAttemptAutoRemediationLogGroup.Arn
+              LogGroupArn: !GetAtt SOARAutoRemediationsLogGroup.Arn
         IncludeExecutionData: false
         Level: ERROR
 
-  SOARAttemptAutoRemediationLogGroup:
+  SOARAutoRemediationsLogGroup:
     Type: AWS::Logs::LogGroup
     Properties: 
       RetentionInDays: 30
@@ -2769,11 +2769,11 @@ Resources:
   #
   #-------------------------------------------------------------------------------
 
-  AlarmSecHubFindingsProcessor:
+  AlarmASFFProcessor:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: INFRA-SOAR-Failure-HIGH
-      AlarmDescription: The SOARSecHubFindingsProcessor state machine failed.
+      AlarmName: INFRA-SOAR-ASFF-Processor-SM-Failure-HIGH
+      AlarmDescription: The SOARASFFProcessor state machine failed.
       ActionsEnabled: true
       OKActions: []
       AlarmActions: []
@@ -2783,7 +2783,7 @@ Resources:
       Statistic: Sum
       Dimensions:
         - Name: StateMachineArn
-          Value: !Ref SOARSecHubFindingsProcessor
+          Value: !Ref SOARASFFProcessor
       Period: 60
       EvaluationPeriods: 1
       DatapointsToAlarm: 1
@@ -2791,11 +2791,11 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
-  AlarmAttemptAutoRemediation:
+  AlarmAutoRemediations:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: INFRA-SOAR-AttemptAutoRemediation-Failure-HIGH
-      AlarmDescription: The SOARAttemptAutoRemediation state machine failed.
+      AlarmName: INFRA-SOAR-AutoRemediations-SM-Failure-HIGH
+      AlarmDescription: The SOARAutoRemediations state machine failed.
       ActionsEnabled: true
       OKActions: []
       AlarmActions: []
@@ -2805,7 +2805,7 @@ Resources:
       Statistic: Sum
       Dimensions:
         - Name: StateMachineArn
-          Value: !Ref SOARAttemptAutoRemediation
+          Value: !Ref SOARAutoRemediations
       Period: 60
       EvaluationPeriods: 1
       DatapointsToAlarm: 1
@@ -2816,7 +2816,7 @@ Resources:
   AlarmIncidents:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: INFRA-SOAR-Incidents-Failure-HIGH
+      AlarmName: INFRA-SOAR-Incidents-SM-Failure-HIGH
       AlarmDescription: The SOARIncidents state machine failed.
       ActionsEnabled: true
       OKActions: []
@@ -2838,7 +2838,7 @@ Resources:
   AlarmWeeklyAIReport:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: INFRA-SOAR-WeeklyAIReport-Failure-HIGH
+      AlarmName: INFRA-SOAR-Weekly-AI-Report-SM-Failure-HIGH
       AlarmDescription: The SOARWeeklyAIReport state machine failed.
       ActionsEnabled: true
       OKActions: []
@@ -2860,7 +2860,7 @@ Resources:
   AlarmSyncEnabledControlsTable:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: INFRA-SOAR-SyncEnabledControlsTable-Failure-HIGH
+      AlarmName: INFRA-SOAR-Sync-Enabled-Controls-Table-SM-Failure-HIGH
       AlarmDescription: The SOARSyncEnabledControlsTable state machine failed.
       ActionsEnabled: true
       OKActions: []
