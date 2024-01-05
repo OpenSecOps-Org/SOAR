@@ -967,6 +967,7 @@ Resources:
         RememberTicketOpenedFunctionArn: !GetAtt RememberTicketOpenedFunction.Arn
         RememberTicketClosedFunctionArn: !GetAtt RememberTicketClosedFunction.Arn
         RememberAutoRemediationDoneFunctionArn: !GetAtt RememberAutoRemediationDoneFunction.Arn
+        GetTicketAndDecideFunctionArn: !GetAtt GetTicketAndDecideFunction.Arn
 
         RemediatableSecHubControlsName: !Ref RemediatableSecHubControls
         LocalControlSuppressionsName: !Ref LocalControlSuppressions
@@ -1053,6 +1054,8 @@ Resources:
             FunctionName: !Ref RememberTicketClosedFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref RememberAutoRemediationDoneFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref GetTicketAndDecideFunction
 
         - DynamoDBReadPolicy:
             TableName: !Ref RemediatableSecHubControls
@@ -1194,6 +1197,23 @@ Resources:
       Environment:
         Variables:
           PRODUCT_NAME: !Ref ProductName
+
+
+  GetTicketAndDecideFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/get_ticket_and_decide/
+      Policies:
+        - Statement:
+            - Sid: TicketTablePermissions
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt Tickets.Arn
+      Environment:
+        Variables:
+          TICKETS_TABLE_NAME: !Ref Tickets
+
 
   GetAccountDataFunction:
     Type: AWS::Serverless::Function

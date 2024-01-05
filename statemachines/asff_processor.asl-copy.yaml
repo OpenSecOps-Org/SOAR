@@ -1,10 +1,8 @@
 Comment: A state machine that processes Security Hub findings.
-StartAt: Setup, Get Ticket and Decide
+StartAt: Setup
 States:
-
-    Setup, Get Ticket and Decide:
-        Type: Task
-        Resource: '${GetTicketAndDecideFunctionArn}'
+    Setup:
+        Type: Pass
         Parameters:
             account: {}
             finding.$: '$.detail.findings[0]'
@@ -26,50 +24,87 @@ States:
             DeferIncidents: '${DeferIncidents}'
             DeferAutoRemediations: '${DeferAutoRemediations}'
             DeferTeamFixes: '${DeferTeamFixes}'
+        Next: SOAR Enabled?
+
+    SOAR Enabled?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.SOAREnabled
+                StringEquals: 'No'
+                Next: Do Nothing
+        Default: Get Ticket
+
+    Get Ticket:
+        Type: Task
+        Resource: 'arn:aws:states:::dynamodb:getItem'
+        Parameters:
+            TableName: '${TicketsName}'
+            Key:
+                id:
+                    S.$: $.finding.Id
+        ResultPath: $.db.tickets
         Retry:
             -
                 ErrorEquals:
                     - States.Timeout
-                    - States.TaskFailed
+                    - DynamoDB.AmazonDynamoDBException
+                    - DynamoDB.InternalServerErrorException
+                    - DynamoDB.SdkClientException
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
                 IntervalSeconds: 3
                 MaxAttempts: 100
                 BackoffRate: 3
-        Next: Branch on Decision
+        Next: 'ARCHIVED, SUPPRESSED, RESOLVED?'
 
-    Branch on Decision:
+    'ARCHIVED, SUPPRESSED, RESOLVED?':
         Type: Choice
         Choices:
             -
-                Variable: $.ASFF_decision
-                StringEquals: 'do_nothing'
+                Variable: $.finding.RecordState
+                StringEquals: ARCHIVED
+                Next: Finding Has Open Ticket?
+            -
+                Variable: $.finding.Workflow.Status
+                StringEquals: SUPPRESSED
+                Next: Finding Has Open Ticket?
+            -
+                Variable: $.finding.Workflow.Status
+                StringEquals: RESOLVED
+                Next: Finding Has Open Ticket?
+        Default: NOTIFIED?
+
+    NOTIFIED?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.finding.Workflow.Status
+                StringEquals: NOTIFIED
                 Next: Do Nothing
+        Default: Compliance Evaluation Error?
+
+    Compliance Evaluation Error?:
+        Type: Choice
+        Choices:
             -
-                Variable: $.ASFF_decision
-                StringEquals: 'suppress_finding'
+                And:
+                    -
+                        Variable: $.finding.Compliance.Status
+                        IsPresent: true
+                    -
+                        Or:
+                            -
+                                Variable: $.finding.Compliance.Status
+                                StringEquals: WARNING
+                            -
+                                Variable: $.finding.Compliance.Status
+                                StringEquals: NOT_AVAILABLE
                 Next: Suppress Finding
-            -
-                Variable: $.ASFF_decision
-                StringEquals: 'close_ticket'
-                Next: Get Account Data for Closing
-            -
-                Variable: $.ASFF_decision
-                StringEquals: 'failed_control'
-                Next: Failed Control
-            -
-                Variable: $.ASFF_decision
-                StringEquals: 'incident'
-                Next: Get Account Data For Incident
-        Default: Nonexistent Decision
+        Default: Get Account Data
 
-
-    Failed Control:
-        Type: Pass
-        Next: Get Account Data For Control
-
-    Get Account Data For Control:
+    Get Account Data:
         Type: Task
         Resource: '${GetAccountDataFunctionArn}'
         InputPath: $.finding.AwsAccountId
@@ -85,7 +120,33 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 100
                 BackoffRate: 3
-        Next:  New Account?
+        Next: Is a Control?
+
+    Is a Control?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.finding.Compliance.SecurityControlId
+                IsPresent: true
+                Next: It's a Control
+            -
+                Variable: $.DeferIncidents
+                StringEquals: 'Yes'
+                Next: Do Nothing
+        Default: Handle Incident
+
+    It's a Control:
+        Type: Pass
+        Next: PASSED?
+
+    PASSED?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.finding.Compliance.Status
+                StringEquals: PASSED
+                Next: Do Nothing
+        Default: New Account?
 
     New Account?:
         Type: Choice
@@ -675,25 +736,6 @@ States:
                 BackoffRate: 3
         End: True
 
-
-    Get Account Data For Incident:
-        Type: Task
-        Resource: '${GetAccountDataFunctionArn}'
-        InputPath: $.finding.AwsAccountId
-        ResultPath: $.account
-        Retry:
-            -
-                ErrorEquals:
-                    - States.Timeout
-                    - States.TaskFailed
-                    - Lambda.ServiceException
-                    - Lambda.AWSLambdaException
-                    - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
-        Next:  Handle Incident
-
     Handle Incident:
         Type: Task
         Resource: 'arn:aws:states:::states:startExecution.sync:2'
@@ -715,6 +757,58 @@ States:
         OutputPath: $.Output
         End: true
 
+
+    Finding Has Open Ticket?:
+        Type: Choice
+        Choices:
+            -
+                And:
+                    -
+                        Variable: $.finding.UserDefinedFields.TicketOpen
+                        IsPresent: true
+                    -
+                        Variable: $.finding.UserDefinedFields.TicketOpen
+                        StringEquals: 'Yes'
+                Next: Setup Ticket ID From Finding
+        Default: Table Has Open Ticket?
+
+    Table Has Open Ticket?:
+        Type: Choice
+        Choices:
+            - 
+                And:
+                    -
+                        Variable: $.db.tickets.Item
+                        IsPresent: true
+                    -
+                        Variable: $.db.tickets.Item.closed_at
+                        StringMatches: "NULL#*"
+                Next: Setup Ticket ID From Table
+        Default: Do Nothing
+
+    Setup Ticket ID From Finding:
+        Type: Pass
+        Parameters:
+            account.$: $.account
+            finding.$: $.finding
+            tags.$: $.tags
+            actions.$: $.actions
+            messages.$: $.messages
+            db.$: $.db
+            ticket_id.$: $.finding.UserDefinedFields.TicketId
+        Next: Setup Ticket ID From Table
+
+    Setup Ticket ID From Table:
+        Type: Pass
+        Parameters:
+            account.$: $.account
+            finding.$: $.finding
+            tags.$: $.tags
+            actions.$: $.actions
+            messages.$: $.messages
+            db.$: $.db
+            ticket_id.$: $.db.tickets.Item.ticket_id.S
+        Next: Get Account Data for Closing
 
     Get Account Data for Closing:
         Type: Task
@@ -899,6 +993,3 @@ States:
                 BackoffRate: 3
         End: true
 
-    Nonexistent Decision:
-        Type: Fail
-        Cause: Nonexistent decision type for the finding.

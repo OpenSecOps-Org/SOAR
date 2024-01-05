@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.7.5
+    * ASFF processor refactored for fewer state changes in the vast majority of cases. This should
+      halve the AWS Step Functions costs.
+
 ## v1.7.4
     * State machine and event renames.
     * Removed the suppression checks for duplicate issues. Not needed anymore.
