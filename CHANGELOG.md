@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.7.6
+    * Added robustness in `get_ticket_and_decide`.
+
 ## v1.7.5
     * ASFF processor refactored for fewer state changes in the vast majority of cases. This should
       halve the AWS Step Functions costs.

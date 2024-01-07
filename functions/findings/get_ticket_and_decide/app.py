@@ -19,7 +19,9 @@ def lambda_handler(data, _context):
     # For convenience 
     finding = data['finding']
     workflow_status = finding['Workflow']['Status']
-    
+    compliance = finding.get('Compliance', {})
+    compliance_status = compliance.get('Status')
+                                    
     # Retrieve the ticket from DynamoDB using the finding ID and assign it to data['db']['tickets']
     data['db']['tickets'] = get_ticket(finding['Id'])
 
@@ -51,14 +53,13 @@ def lambda_handler(data, _context):
         return data
     
     # Compliance evaluation error?
-    compliance_status = finding['Compliance']['Status']
-    if compliance_status in ['WARNING', 'NOT_AVAILABLE']:
+    if compliance_status and compliance_status in ['WARNING', 'NOT_AVAILABLE']:
         data['ASFF_decision'] = 'suppress_finding'
         data['ASFF_decision_reason'] = 'Compliance evaluation error'
         return data
     
     # Is it a control?
-    if finding['Compliance'].get('SecurityControlId'):
+    if compliance.get('SecurityControlId'):
         # It is a control. Is it PASSED?
         if compliance_status == 'PASSED':
             # If passed, do nothing
