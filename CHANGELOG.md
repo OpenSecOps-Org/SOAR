@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.8.1
+    * Fixed references.
+
 ## v1.8.0
     * CloudWatch dashboard for the SOAR.
 

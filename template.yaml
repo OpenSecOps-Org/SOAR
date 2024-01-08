@@ -3041,7 +3041,7 @@ Resources:
                 "title": "Incidents",
                 "metrics": [
                     [ "AWS/States", "ExecutionsStarted", 
-                      "StateMachineArn", "${Incidents.Arn}", 
+                      "StateMachineArn", "${SOARIncidents.Arn}", 
                       { "region": "${AWS::Region}" } ]
                 ],
                 "view": "timeSeries",
@@ -3059,7 +3059,7 @@ Resources:
                 "title": "AutoRemediations",
                 "metrics": [
                     [ "AWS/States", "ExecutionsStarted", 
-                      "StateMachineArn", "${AutoRemediations.Arn}", 
+                      "StateMachineArn", "${SOARAutoRemediations.Arn}", 
                       { "region": "${AWS::Region}" } ]
                 ],
                 "view": "timeSeries",
