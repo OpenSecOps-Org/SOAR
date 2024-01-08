@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.8.2
+    * Dashboard widgets for tickets opened and closed.
+
 ## v1.8.1
     * Fixed references.
 

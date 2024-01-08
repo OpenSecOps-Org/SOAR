@@ -2981,7 +2981,23 @@ Resources:
 
             {
               "type": "metric",
-              "width": 12,
+              "width": 8,
+              "properties": {
+                  "title": "State Transitions",
+                  "metrics": [
+                      [ "AWS/States", "ConsumedCapacity", "ServiceMetric", "StateTransition", { "region": "${AWS::Region}" } ]
+                  ],
+                  "view": "timeSeries",
+                  "stacked": false,
+                  "region": "${AWS::Region}",
+                  "period": 86400,
+                  "stat": "Sum"
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 8,
               "properties": {
                 "title": "ASFF Processor Executions",
                 "metrics": [
@@ -3002,23 +3018,7 @@ Resources:
 
             {
               "type": "metric",
-              "width": 6,
-              "properties": {
-                  "title": "State Transitions",
-                  "metrics": [
-                      [ "AWS/States", "ConsumedCapacity", "ServiceMetric", "StateTransition", { "region": "${AWS::Region}" } ]
-                  ],
-                  "view": "timeSeries",
-                  "stacked": false,
-                  "region": "${AWS::Region}",
-                  "period": 86400,
-                  "stat": "Sum"
-              }
-            },
-
-            {
-              "type": "metric",
-              "width": 6,
+              "width": 8,
               "properties": {
                 "title": "ASFF Processor ExecutionsFailed",
                 "metrics": [
@@ -3036,7 +3036,7 @@ Resources:
 
             {
               "type": "metric",
-              "width": 9,
+              "width": 8,
               "properties": {
                 "title": "Incidents",
                 "metrics": [
@@ -3054,7 +3054,7 @@ Resources:
 
             {
               "type": "metric",
-              "width": 9,
+              "width": 8,
               "properties": {
                 "title": "AutoRemediations",
                 "metrics": [
@@ -3072,7 +3072,7 @@ Resources:
 
             {
               "type": "metric",
-              "width": 6,
+              "width": 8,
               "properties": {
                 "title": "AI Report ExecutionTime, ExecutionsFailed",
                 "metrics": [
@@ -3096,6 +3096,42 @@ Resources:
                         "showUnits": true
                     }
                 }
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 8,
+              "properties": {
+                "title": "Tickets Opened",
+                "metrics": [
+                    [ "AWS/States", "LambdaFunctionsSucceeded", 
+                      "LambdaFunctionArn", "${UpdateTicketedFindingFunction.Arn}", 
+                      { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum"
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 8,
+              "properties": {
+                "title": "Tickets Closed",
+                "metrics": [
+                    [ "AWS/States", "LambdaFunctionsSucceeded", 
+                      "LambdaFunctionArn", "${UpdateClosedFindingFunction.Arn}", 
+                      { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum"
               }
             }
             
