@@ -2961,4 +2961,144 @@ Resources:
     Properties:
       ServiceToken: !GetAtt IssueTablesSetupFunction.Arn
       FunctionName: !Ref IssueTablesSetupFunction
+      
+
+  #-------------------------------------------------------------------------------
+  #
+  # CloudWatch SOAR dashboard
+  #
+  #-------------------------------------------------------------------------------
+
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: Delegat_SOAR
+      DashboardBody: !Sub |
+        {
+          "start": "-P4W",
+          "periodOverride": "inherit",
+          "widgets": [
+
+            {
+              "type": "metric",
+              "width": 12,
+              "properties": {
+                "title": "ASFF Processor Executions",
+                "metrics": [
+                  [ 
+                    "AWS/States", "ExecutionsStarted", 
+                    "StateMachineArn", "${SOARASFFProcessor.Arn}",
+                    { "region": "${AWS::Region}" }
+                  ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "stat": "Sum",
+                "period": 86400,
+                "setPeriodToTimeRange": true
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 6,
+              "properties": {
+                  "title": "State Transitions",
+                  "metrics": [
+                      [ "AWS/States", "ConsumedCapacity", "ServiceMetric", "StateTransition", { "region": "${AWS::Region}" } ]
+                  ],
+                  "view": "timeSeries",
+                  "stacked": false,
+                  "region": "${AWS::Region}",
+                  "period": 86400,
+                  "stat": "Sum"
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 6,
+              "properties": {
+                "title": "ASFF Processor ExecutionsFailed",
+                "metrics": [
+                    [ "AWS/States", "ExecutionsFailed", 
+                      "StateMachineArn", "${SOARASFFProcessor.Arn}", 
+                      { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum"
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 9,
+              "properties": {
+                "title": "Incidents",
+                "metrics": [
+                    [ "AWS/States", "ExecutionsStarted", 
+                      "StateMachineArn", "${Incidents.Arn}", 
+                      { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum"
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 9,
+              "properties": {
+                "title": "AutoRemediations",
+                "metrics": [
+                    [ "AWS/States", "ExecutionsStarted", 
+                      "StateMachineArn", "${AutoRemediations.Arn}", 
+                      { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum"
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 6,
+              "properties": {
+                "title": "AI Report ExecutionTime, ExecutionsFailed",
+                "metrics": [
+                    [ { "expression": "m2 / 60000", "label": "Execution Time in Minutes", "id": "e1", "region": "${AWS::Region}" } ],
+                    [ "AWS/States", "ExecutionsFailed", 
+                      "StateMachineArn", "${SOARWeeklyAIReport.Arn}",  
+                      { "region": "${AWS::Region}", "id": "m1", "yAxis": "right" } ],
+                    [ ".", "ExecutionTime", ".", ".", { "region": "${AWS::Region}", "id": "m2", "visible": false } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum",
+                "yAxis": {
+                    "left": {
+                        "label": "Minutes",
+                        "showUnits": false
+                    },
+                    "right": {
+                        "showUnits": true
+                    }
+                }
+              }
+            }
+            
+          ]
+        }
 

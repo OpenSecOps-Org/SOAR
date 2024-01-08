@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.8.0
+    * CloudWatch dashboard for the SOAR.
+
 ## v1.7.6
     * Added robustness in `get_ticket_and_decide`.
 
