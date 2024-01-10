@@ -1,0 +1,3 @@
+boto3==1.33.12
+pandas
+humanize

@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.9.0
+    * Overdue ticket email reminders with escalation address.
+
+## v1.8.3
+    * Added AI request timing widget.
+
 ## v1.8.2
     * Dashboard widgets for tickets opened and closed.
 

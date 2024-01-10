@@ -1,0 +1,106 @@
+Comment: "A state machine that sends reminders for overdue tickets."
+StartAt: Get Overdue Tickets
+States:
+    Get Overdue Tickets:
+        Type: Task
+        Resource: "${GetOverdueTicketsFunctionArn}"
+        ResultPath: "$.overdue_tickets"
+        Retry:
+            - ErrorEquals:
+                  - States.Timeout
+                  - Lambda.ServiceException
+                  - Lambda.AWSLambdaException
+                  - Lambda.SdkClientException
+              IntervalSeconds: 3
+              MaxAttempts: 10
+              BackoffRate: 3
+        Next: Process Overdue Tickets
+
+    Process Overdue Tickets:
+        Type: Map
+        InputPath: $
+        ItemsPath: "$.overdue_tickets"
+        MaxConcurrency: 0
+        Iterator:
+            StartAt: Process Overdue Ticket
+            States:
+                Process Overdue Ticket:
+                    Type: Task
+                    Resource: "${ConsiderOverdueTicketFunctionArn}"
+                    ResultPath: "$.send_reminder"
+                    Retry:
+                        - ErrorEquals:
+                              - States.Timeout
+                              - Lambda.ServiceException
+                              - Lambda.AWSLambdaException
+                              - Lambda.SdkClientException
+                          IntervalSeconds: 3
+                          MaxAttempts: 10
+                          BackoffRate: 3
+                    Next: Send Reminder?
+
+                Send Reminder?:
+                    Type: Choice
+                    Choices:
+                        -
+                            Variable: $.send_reminder
+                            StringEquals: "Yes"
+                            Next: Format Reminder Email
+                    Default: Don't Send Reminder
+
+                Format Reminder Email:
+                    Type: Task
+                    Resource: "${FormatTicketOverdueMessageFunctionArn}"
+                    Retry:
+                        - ErrorEquals:
+                              - States.Timeout
+                              - Lambda.ServiceException
+                              - Lambda.AWSLambdaException
+                              - Lambda.SdkClientException
+                          IntervalSeconds: 3
+                          MaxAttempts: 10
+                          BackoffRate: 3
+                    Next: Send Email
+
+                Send Email:
+                    Type: Task
+                    Resource: '${SendEmailFunctionArn}'
+                    Parameters:
+                        Recipient.$: $.TeamEmail
+                        Subject.$: $.messages.email.subject
+                        Body.$: $.messages.email.body
+                        Html.$: $.messages.email.html
+                        AdditionalCC: "${EscalationEmailCC}"
+                    ResultPath: null
+                    Retry:
+                        -
+                            ErrorEquals:
+                                - States.Timeout
+                                - Lambda.ServiceException
+                                - Lambda.AWSLambdaException
+                                - Lambda.SdkClientException
+                            IntervalSeconds: 3
+                            MaxAttempts: 10
+                            BackoffRate: 3
+                    Next: Record Reminder Sent
+
+                Record Reminder Sent:
+                    Type: Task
+                    Resource: '${RecordReminderSentFunctionArn}'
+                    ResultPath: null
+                    Retry:
+                        -
+                            ErrorEquals:
+                                - States.Timeout
+                                - Lambda.ServiceException
+                                - Lambda.AWSLambdaException
+                                - Lambda.SdkClientException
+                            IntervalSeconds: 3
+                            MaxAttempts: 10
+                            BackoffRate: 3
+                    End: true
+
+                Don't Send Reminder:
+                    Type: Succeed
+
+        End: true

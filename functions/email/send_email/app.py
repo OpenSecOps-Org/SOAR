@@ -46,12 +46,18 @@ LOGO_IMAGE, LOGO_HTML = load_logo_image()
 
 
 def lambda_handler(data, _context):
+    global EMAIL_CC  # This tells Python to use the global variable
 
     logger.info(data)
 
     if SEND_EMAIL == 'No':
         print("Email disabled.")
         return data
+
+    extra_cc = data.get('AdditionalCC')
+    if extra_cc:
+        extra_cc = extra_cc.split(',')
+        EMAIL_CC = EMAIL_CC + extra_cc
 
     logger.info('EMAIL_SENDER: %s', EMAIL_SENDER)
     logger.info('EMAIL_CC: %s', EMAIL_CC)
@@ -138,11 +144,13 @@ html_pre = '''
 <html>
   <head></head>
   <body>
-    <table border="0" cellspacing="0" cellpadding="0">
+    <div style="font-family: Verdana, sans-serif; font-size:16px;">
+      <table border="0" cellspacing="0" cellpadding="0">
 '''
 
 html_post = '''
-    </table>
+      </table>
+    </div>
   </body>
 </html>
 '''

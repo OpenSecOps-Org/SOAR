@@ -362,6 +362,11 @@ Parameters:
     Default: soar:dynamodb:no-pit-recovery
 
   # Overdue Ticket Limits ------------------------------------------------------
+
+  EscalationEmailCC:
+    Type: String
+    Description: CC this email address about overdue tickets
+    Default: ''
   
   SeverityAllowedAgeInHoursCritical:
     Type: Number
@@ -2779,6 +2784,138 @@ Resources:
 
   #-------------------------------------------------------------------------------
   #
+  # State machine for overdue ticket reminders
+  #
+  #-------------------------------------------------------------------------------
+  
+  SOAROverdueTicketReminders:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachines/overdue_ticket_reminders.asl.yaml
+      DefinitionSubstitutions:
+        GetOverdueTicketsFunctionArn: !GetAtt GetOverdueTicketsFunction.Arn
+        ConsiderOverdueTicketFunctionArn: !GetAtt ConsiderOverdueTicketFunction.Arn
+        FormatTicketOverdueMessageFunctionArn: !GetAtt FormatTicketOverdueMessageFunction.Arn
+        SendEmailFunctionArn: !GetAtt SendEmailFunction.Arn
+        RecordReminderSentFunctionArn: !GetAtt RecordReminderSentFunction.Arn
+        EscalationEmailCC: !Ref EscalationEmailCC
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref GetOverdueTicketsFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ConsiderOverdueTicketFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref FormatTicketOverdueMessageFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SendEmailFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref RecordReminderSentFunction
+        - Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Action:
+                - logs:*
+              Resource: '*'
+      Logging:
+        Destinations:
+          - CloudWatchLogsLogGroup:
+              LogGroupArn: !GetAtt SOAROverdueTicketRemindersLogGroup.Arn
+        IncludeExecutionData: false
+        Level: ERROR
+      Events:
+        SyncControlsEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 * * * ? *)  # Scheduled to run every hour
+
+  SOAROverdueTicketRemindersLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+
+  GetOverdueTicketsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ticketing/get_overdue_tickets/
+      Policies:
+        - Statement:
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource: 
+                - !GetAtt Tickets.Arn
+                - !Sub "${Tickets.Arn}/index/*"
+            - Sid: OrganizationsPermissions
+              Effect: Allow
+              Action:
+                - organizations:DescribeAccount
+                - organizations:DescribeOrganization
+                - organizations:DescribeOrganizationalUnit
+                - organizations:ListAccounts
+                - organizations:ListParents
+                - organizations:ListTagsForResource
+              Resource: '*'
+      Environment:
+        Variables:
+          ACCOUNT_TEAM_EMAIL_TAG_APP: !Ref AccountTeamEmailTagApp
+          ACCOUNT_TEAM_EMAIL_TAG: !Ref AccountTeamEmailTag
+          CLIENT_TAG: !Ref ClientTag
+          DEFAULT_TEAM_EMAIL: !Ref DefaultTeamEmail
+          ENVIRONMENT_TAG: !Ref EnvironmentTag
+          JIRA_DEFAULT_PROJECT_KEY: !Ref JiraDefaultProjectKey
+          JIRA_PROJECT_KEY_TAG_APP: !Ref JiraProjectKeyTagApp
+          JIRA_PROJECT_KEY_TAG: !Ref JiraProjectKeyTag
+          PROJECT_TAG: !Ref ProjectTag
+          SERVICE_NOW_DEFAULT_PROJECT_QUEUE: !Ref ServiceNowDefaultProjectQueue
+          SERVICE_NOW_PROJECT_QUEUE_TAG_APP: !Ref ServiceNowProjectQueueTagApp
+          SERVICE_NOW_PROJECT_QUEUE_TAG: !Ref ServiceNowProjectQueueTag
+          SEVERITY_ALLOWED_AGE_IN_HOURS_CRITICAL: !Ref SeverityAllowedAgeInHoursCritical
+          SEVERITY_ALLOWED_AGE_IN_HOURS_HIGH: !Ref SeverityAllowedAgeInHoursHigh
+          SEVERITY_ALLOWED_AGE_IN_HOURS_LOW: !Ref SeverityAllowedAgeInHoursLow
+          SEVERITY_ALLOWED_AGE_IN_HOURS_MEDIUM: !Ref SeverityAllowedAgeInHoursMedium
+          TEAM_TAG: !Ref TeamTag
+          TICKETING_SYSTEM: !Ref TicketingSystem
+          TICKETS_TABLE: !Ref Tickets
+
+
+  ConsiderOverdueTicketFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ticketing/consider_overdue_ticket/
+
+
+  FormatTicketOverdueMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/email/format_ticket_overdue_message/
+      Environment:
+        Variables:
+          PRODUCT_NAME: !Ref ProductName
+
+
+  RecordReminderSentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ticketing/record_reminder_sent/
+      Policies:
+        - Statement:
+            - Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+              Resource: 
+                - !GetAtt Tickets.Arn
+                - !Sub "${Tickets.Arn}/index/*"
+      Environment:
+        Variables:
+          TICKETS_TABLE: !Ref Tickets
+  
+
+  #-------------------------------------------------------------------------------
+  #
   # Monitoring. Only the state machines should be monitored as they
   # orchestrate the lambda functions which are expected to fail in certain
   # circumstances without this generating an incident.
@@ -2892,6 +3029,28 @@ Resources:
       Dimensions:
         - Name: StateMachineArn
           Value: !Ref SOARSyncEnabledControlsTable
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  AlarmSOAROverdueTicketReminders:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: INFRA-SOAR-Overdue-Ticket-Reminders-SM-Failure-HIGH
+      AlarmDescription: The SOAROverdueTicketReminders state machine failed.
+      ActionsEnabled: true
+      OKActions: []
+      AlarmActions: []
+      InsufficientDataActions: []
+      MetricName: ExecutionsFailed
+      Namespace: AWS/States
+      Statistic: Sum
+      Dimensions:
+        - Name: StateMachineArn
+          Value: !Ref SOAROverdueTicketReminders
       Period: 60
       EvaluationPeriods: 1
       DatapointsToAlarm: 1
@@ -3132,6 +3291,24 @@ Resources:
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Sum"
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 8,
+              "properties": {
+                "title": "AI query execution time",
+                "metrics": [
+                    [ "AWS/States", "LambdaFunctionRunTime", 
+                      "LambdaFunctionArn", "${QueryChatGPTFunction.Arn}", 
+                      { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": false,
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Average"
               }
             }
             
