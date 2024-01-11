@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.1
+    * Added EscalationEmailSeverities.
+
 ## v1.9.0
     * Overdue ticket email reminders with escalation address.
 

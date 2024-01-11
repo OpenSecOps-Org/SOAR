@@ -367,6 +367,11 @@ Parameters:
     Type: String
     Description: CC this email address about overdue tickets
     Default: ''
+
+  EscalationEmailSeverities:
+    Type: String
+    Description: Comma-separated list of severities for which to email EscalationEmailCC
+    Default: 'CRITICAL,HIGH,MEDIUM,LOW'
   
   SeverityAllowedAgeInHoursCritical:
     Type: Number
@@ -2798,7 +2803,6 @@ Resources:
         FormatTicketOverdueMessageFunctionArn: !GetAtt FormatTicketOverdueMessageFunction.Arn
         SendEmailFunctionArn: !GetAtt SendEmailFunction.Arn
         RecordReminderSentFunctionArn: !GetAtt RecordReminderSentFunction.Arn
-        EscalationEmailCC: !Ref EscalationEmailCC
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref GetOverdueTicketsFunction
@@ -2879,6 +2883,8 @@ Resources:
           TEAM_TAG: !Ref TeamTag
           TICKETING_SYSTEM: !Ref TicketingSystem
           TICKETS_TABLE: !Ref Tickets
+          ESCALATION_EMAIL_CC: !Ref EscalationEmailCC
+          ESCALATION_EMAIL_SEVERITIES: !Ref EscalationEmailSeverities
 
 
   ConsiderOverdueTicketFunction:

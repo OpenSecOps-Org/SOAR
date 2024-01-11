@@ -39,6 +39,9 @@ SERVICE_NOW_PROJECT_QUEUE_TAG = os.environ['SERVICE_NOW_PROJECT_QUEUE_TAG']     
 SERVICE_NOW_PROJECT_QUEUE_TAG_APP = os.environ['SERVICE_NOW_PROJECT_QUEUE_TAG_APP'] # soar:service-now:project-queue:app
 SERVICE_NOW_DEFAULT_PROJECT_QUEUE = os.environ['SERVICE_NOW_DEFAULT_PROJECT_QUEUE'] # XXX
 
+ESCALATION_EMAIL_CC = os.environ['ESCALATION_EMAIL_CC']
+ESCALATION_EMAIL_SEVERITIES = os.environ['ESCALATION_EMAIL_SEVERITIES'].split(',')
+
 
 organizations = boto3.client('organizations')
 dynamodb = boto3.resource('dynamodb')
@@ -56,14 +59,16 @@ def lambda_handler(_data, _context):
     n_overdue_tickets = len(overdue_tickets)
     print(f"Overdue tickets ({n_overdue_tickets}): {overdue_tickets}")
 
-    # Add team email if overdue tickets exist
+    # Adorn any overdue tickets
     if (n_overdue_tickets > 0):
         # Get all account data
         account_data = get_all_account_data()
-        # Adorn the overdue tickets with email recipient
+        # Adorn the overdue tickets with email recipient and AdditionalCC
         for ticket in overdue_tickets:
             account_name = ticket['Account']
+            severity_label = ticket['severity_label']
             ticket['TeamEmail'] = account_data[account_name]['TeamEmail']
+            ticket['AdditionalCC'] = ESCALATION_EMAIL_CC if severity_label in ESCALATION_EMAIL_SEVERITIES else ''
 
     return overdue_tickets
 
