@@ -42,10 +42,13 @@ SERVICE_NOW_DEFAULT_PROJECT_QUEUE = os.environ['SERVICE_NOW_DEFAULT_PROJECT_QUEU
 ESCALATION_EMAIL_CC = os.environ['ESCALATION_EMAIL_CC']
 ESCALATION_EMAIL_SEVERITIES = os.environ['ESCALATION_EMAIL_SEVERITIES'].split(',')
 
+METRIC_NAMESPACE = os.environ['METRIC_NAMESPACE']
+
 
 organizations = boto3.client('organizations')
 dynamodb = boto3.resource('dynamodb')
 tickets = dynamodb.Table(TICKETS_TABLE)
+cloudwatch_client = boto3.client('cloudwatch')
 
 
 # Lambda handler
@@ -69,6 +72,34 @@ def lambda_handler(_data, _context):
             severity_label = ticket['severity_label']
             ticket['TeamEmail'] = account_data[account_name]['TeamEmail']
             ticket['AdditionalCC'] = ESCALATION_EMAIL_CC if severity_label in ESCALATION_EMAIL_SEVERITIES else ''
+
+    # Emit metric for the total number of open tickets
+    emit_cloudwatch_metric(
+        metric_name='TotalTickets',
+        metric_value=len(open_tickets),
+        dimension_name='TicketStatus',
+        dimension_value='Open'
+    )
+
+    # Emit metric for the total number of overdue tickets
+    emit_cloudwatch_metric(
+        metric_name='TotalTickets',
+        metric_value=n_overdue_tickets,
+        dimension_name='TicketStatus',
+        dimension_value='Overdue'
+    )
+
+    # Emit metrics for each dimension for open tickets
+    emit_metrics_for_dimension(open_tickets, 'Account', 'TotalOpenTicketsByAccount')
+    emit_metrics_for_dimension(open_tickets, 'Environment', 'TotalOpenTicketsByEnvironment')
+    emit_metrics_for_dimension(open_tickets, 'severity_label', 'TotalOpenTicketsBySeverity')
+    emit_metrics_for_dimension(open_tickets, 'Team', 'TotalOpenTicketsByTeam')
+
+    # Emit metrics for each dimension for overdue tickets
+    emit_metrics_for_dimension(overdue_tickets, 'Account', 'TotalOverdueTicketsByAccount')
+    emit_metrics_for_dimension(overdue_tickets, 'Environment', 'TotalOverdueTicketsByEnvironment')
+    emit_metrics_for_dimension(overdue_tickets, 'severity_label', 'TotalOverdueTicketsBySeverity')
+    emit_metrics_for_dimension(overdue_tickets, 'Team', 'TotalOverdueTicketsByTeam')
 
     return overdue_tickets
 
@@ -276,3 +307,49 @@ def retrieve_open_tickets():
     )
 
     return open_tickets
+
+
+# ----------------------------------------------------------------
+#
+#   CloudWatch metrics
+#
+# ----------------------------------------------------------------
+
+def emit_cloudwatch_metric(metric_name, metric_value, dimension_name, dimension_value):
+    """
+    Emit a single data point to CloudWatch with a specified dimension.
+
+    :param metric_name: The name of the metric.
+    :param metric_value: The value for the metric.
+    :param dimension_name: The name of the dimension.
+    :param dimension_value: The value for the dimension.
+    """
+    cloudwatch_client.put_metric_data(
+        Namespace=METRIC_NAMESPACE,       # 'DelegatSOAR' as passed in via en ENV var
+        MetricData=[
+            {
+                'MetricName': metric_name,
+                'Dimensions': [
+                    {
+                        'Name': dimension_name,
+                        'Value': dimension_value
+                    },
+                ],
+                'Value': metric_value,
+                'Unit': 'Count'
+            },
+        ]
+    )
+    print(f"Metric emitted: {metric_name} - {dimension_name}: {dimension_value}, Value: {metric_value}")
+
+
+# Helper function to emit metrics for each unique value in a dimension
+def emit_metrics_for_dimension(tickets, dimension_name, metric_name):
+    unique_values = set(ticket[dimension_name] for ticket in tickets)
+    for value in unique_values:
+        emit_cloudwatch_metric(
+            metric_name=metric_name,
+            metric_value=sum(1 for ticket in tickets if ticket[dimension_name] == value),
+            dimension_name=dimension_name,
+            dimension_value=value
+        )

@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.3
+    * Emitting ticket CloudWatch metrics every hour.
+
 ## v1.9.2
     * Dashboard name configurable so it can be used as the default dashboard.
 

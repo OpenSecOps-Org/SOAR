@@ -2852,7 +2852,8 @@ Resources:
       CodeUri: functions/ticketing/get_overdue_tickets/
       Policies:
         - Statement:
-            - Sid: DynamoDBPermissions
+            - 
+              Sid: DynamoDBPermissions
               Effect: Allow
               Action:
                 - dynamodb:GetItem
@@ -2860,7 +2861,8 @@ Resources:
               Resource: 
                 - !GetAtt Tickets.Arn
                 - !Sub "${Tickets.Arn}/index/*"
-            - Sid: OrganizationsPermissions
+            - 
+              Sid: OrganizationsPermissions
               Effect: Allow
               Action:
                 - organizations:DescribeAccount
@@ -2869,6 +2871,12 @@ Resources:
                 - organizations:ListAccounts
                 - organizations:ListParents
                 - organizations:ListTagsForResource
+              Resource: '*'
+            - 
+              Sid: CloudWatchPermissions
+              Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
               Resource: '*'
       Environment:
         Variables:
@@ -2893,6 +2901,7 @@ Resources:
           TICKETS_TABLE: !Ref Tickets
           ESCALATION_EMAIL_CC: !Ref EscalationEmailCC
           ESCALATION_EMAIL_SEVERITIES: !Ref EscalationEmailSeverities
+          METRIC_NAMESPACE: 'DelegatSOAR'  # Parametrise this, of course
 
 
   ConsiderOverdueTicketFunction:
