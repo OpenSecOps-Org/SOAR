@@ -499,6 +499,14 @@ Parameters:
     Default: ''
 
 
+  # Dashboard ------------------------------------------------------------------
+
+  DashboardName:
+    Type: String
+    Description: The name of the dashboard. Set to 'CloudWatch-Default' to make it the default one.
+    Default: 'Delegat_SOAR'
+
+
 #-------------------------------------------------------------------------------
 #
 # Conditions
@@ -3137,7 +3145,7 @@ Resources:
   Dashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
-      DashboardName: Delegat_SOAR
+      DashboardName: !Ref DashboardName
       DashboardBody: !Sub |
         {
           "start": "-P4W",
@@ -3147,24 +3155,31 @@ Resources:
             {
               "type": "metric",
               "width": 8,
+              "height": 4,
+              "x": 0,
+              "y": 0,
               "properties": {
-                  "title": "State Transitions",
+                  "title": "Step Functions State Transitions (all)",
                   "metrics": [
                       [ "AWS/States", "ConsumedCapacity", "ServiceMetric", "StateTransition", { "region": "${AWS::Region}" } ]
                   ],
                   "view": "timeSeries",
-                  "stacked": false,
+                  "stacked": true,
                   "region": "${AWS::Region}",
                   "period": 86400,
-                  "stat": "Sum"
+                  "stat": "Sum",
+                  "liveData": true
               }
             },
 
             {
               "type": "metric",
               "width": 8,
+              "height": 4,
+              "x": 8,
+              "y": 0,
               "properties": {
-                "title": "ASFF Processor Executions",
+                "title": "Delegat SOAR ASFF Processor Executions",
                 "metrics": [
                   [ 
                     "AWS/States", "ExecutionsStarted", 
@@ -3173,19 +3188,22 @@ Resources:
                   ]
                 ],
                 "view": "timeSeries",
-                "stacked": false,
+                "stacked": true,
                 "region": "${AWS::Region}",
                 "stat": "Sum",
                 "period": 86400,
-                "setPeriodToTimeRange": true
+                "liveData": true
               }
             },
 
             {
               "type": "metric",
               "width": 8,
+              "height": 4,
+              "x": 16,
+              "y": 0,
               "properties": {
-                "title": "ASFF Processor ExecutionsFailed",
+                "title": "Delegat SOAR ASFF Processor Failures",
                 "metrics": [
                     [ "AWS/States", "ExecutionsFailed", 
                       "StateMachineArn", "${SOARASFFProcessor.Arn}", 
@@ -3195,13 +3213,17 @@ Resources:
                 "stacked": false,
                 "region": "${AWS::Region}",
                 "period": 86400,
-                "stat": "Sum"
+                "stat": "Sum",
+                "liveData": true
               }
             },
 
             {
               "type": "metric",
               "width": 8,
+              "height": 4,
+              "x": 0,
+              "y": 4,
               "properties": {
                 "title": "Incidents",
                 "metrics": [
@@ -3213,13 +3235,17 @@ Resources:
                 "stacked": false,
                 "region": "${AWS::Region}",
                 "period": 86400,
-                "stat": "Sum"
+                "stat": "Sum",
+                "liveData": true
               }
             },
 
             {
               "type": "metric",
               "width": 8,
+              "height": 4,
+              "x": 8,
+              "y": 4,
               "properties": {
                 "title": "AutoRemediations",
                 "metrics": [
@@ -3231,13 +3257,17 @@ Resources:
                 "stacked": false,
                 "region": "${AWS::Region}",
                 "period": 86400,
-                "stat": "Sum"
+                "stat": "Sum",
+                "liveData": true
               }
             },
 
             {
               "type": "metric",
               "width": 8,
+              "height": 4,
+              "x": 16,
+              "y": 4,
               "properties": {
                 "title": "AI Report ExecutionTime, ExecutionsFailed",
                 "metrics": [
@@ -3252,6 +3282,7 @@ Resources:
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Sum",
+                "liveData": true,
                 "yAxis": {
                     "left": {
                         "label": "Minutes",
@@ -3267,6 +3298,9 @@ Resources:
             {
               "type": "metric",
               "width": 8,
+              "height": 4,
+              "x": 0,
+              "y": 12,
               "properties": {
                 "title": "Tickets Opened",
                 "metrics": [
@@ -3278,13 +3312,17 @@ Resources:
                 "stacked": false,
                 "region": "${AWS::Region}",
                 "period": 86400,
-                "stat": "Sum"
+                "stat": "Sum",
+                "liveData": true
               }
             },
 
             {
               "type": "metric",
               "width": 8,
+              "height": 4,
+              "x": 8,
+              "y": 12,
               "properties": {
                 "title": "Tickets Closed",
                 "metrics": [
@@ -3296,13 +3334,17 @@ Resources:
                 "stacked": false,
                 "region": "${AWS::Region}",
                 "period": 86400,
-                "stat": "Sum"
+                "stat": "Sum",
+                "liveData": true
               }
             },
 
             {
               "type": "metric",
               "width": 8,
+              "height": 4,
+              "x": 16,
+              "y": 12,
               "properties": {
                 "title": "AI query execution time",
                 "metrics": [
@@ -3314,10 +3356,10 @@ Resources:
                 "stacked": false,
                 "region": "${AWS::Region}",
                 "period": 86400,
-                "stat": "Average"
+                "stat": "Average",
+                "liveData": true
               }
             }
             
           ]
         }
-
