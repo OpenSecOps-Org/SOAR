@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.4
+    * Widgets for the new metrics.
+
 ## v1.9.3
     * Emitting ticket CloudWatch metrics every hour.
 

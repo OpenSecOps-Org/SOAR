@@ -3163,10 +3163,174 @@ Resources:
 
             {
               "type": "metric",
-              "width": 8,
+              "width": 12,
               "height": 4,
               "x": 0,
               "y": 0,
+              "properties": {
+                "sparkline": false,
+                "metrics": [
+                    [ "DelegatSOAR", "TotalTickets", "TicketStatus", "Open", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Maximum",
+                "liveData": true,
+                "title": "Open Tickets",
+                "singleValueFullPrecision": false
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 12,
+              "height": 4,
+              "x": 12,
+              "y": 0,
+              "properties": {
+                "sparkline": false,
+                "metrics": [
+                    [ "DelegatSOAR", "TotalTickets", "TicketStatus", "Overdue", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Maximum",
+                "liveData": true,
+                "title": "Overdue Tickets",
+                "singleValueFullPrecision": false
+              }
+            },
+
+
+            {
+              "type": "metric",
+              "width": 6,
+              "height": 7,
+              "x": 0,
+              "y": 4,
+              "properties": {
+                "metrics": [
+                    [ { "expression": "SELECT MAX(TotalOpenTicketsBySeverity) FROM SCHEMA(DelegatSOAR, severity_label) GROUP BY severity_label",
+                        "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
+                ],
+                "view": "pie",
+                "region": "${AWS::Region}",
+                "liveData": true,
+                "stacked": false,
+                "setPeriodToTimeRange": false,
+                "stat": "Maximum",
+                "period": 86400,
+                "labels": {
+                    "visible": true
+                },
+                "sparkline": true,
+                "trend": true,
+                "title": "Open Ticket Severities",
+                "legend": {
+                    "position": "hidden"
+                }
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 6,
+              "height": 7,
+              "x": 6,
+              "y": 4,
+              "properties": {
+              "metrics": [
+                  [ { "expression": "SELECT SUM(TotalOpenTicketsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
+                      "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
+              ],
+                "view": "pie",
+                "region": "${AWS::Region}",
+                "liveData": true,
+                "stacked": false,
+                "setPeriodToTimeRange": false,
+                "stat": "Maximum",
+                "period": 86400,
+                "labels": {
+                    "visible": true
+                },
+                "sparkline": true,
+                "trend": true,
+                "title": "Open Tickets per Environment",
+                "legend": {
+                    "position": "hidden"
+                }
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 6,
+              "height": 7,
+              "x": 12,
+              "y": 4,
+              "properties": {
+              "metrics": [
+                  [ { "expression": "SELECT MAX(TotalOpenTicketsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
+                      "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
+              ],
+                "view": "pie",
+                "region": "${AWS::Region}",
+                "liveData": true,
+                "stacked": false,
+                "setPeriodToTimeRange": false,
+                "stat": "Maximum",
+                "period": 86400,
+                "labels": {
+                    "visible": true
+                },
+                "sparkline": true,
+                "trend": true,
+                "title": "Open Tickets per Account",
+                "legend": {
+                    "position": "hidden"
+                }
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 6,
+              "height": 7,
+              "x": 18,
+              "y": 4,
+              "properties": {
+              "metrics": [
+                  [ { "expression": "SELECT MAX(TotalOpenTicketsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
+                      "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
+              ],
+                "view": "pie",
+                "region": "${AWS::Region}",
+                "liveData": true,
+                "stacked": false,
+                "setPeriodToTimeRange": false,
+                "stat": "Maximum",
+                "period": 86400,
+                "labels": {
+                    "visible": true
+                },
+                "sparkline": true,
+                "trend": true,
+                "title": "Open Tickets per Team",
+                "legend": {
+                    "position": "hidden"
+                }
+              }
+            },
+
+
+            {
+              "type": "metric",
+              "width": 8,
+              "height": 4,
+              "x": 0,
+              "y": 11,
               "properties": {
                   "title": "Step Functions State Transitions (all)",
                   "metrics": [
@@ -3186,7 +3350,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 8,
-              "y": 0,
+              "y": 11,
               "properties": {
                 "title": "Delegat SOAR ASFF Processor Executions",
                 "metrics": [
@@ -3210,7 +3374,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 16,
-              "y": 0,
+              "y": 11,
               "properties": {
                 "title": "Delegat SOAR ASFF Processor Failures",
                 "metrics": [
@@ -3227,12 +3391,13 @@ Resources:
               }
             },
 
+
             {
               "type": "metric",
               "width": 8,
               "height": 4,
               "x": 0,
-              "y": 4,
+              "y": 15,
               "properties": {
                 "title": "Incidents",
                 "metrics": [
@@ -3254,7 +3419,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 8,
-              "y": 4,
+              "y": 15,
               "properties": {
                 "title": "AutoRemediations",
                 "metrics": [
@@ -3276,7 +3441,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 16,
-              "y": 4,
+              "y": 15,
               "properties": {
                 "title": "AI Report ExecutionTime, ExecutionsFailed",
                 "metrics": [
@@ -3304,12 +3469,13 @@ Resources:
               }
             },
 
+
             {
               "type": "metric",
               "width": 8,
               "height": 4,
               "x": 0,
-              "y": 12,
+              "y": 23,
               "properties": {
                 "title": "Tickets Opened",
                 "metrics": [
@@ -3331,7 +3497,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 8,
-              "y": 12,
+              "y": 23,
               "properties": {
                 "title": "Tickets Closed",
                 "metrics": [
@@ -3353,7 +3519,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 16,
-              "y": 12,
+              "y": 23,
               "properties": {
                 "title": "AI query execution time",
                 "metrics": [
