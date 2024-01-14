@@ -325,7 +325,7 @@ def emit_cloudwatch_metric(metric_name, metric_value, dimension_name, dimension_
     :param dimension_value: The value for the dimension.
     """
     cloudwatch_client.put_metric_data(
-        Namespace=METRIC_NAMESPACE,       # 'DelegatSOAR' as passed in via en ENV var
+        Namespace=METRIC_NAMESPACE,       # 'DelegatSOAR' as passed in via an ENV var
         MetricData=[
             {
                 'MetricName': metric_name,

@@ -506,6 +506,12 @@ Parameters:
     Description: The name of the dashboard. Set to 'CloudWatch-Default' to make it the default one.
     Default: 'Delegat_SOAR'
 
+  MetricNamespace:
+    Type: String
+    Description: The CloudWatch metric namespace. There is no reason to change this value.
+    Default: 'DelegatSOAR'
+
+
 
 #-------------------------------------------------------------------------------
 #
@@ -898,15 +904,23 @@ Resources:
       CodeUri: functions/statistics/remember_incident_opened/
       Policies:
         - Statement:
-            - Sid: TablePermissions
+            - 
+              Sid: TablePermissions
               Effect: Allow
               Action:
                 - dynamodb:PutItem
               Resource: !GetAtt Incidents.Arn
+            - 
+              Sid: CloudWatchPermissions
+              Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
       Environment:
         Variables:
           INCIDENTS_TABLE_NAME: !Ref Incidents
           EXPIRATION_DAYS: !Ref IncidentExpirationInDays
+          METRIC_NAMESPACE: !Ref MetricNamespace
 
   RememberAutoRemediationDoneFunction:
     Type: AWS::Serverless::Function
@@ -914,15 +928,23 @@ Resources:
       CodeUri: functions/statistics/remember_autoremediation_done/
       Policies:
         - Statement:
-            - Sid: TablePermissions
+            - 
+              Sid: TablePermissions
               Effect: Allow
               Action:
                 - dynamodb:PutItem
               Resource: !GetAtt AutoRemediations.Arn
+            - 
+              Sid: CloudWatchPermissions
+              Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
       Environment:
         Variables:
           AUTOREMEDIATIONS_TABLE_NAME: !Ref AutoRemediations
           EXPIRATION_DAYS: !Ref AutoremediationExpirationInDays
+          METRIC_NAMESPACE: !Ref MetricNamespace
 
   RememberTicketOpenedFunction:
     Type: AWS::Serverless::Function
@@ -930,14 +952,22 @@ Resources:
       CodeUri: functions/statistics/remember_ticket_opened/
       Policies:
         - Statement:
-            - Sid: TablePermissions
+            - 
+              Sid: TablePermissions
               Effect: Allow
               Action:
                 - dynamodb:PutItem
               Resource: !GetAtt Tickets.Arn
+            - 
+              Sid: CloudWatchPermissions
+              Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
       Environment:
         Variables:
           TICKETS_TABLE_NAME: !Ref Tickets
+          METRIC_NAMESPACE: !Ref MetricNamespace
 
   RememberTicketClosedFunction:
     Type: AWS::Serverless::Function
@@ -945,16 +975,24 @@ Resources:
       CodeUri: functions/statistics/remember_ticket_closed/
       Policies:
         - Statement:
-            - Sid: TablePermissions
+            - 
+              Sid: TablePermissions
               Effect: Allow
               Action:
                 - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource: !GetAtt Tickets.Arn
+            - 
+              Sid: CloudWatchPermissions
+              Effect: Allow
+              Action:
+                - cloudwatch:PutMetricData
+              Resource: '*'
       Environment:
         Variables:
           TICKETS_TABLE_NAME: !Ref Tickets
           EXPIRATION_DAYS: !Ref ClosedTicketExpirationInDays
+          METRIC_NAMESPACE: !Ref MetricNamespace
 
 
   #-------------------------------------------------------------------------------
@@ -2901,7 +2939,7 @@ Resources:
           TICKETS_TABLE: !Ref Tickets
           ESCALATION_EMAIL_CC: !Ref EscalationEmailCC
           ESCALATION_EMAIL_SEVERITIES: !Ref EscalationEmailSeverities
-          METRIC_NAMESPACE: 'DelegatSOAR'  # Parametrise this, of course
+          METRIC_NAMESPACE: !Ref MetricNamespace
 
 
   ConsiderOverdueTicketFunction:

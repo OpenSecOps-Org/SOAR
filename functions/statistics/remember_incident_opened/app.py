@@ -9,9 +9,11 @@ logger.setLevel(logging.INFO)
 
 INCIDENTS_TABLE_NAME = os.environ['INCIDENTS_TABLE_NAME']
 EXPIRATION_DAYS = int(os.environ['EXPIRATION_DAYS'])
+METRIC_NAMESPACE = os.environ['METRIC_NAMESPACE']
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(INCIDENTS_TABLE_NAME)
+cloudwatch_client = boto3.client('cloudwatch')
 
 
 def lambda_handler(event, _context):
@@ -42,4 +44,45 @@ def lambda_handler(event, _context):
     
     table.put_item(Item=item)
     
+    emit_cloudwatch_metric(
+        metric_name='Incident',
+        metric_value=1,
+        dimension_name='Action',
+        dimension_value='Processed'
+    )
+
     return True
+
+
+# ----------------------------------------------------------------
+#
+#   CloudWatch metrics
+#
+# ----------------------------------------------------------------
+
+def emit_cloudwatch_metric(metric_name, metric_value, dimension_name, dimension_value):
+    """
+    Emit a single data point to CloudWatch with a specified dimension.
+
+    :param metric_name: The name of the metric.
+    :param metric_value: The value for the metric.
+    :param dimension_name: The name of the dimension.
+    :param dimension_value: The value for the dimension.
+    """
+    cloudwatch_client.put_metric_data(
+        Namespace=METRIC_NAMESPACE,       # 'DelegatSOAR' as passed in via an ENV var
+        MetricData=[
+            {
+                'MetricName': metric_name,
+                'Dimensions': [
+                    {
+                        'Name': dimension_name,
+                        'Value': dimension_value
+                    },
+                ],
+                'Value': metric_value,
+                'Unit': 'Count'
+            },
+        ]
+    )
+    print(f"Metric emitted: {metric_name} - {dimension_name}: {dimension_value}, Value: {metric_value}")
