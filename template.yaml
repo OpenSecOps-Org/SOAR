@@ -3576,10 +3576,12 @@ Resources:
                 "yAxis": {
                     "left": {
                         "label": "Minutes",
-                        "showUnits": false
+                        "showUnits": false,
+                        "min": 0
                     },
                     "right": {
-                        "showUnits": true
+                        "showUnits": true,
+                        "min": 0
                     }
                 }
               }

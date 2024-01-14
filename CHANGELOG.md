@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.7
+    * Y axis adjusted for one widget.
+
 ## v1.9.6
     * Widgets for auto-remediations and incidents.
 
