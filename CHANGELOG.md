@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.6
+    * Widgets for auto-remediations and incidents.
+
 ## v1.9.5
     * Cloudwatch metric data points for incidents, autoremediations, and tickets opened and closed.
 

@@ -3201,7 +3201,7 @@ Resources:
 
             {
               "type": "metric",
-              "width": 12,
+              "width": 6,
               "height": 4,
               "x": 0,
               "y": 0,
@@ -3222,9 +3222,9 @@ Resources:
 
             {
               "type": "metric",
-              "width": 12,
+              "width": 6,
               "height": 4,
-              "x": 12,
+              "x": 6,
               "y": 0,
               "properties": {
                 "sparkline": false,
@@ -3238,6 +3238,50 @@ Resources:
                 "liveData": true,
                 "title": "Overdue Tickets",
                 "singleValueFullPrecision": false
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 6,
+              "height": 4,
+              "x": 12,
+              "y": 0,
+              "properties": {
+                "sparkline": false,
+                "metrics": [
+                    [ "DelegatSOAR", "AutoRemediation", "Action", "Successful", { "region": "eu-north-1" } ]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum",
+                "liveData": true,
+                "title": "Auto-Remediations",
+                "singleValueFullPrecision": false,
+                "setPeriodToTimeRange": true
+              }
+            },
+
+            {
+              "type": "metric",
+              "width": 6,
+              "height": 4,
+              "x": 18,
+              "y": 0,
+              "properties": {
+                "sparkline": false,
+                "metrics": [
+                    [ "DelegatSOAR", "Incident", "Action", "Processed", { "region": "eu-north-1" } ]
+                ],
+                "view": "singleValue",
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum",
+                "liveData": true,
+                "title": "Incidents",
+                "singleValueFullPrecision": false,
+                "setPeriodToTimeRange": true
               }
             },
 
@@ -3370,16 +3414,24 @@ Resources:
               "x": 0,
               "y": 11,
               "properties": {
-                  "title": "Step Functions State Transitions (all)",
-                  "metrics": [
-                      [ "AWS/States", "ConsumedCapacity", "ServiceMetric", "StateTransition", { "region": "${AWS::Region}" } ]
-                  ],
-                  "view": "timeSeries",
-                  "stacked": true,
-                  "region": "${AWS::Region}",
-                  "period": 86400,
-                  "stat": "Sum",
-                  "liveData": true
+                "title": "Step Functions State Transitions (all)",
+                "metrics": [
+                    [ "AWS/States", "ConsumedCapacity", "ServiceMetric", "StateTransition", { "region": "${AWS::Region}" } ]
+                ],
+                "view": "timeSeries",
+                "stacked": true,
+                "region": "${AWS::Region}",
+                "period": 86400,
+                "stat": "Sum",
+                "liveData": true,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    },
+                    "right": {
+                        "min": 0
+                    }
+                }
               }
             },
 
@@ -3403,7 +3455,15 @@ Resources:
                 "region": "${AWS::Region}",
                 "stat": "Sum",
                 "period": 86400,
-                "liveData": true
+                "liveData": true,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    },
+                    "right": {
+                        "min": 0
+                    }
+                }
               }
             },
 
@@ -3425,7 +3485,15 @@ Resources:
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Sum",
-                "liveData": true
+                "liveData": true,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    },
+                    "right": {
+                        "min": 0
+                    }
+                }
               }
             },
 
@@ -3448,7 +3516,12 @@ Resources:
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Sum",
-                "liveData": true
+                "liveData": true,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    }
+                }
               }
             },
 
@@ -3470,7 +3543,12 @@ Resources:
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Sum",
-                "liveData": true
+                "liveData": true,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    }
+                }
               }
             },
 
@@ -3526,7 +3604,12 @@ Resources:
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Sum",
-                "liveData": true
+                "liveData": true,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    }
+                }
               }
             },
 
@@ -3548,7 +3631,12 @@ Resources:
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Sum",
-                "liveData": true
+                "liveData": true,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    }
+                }
               }
             },
 
@@ -3570,7 +3658,12 @@ Resources:
                 "region": "${AWS::Region}",
                 "period": 86400,
                 "stat": "Average",
-                "liveData": true
+                "liveData": true,
+                "yAxis": {
+                    "left": {
+                        "min": 0
+                    }
+                }
               }
             }
             
