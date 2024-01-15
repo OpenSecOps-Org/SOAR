@@ -43,12 +43,44 @@ def lambda_handler(event, _context):
     
     table.put_item(Item=item)
     
+
+    # CloudWatch metrics, main one
     emit_cloudwatch_metric(
         metric_name='AutoRemediation',
         metric_value=1,
         dimension_name='Action',
         dimension_value='Successful'
     )
+
+    # In four different dimensions
+    emit_cloudwatch_metric(
+        metric_name='AutoRemediationsByAccount',
+        metric_value=1,
+        dimension_name='Account',
+        dimension_value=event['Account']
+    )
+
+    emit_cloudwatch_metric(
+        metric_name='AutoRemediationsByEnvironment',
+        metric_value=1,
+        dimension_name='Environment',
+        dimension_value=event['Environment']
+    )
+
+    emit_cloudwatch_metric(
+        metric_name='AutoRemediationsBySeverity',
+        metric_value=1,
+        dimension_name='Severity',
+        dimension_value=event['SeverityLabel']
+    )
+
+    emit_cloudwatch_metric(
+        metric_name='AutoRemediationsByTeam',
+        metric_value=1,
+        dimension_name='Team',
+        dimension_value=event['Team']
+    )
+
 
     return True
 

@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.8
+    * Cloudwatch metric data points in four dimensions for incidents and auto-remediations, just like for tickets.
+
 ## v1.9.7
     * Y axis adjusted for one widget.
 
