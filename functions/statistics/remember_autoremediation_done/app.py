@@ -9,11 +9,9 @@ logger.setLevel(logging.INFO)
 
 AUTOREMEDIATIONS_TABLE_NAME = os.environ['AUTOREMEDIATIONS_TABLE_NAME']
 EXPIRATION_DAYS = int(os.environ['EXPIRATION_DAYS'])
-METRIC_NAMESPACE = os.environ['METRIC_NAMESPACE']
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(AUTOREMEDIATIONS_TABLE_NAME)
-cloudwatch_client = boto3.client('cloudwatch')
 
 
 def lambda_handler(event, _context):
@@ -43,77 +41,4 @@ def lambda_handler(event, _context):
     
     table.put_item(Item=item)
     
-
-    # CloudWatch metrics, main one
-    emit_cloudwatch_metric(
-        metric_name='AutoRemediation',
-        metric_value=1,
-        dimension_name='Action',
-        dimension_value='Successful'
-    )
-
-    # In four different dimensions
-    emit_cloudwatch_metric(
-        metric_name='AutoRemediationsByAccount',
-        metric_value=1,
-        dimension_name='Account',
-        dimension_value=event['Account']
-    )
-
-    emit_cloudwatch_metric(
-        metric_name='AutoRemediationsByEnvironment',
-        metric_value=1,
-        dimension_name='Environment',
-        dimension_value=event['Environment']
-    )
-
-    emit_cloudwatch_metric(
-        metric_name='AutoRemediationsBySeverity',
-        metric_value=1,
-        dimension_name='Severity',
-        dimension_value=event['SeverityLabel']
-    )
-
-    emit_cloudwatch_metric(
-        metric_name='AutoRemediationsByTeam',
-        metric_value=1,
-        dimension_name='Team',
-        dimension_value=event['Team']
-    )
-
-
     return True
-
-
-# ----------------------------------------------------------------
-#
-#   CloudWatch metrics
-#
-# ----------------------------------------------------------------
-
-def emit_cloudwatch_metric(metric_name, metric_value, dimension_name, dimension_value):
-    """
-    Emit a single data point to CloudWatch with a specified dimension.
-
-    :param metric_name: The name of the metric.
-    :param metric_value: The value for the metric.
-    :param dimension_name: The name of the dimension.
-    :param dimension_value: The value for the dimension.
-    """
-    cloudwatch_client.put_metric_data(
-        Namespace=METRIC_NAMESPACE,       # 'DelegatSOAR' as passed in via an ENV var
-        MetricData=[
-            {
-                'MetricName': metric_name,
-                'Dimensions': [
-                    {
-                        'Name': dimension_name,
-                        'Value': dimension_value
-                    },
-                ],
-                'Value': metric_value,
-                'Unit': 'Count'
-            },
-        ]
-    )
-    print(f"Metric emitted: {metric_name} - {dimension_name}: {dimension_value}, Value: {metric_value}")

@@ -8,6 +8,8 @@ import datetime as dt
 
 # Get environment variables
 TICKETS_TABLE = os.environ['TICKETS_TABLE']
+AUTOREMEDIATIONS_TABLE = os.environ['AUTOREMEDIATIONS_TABLE']
+INCIDENTS_TABLE = os.environ['INCIDENTS_TABLE']
 
 SEVERITY_ALLOWED_AGE_IN_HOURS_CRITICAL = int(os.environ['SEVERITY_ALLOWED_AGE_IN_HOURS_CRITICAL'])
 SEVERITY_ALLOWED_AGE_IN_HOURS_HIGH = int(os.environ['SEVERITY_ALLOWED_AGE_IN_HOURS_HIGH'])
@@ -48,11 +50,23 @@ METRIC_NAMESPACE = os.environ['METRIC_NAMESPACE']
 organizations = boto3.client('organizations')
 dynamodb = boto3.resource('dynamodb')
 tickets = dynamodb.Table(TICKETS_TABLE)
+autoremediations = dynamodb.Table(AUTOREMEDIATIONS_TABLE)
+incidents = dynamodb.Table(INCIDENTS_TABLE)
 cloudwatch_client = boto3.client('cloudwatch')
 
 
 # Lambda handler
 def lambda_handler(_data, _context):
+    # Four weeks ago in ISO format
+    four_weeks_ago = datetime.now(timezone.utc) - timedelta(weeks=4)
+    four_weeks_ago_iso = four_weeks_ago.isoformat()
+
+    # Autoremediations
+    emit_autoremediation_metrics(get_recent_autoremediations(four_weeks_ago_iso))
+
+    # Incidents
+    emit_incident_metrics(get_recent_incidents(four_weeks_ago_iso))
+
     # Retrieve all open tickets and set their age and overdue status
     open_tickets = set_age_and_overdue(retrieve_open_tickets())
     print(f"Open tickets ({len(open_tickets)}): {open_tickets}")
@@ -73,10 +87,38 @@ def lambda_handler(_data, _context):
             ticket['TeamEmail'] = account_data[account_name]['TeamEmail']
             ticket['AdditionalCC'] = ESCALATION_EMAIL_CC if severity_label in ESCALATION_EMAIL_SEVERITIES else ''
 
+    emit_ticket_metrics(open_tickets, overdue_tickets)
+
+    return overdue_tickets
+
+
+# Emit autoremediation metrics
+def emit_autoremediation_metrics(items):
+    # Emit metrics for each dimension
+    emit_metrics_for_dimension(items, 'severity_label', 'TotalAutoRemediationsBySeverity')
+    emit_metrics_for_dimension(items, 'Environment', 'TotalAutoRemediationsByEnvironment')
+    emit_metrics_for_dimension(items, 'Account', 'TotalAutoRemediationsByAccount')
+    emit_metrics_for_dimension(items, 'Team', 'TotalAutoRemediationsByTeam')
+
+
+# Emit incident metrics
+def emit_incident_metrics(items):
+    # Emit metrics for each dimension
+    emit_metrics_for_dimension(items, 'severity_label', 'TotalIncidentsBySeverity')
+    emit_metrics_for_dimension(items, 'Environment', 'TotalIncidentsByEnvironment')
+    emit_metrics_for_dimension(items, 'Account', 'TotalIncidentsByAccount')
+    emit_metrics_for_dimension(items, 'Team', 'TotalIncidentsByTeam')
+
+
+# Emit ticket metrics
+def emit_ticket_metrics(open_tickets, overdue_tickets):
+    n_tickets = len(open_tickets)
+    n_overdue_tickets = len(overdue_tickets)
+
     # Emit metric for the total number of open tickets
     emit_cloudwatch_metric(
         metric_name='TotalTickets',
-        metric_value=len(open_tickets),
+        metric_value=n_tickets,
         dimension_name='TicketStatus',
         dimension_value='Open'
     )
@@ -90,18 +132,16 @@ def lambda_handler(_data, _context):
     )
 
     # Emit metrics for each dimension for open tickets
-    emit_metrics_for_dimension(open_tickets, 'Account', 'TotalOpenTicketsByAccount')
-    emit_metrics_for_dimension(open_tickets, 'Environment', 'TotalOpenTicketsByEnvironment')
     emit_metrics_for_dimension(open_tickets, 'severity_label', 'TotalOpenTicketsBySeverity')
+    emit_metrics_for_dimension(open_tickets, 'Environment', 'TotalOpenTicketsByEnvironment')
+    emit_metrics_for_dimension(open_tickets, 'Account', 'TotalOpenTicketsByAccount')
     emit_metrics_for_dimension(open_tickets, 'Team', 'TotalOpenTicketsByTeam')
 
     # Emit metrics for each dimension for overdue tickets
-    emit_metrics_for_dimension(overdue_tickets, 'Account', 'TotalOverdueTicketsByAccount')
-    emit_metrics_for_dimension(overdue_tickets, 'Environment', 'TotalOverdueTicketsByEnvironment')
     emit_metrics_for_dimension(overdue_tickets, 'severity_label', 'TotalOverdueTicketsBySeverity')
+    emit_metrics_for_dimension(overdue_tickets, 'Environment', 'TotalOverdueTicketsByEnvironment')
+    emit_metrics_for_dimension(overdue_tickets, 'Account', 'TotalOverdueTicketsByAccount')
     emit_metrics_for_dimension(overdue_tickets, 'Team', 'TotalOverdueTicketsByTeam')
-
-    return overdue_tickets
 
 
 # Massage the tickets
@@ -309,6 +349,67 @@ def retrieve_open_tickets():
     return open_tickets
 
 
+def get_recent_autoremediations(four_weeks_ago_iso):
+    # Perform the query using the 'dummy-opened_at-index'
+    response = autoremediations.query(
+        IndexName='dummy-opened_at-index',
+        KeyConditionExpression='dummy = :dummy_val AND opened_at >= :four_weeks_ago_val',
+        ExpressionAttributeValues={
+            ':dummy_val': 'dummy',
+            ':four_weeks_ago_val': four_weeks_ago_iso
+        }
+    )
+
+    # Retrieve and return the autoremediations from the past four weeks
+    recent_autoremediations = response.get('Items', [])
+    
+    # Handle the possibility of paginated results
+    while 'LastEvaluatedKey' in response:
+        response = autoremediations.query(
+            IndexName='dummy-opened_at-index',
+            KeyConditionExpression='dummy = :dummy_val AND opened_at >= :four_weeks_ago_val',
+            ExpressionAttributeValues={
+                ':dummy_val': 'dummy',
+                ':four_weeks_ago_val': four_weeks_ago_iso
+            },
+            ExclusiveStartKey=response['LastEvaluatedKey']
+        )
+        recent_autoremediations.extend(response.get('Items', []))
+
+    return recent_autoremediations
+
+
+def get_recent_incidents(four_weeks_ago_iso):
+    # Perform the query using the 'dummy-opened_at-index'
+    response = incidents.query(
+        IndexName='dummy-opened_at-index',
+        KeyConditionExpression='dummy = :dummy_val AND opened_at >= :four_weeks_ago_val',
+        ExpressionAttributeValues={
+            ':dummy_val': 'dummy',
+            ':four_weeks_ago_val': four_weeks_ago_iso
+        }
+    )
+
+    # Retrieve and return the autoremediations from the past four weeks
+    recent_incidents = response.get('Items', [])
+    
+    # Handle the possibility of paginated results
+    while 'LastEvaluatedKey' in response:
+        response = incidents.query(
+            IndexName='dummy-opened_at-index',
+            KeyConditionExpression='dummy = :dummy_val AND opened_at >= :four_weeks_ago_val',
+            ExpressionAttributeValues={
+                ':dummy_val': 'dummy',
+                ':four_weeks_ago_val': four_weeks_ago_iso
+            },
+            ExclusiveStartKey=response['LastEvaluatedKey']
+        )
+        recent_incidents.extend(response.get('Items', []))
+
+    return recent_incidents
+
+
+
 # ----------------------------------------------------------------
 #
 #   CloudWatch metrics
@@ -344,12 +445,12 @@ def emit_cloudwatch_metric(metric_name, metric_value, dimension_name, dimension_
 
 
 # Helper function to emit metrics for each unique value in a dimension
-def emit_metrics_for_dimension(tickets, dimension_name, metric_name):
-    unique_values = set(ticket[dimension_name] for ticket in tickets)
+def emit_metrics_for_dimension(items, dimension_name, metric_name):
+    unique_values = set(item[dimension_name] for item in items)
     for value in unique_values:
         emit_cloudwatch_metric(
             metric_name=metric_name,
-            metric_value=sum(1 for ticket in tickets if ticket[dimension_name] == value),
+            metric_value=sum(1 for item in items if item[dimension_name] == value),
             dimension_name=dimension_name,
             dimension_value=value
         )

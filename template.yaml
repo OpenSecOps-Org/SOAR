@@ -731,18 +731,26 @@ Resources:
     Properties:
       TableName: incidents
       BillingMode: PAY_PER_REQUEST
+
       AttributeDefinitions:
-        - AttributeName: id
+        - 
+          AttributeName: id
           AttributeType: S
-        - AttributeName: opened_at
+        - 
+          AttributeName: opened_at
           AttributeType: S
-        - AttributeName: dummy
+        - 
+          AttributeName: dummy
           AttributeType: S
+
       KeySchema:
-        - AttributeName: id
+        - 
+          AttributeName: id
           KeyType: HASH
+          
       GlobalSecondaryIndexes:
-        - IndexName: dummy-opened_at-index
+        - 
+          IndexName: dummy-opened_at-index
           KeySchema:
             - AttributeName: dummy
               KeyType: HASH
@@ -750,11 +758,14 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+
       TimeToLiveSpecification:       # Enable TTL
         AttributeName: expire_at
         Enabled: true
+
       Tags:
-        - Key: "soar:dynamodb:no-pit-recovery"
+        - 
+          Key: "soar:dynamodb:no-pit-recovery"
           Value: ""
 
 
@@ -769,18 +780,26 @@ Resources:
     Properties:
       TableName: autoremediations
       BillingMode: PAY_PER_REQUEST
+
       AttributeDefinitions:
-        - AttributeName: id
+        - 
+          AttributeName: id
           AttributeType: S
-        - AttributeName: opened_at
+        - 
+          AttributeName: opened_at
           AttributeType: S
-        - AttributeName: dummy
+        - 
+          AttributeName: dummy
           AttributeType: S
+
       KeySchema:
-        - AttributeName: id
+        - 
+          AttributeName: id
           KeyType: HASH
+
       GlobalSecondaryIndexes:
-        - IndexName: dummy-opened_at-index
+        - 
+          IndexName: dummy-opened_at-index
           KeySchema:
             - AttributeName: dummy
               KeyType: HASH
@@ -788,11 +807,14 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+
       TimeToLiveSpecification:       # Enable TTL
         AttributeName: expire_at
         Enabled: true
+
       Tags:
-        - Key: "soar:dynamodb:no-pit-recovery"
+        - 
+          Key: "soar:dynamodb:no-pit-recovery"
           Value: ""
 
 
@@ -920,7 +942,6 @@ Resources:
         Variables:
           INCIDENTS_TABLE_NAME: !Ref Incidents
           EXPIRATION_DAYS: !Ref IncidentExpirationInDays
-          METRIC_NAMESPACE: !Ref MetricNamespace
 
   RememberAutoRemediationDoneFunction:
     Type: AWS::Serverless::Function
@@ -944,7 +965,6 @@ Resources:
         Variables:
           AUTOREMEDIATIONS_TABLE_NAME: !Ref AutoRemediations
           EXPIRATION_DAYS: !Ref AutoremediationExpirationInDays
-          METRIC_NAMESPACE: !Ref MetricNamespace
 
   RememberTicketOpenedFunction:
     Type: AWS::Serverless::Function
@@ -967,7 +987,6 @@ Resources:
       Environment:
         Variables:
           TICKETS_TABLE_NAME: !Ref Tickets
-          METRIC_NAMESPACE: !Ref MetricNamespace
 
   RememberTicketClosedFunction:
     Type: AWS::Serverless::Function
@@ -992,7 +1011,6 @@ Resources:
         Variables:
           TICKETS_TABLE_NAME: !Ref Tickets
           EXPIRATION_DAYS: !Ref ClosedTicketExpirationInDays
-          METRIC_NAMESPACE: !Ref MetricNamespace
 
 
   #-------------------------------------------------------------------------------
@@ -2899,6 +2917,10 @@ Resources:
               Resource: 
                 - !GetAtt Tickets.Arn
                 - !Sub "${Tickets.Arn}/index/*"
+                - !GetAtt AutoRemediations.Arn
+                - !Sub "${AutoRemediations.Arn}/index/*"
+                - !GetAtt Incidents.Arn
+                - !Sub "${Incidents.Arn}/index/*"
             - 
               Sid: OrganizationsPermissions
               Effect: Allow
@@ -2920,12 +2942,17 @@ Resources:
         Variables:
           ACCOUNT_TEAM_EMAIL_TAG_APP: !Ref AccountTeamEmailTagApp
           ACCOUNT_TEAM_EMAIL_TAG: !Ref AccountTeamEmailTag
+          AUTOREMEDIATIONS_TABLE: !Ref AutoRemediations
           CLIENT_TAG: !Ref ClientTag
           DEFAULT_TEAM_EMAIL: !Ref DefaultTeamEmail
           ENVIRONMENT_TAG: !Ref EnvironmentTag
+          ESCALATION_EMAIL_CC: !Ref EscalationEmailCC
+          ESCALATION_EMAIL_SEVERITIES: !Ref EscalationEmailSeverities
+          INCIDENTS_TABLE: !Ref Incidents
           JIRA_DEFAULT_PROJECT_KEY: !Ref JiraDefaultProjectKey
           JIRA_PROJECT_KEY_TAG_APP: !Ref JiraProjectKeyTagApp
           JIRA_PROJECT_KEY_TAG: !Ref JiraProjectKeyTag
+          METRIC_NAMESPACE: !Ref MetricNamespace
           PROJECT_TAG: !Ref ProjectTag
           SERVICE_NOW_DEFAULT_PROJECT_QUEUE: !Ref ServiceNowDefaultProjectQueue
           SERVICE_NOW_PROJECT_QUEUE_TAG_APP: !Ref ServiceNowProjectQueueTagApp
@@ -2937,10 +2964,6 @@ Resources:
           TEAM_TAG: !Ref TeamTag
           TICKETING_SYSTEM: !Ref TicketingSystem
           TICKETS_TABLE: !Ref Tickets
-          ESCALATION_EMAIL_CC: !Ref EscalationEmailCC
-          ESCALATION_EMAIL_SEVERITIES: !Ref EscalationEmailSeverities
-          METRIC_NAMESPACE: !Ref MetricNamespace
-
 
   ConsiderOverdueTicketFunction:
     Type: AWS::Serverless::Function
@@ -3212,7 +3235,7 @@ Resources:
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
-                "period": 86400,
+                "period": 300,
                 "stat": "Maximum",
                 "liveData": true,
                 "title": "Open Tickets",
@@ -3233,7 +3256,7 @@ Resources:
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
-                "period": 86400,
+                "period": 300,
                 "stat": "Maximum",
                 "liveData": true,
                 "title": "Overdue Tickets",
@@ -3254,7 +3277,7 @@ Resources:
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
-                "period": 86400,
+                "period": 300,
                 "stat": "Sum",
                 "liveData": true,
                 "title": "Auto-Remediations",
@@ -3276,7 +3299,7 @@ Resources:
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
-                "period": 86400,
+                "period": 300,
                 "stat": "Sum",
                 "liveData": true,
                 "title": "Incidents",
@@ -3303,7 +3326,7 @@ Resources:
                 "stacked": false,
                 "setPeriodToTimeRange": false,
                 "stat": "Maximum",
-                "period": 86400,
+                "period": 300,
                 "labels": {
                     "visible": true
                 },
@@ -3333,7 +3356,7 @@ Resources:
                 "stacked": false,
                 "setPeriodToTimeRange": false,
                 "stat": "Maximum",
-                "period": 86400,
+                "period": 300,
                 "labels": {
                     "visible": true
                 },
@@ -3363,7 +3386,7 @@ Resources:
                 "stacked": false,
                 "setPeriodToTimeRange": false,
                 "stat": "Maximum",
-                "period": 86400,
+                "period": 300,
                 "labels": {
                     "visible": true
                 },
@@ -3393,7 +3416,7 @@ Resources:
                 "stacked": false,
                 "setPeriodToTimeRange": false,
                 "stat": "Maximum",
-                "period": 86400,
+                "period": 300,
                 "labels": {
                     "visible": true
                 },

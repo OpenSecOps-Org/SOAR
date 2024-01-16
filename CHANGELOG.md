@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.9.9
+    * Incident and Auto-Remediation metric data points changed: now works like tickets, i.e. complete data
+      emitted every hour.
+
 ## v1.9.8
     * Cloudwatch metric data points in four dimensions for incidents and auto-remediations, just like for tickets.
 
