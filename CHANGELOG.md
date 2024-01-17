@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.14
+    * More tests.
+
 ## v1.9.13
     * Testing changes to ./publish script.
 
