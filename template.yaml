@@ -3279,7 +3279,7 @@ Resources:
                 "view": "singleValue",
                 "region": "${AWS::Region}",
                 "period": 300,
-                "stat": "Sum",
+                "stat": "Maximum",
                 "liveData": true,
                 "title": "Auto-Remediations",
                 "singleValueFullPrecision": false
@@ -3300,7 +3300,7 @@ Resources:
                 "view": "singleValue",
                 "region": "${AWS::Region}",
                 "period": 300,
-                "stat": "Sum",
+                "stat": "Maximum",
                 "liveData": true,
                 "title": "Incidents",
                 "singleValueFullPrecision": false
@@ -3438,7 +3438,7 @@ Resources:
                 "properties": {
                     "metrics": [
                         [ { "expression": "SELECT SUM(TotalAutoRemediationsBySeverity) FROM SCHEMA(DelegatSOAR, severity_label) GROUP BY severity_label", 
-                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
                     "region": "${AWS::Region}",
@@ -3468,7 +3468,7 @@ Resources:
                 "properties": {
                     "metrics": [
                         [ { "expression": "SELECT SUM(TotalAutoRemediationsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
-                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
                     "region": "${AWS::Region}",
@@ -3498,7 +3498,7 @@ Resources:
                 "properties": {
                     "metrics": [
                         [ { "expression": "SELECT SUM(TotalAutoRemediationsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
-                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
                     "region": "${AWS::Region}",
@@ -3528,7 +3528,7 @@ Resources:
                 "properties": {
                     "metrics": [
                         [ { "expression": "SELECT SUM(TotalAutoRemediationsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
-                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
                     "region": "${AWS::Region}",
@@ -3559,7 +3559,7 @@ Resources:
                 "properties": {
                     "metrics": [
                         [ { "expression": "SELECT SUM(TotalIncidentsBySeverity) FROM SCHEMA(DelegatSOAR, severity_label) GROUP BY severity_label", 
-                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
                     "region": "${AWS::Region}",
@@ -3589,7 +3589,7 @@ Resources:
                 "properties": {
                     "metrics": [
                         [ { "expression": "SELECT SUM(TotalIncidentsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
-                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
                     "region": "${AWS::Region}",
@@ -3619,7 +3619,7 @@ Resources:
                 "properties": {
                     "metrics": [
                         [ { "expression": "SELECT SUM(TotalIncidentsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
-                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
                     "region": "${AWS::Region}",
@@ -3649,7 +3649,7 @@ Resources:
                 "properties": {
                     "metrics": [
                         [ { "expression": "SELECT SUM(TotalIncidentsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
-                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
                     "region": "${AWS::Region}",

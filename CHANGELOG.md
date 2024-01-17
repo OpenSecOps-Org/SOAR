@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.11
+    * Stat change from Sum to Maximum for some widgets.
+
 ## v1.9.10
     * Widgets for auto-remediations and incidents added. Counters updated for new CloudWatch metric dimensions.
 
