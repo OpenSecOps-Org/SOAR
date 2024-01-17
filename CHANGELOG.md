@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.16
+    * Fully functional, deleting copy of orig script.
+
 ## v1.9.15
     * And the last test.
 
