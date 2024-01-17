@@ -53,28 +53,57 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Get the tree object for the current HEAD of main
-MAIN_TREE=$(git rev-parse HEAD^{tree})
-
 # Check if the 'releases' branch exists
 if ! git rev-parse --verify releases > /dev/null 2>&1; then
-    # Create a fresh 'releases' branch from 'main'
-    git checkout -b releases main
+    # Clean up the working directory before creating a new branch
+    git clean -fd
+    # For a fresh releases branch, squash all the existing commits into one
+    git checkout --orphan releases
+    git add -A
+    git commit -m "Initial release $TAG_VERSION"
+    git tag $TAG_VERSION
 else
-    # Checkout the 'releases' branch
-    git checkout releases
+    # Check if `main` and `releases` are equal
+    if git diff main releases --quiet; then
+        # Check if delegat branch is empty or doesn't exist
+        if ! git ls-remote --heads delegat main | grep main > /dev/null; then
+            git checkout --orphan releases
+            git add -A
+            git commit -m "Initial release $TAG_VERSION"
+            git tag $TAG_VERSION
+        else
+            echo "'main' and 'releases' are equal. No changes to publish."
+            exit 0
+        fi
+    else
+        git checkout releases
+        git merge main --squash --allow-unrelated-histories -X theirs
+        if [ $? -ne 0 ]; then
+            echo "Error: Squash merge failed."
+            exit 1
+        fi
+
+        # Commit the squashed changes
+        git commit -m "Release $TAG_VERSION"
+        if [ $? -ne 0 ]; then
+            echo "Error: Commit of squashed changes failed."
+            exit 1
+        fi
+
+        # Tag the release
+        if ! git rev-parse $TAG_VERSION > /dev/null 2>&1; then
+            git tag $TAG_VERSION
+            if [ $? -ne 0 ]; then
+                echo "Error: Tagging failed."
+                exit 1
+            fi
+        else
+            echo "Tag '$TAG_VERSION' already exists. Proceeding without creating a new tag."
+        fi
+    fi
 fi
 
-# Create a new commit on the 'releases' branch with the tree from 'main'
-RELEASE_COMMIT=$(git commit-tree -m "Release $TAG_VERSION" $MAIN_TREE -p releases)
-
-# Move the 'releases' branch to the new commit
-git reset --hard $RELEASE_COMMIT
-
-# Tag the release
-git tag $TAG_VERSION
-
-# Push the release branch and tags to the origin repo
+# Push the release branch and tags to the dev repo
 git push origin releases --tags
 if [ $? -ne 0 ]; then
     echo "Error: Pushing to origin failed."

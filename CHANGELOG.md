@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.13
+    * Testing changes to ./publish script.
+
 ## v1.9.12
     * Dashboard layout changes.
 
