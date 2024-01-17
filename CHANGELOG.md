@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.12
+    * Dashboard layout changes.
+
 ## v1.9.11
     * Stat change from Sum to Maximum for some widgets.
 
