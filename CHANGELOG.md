@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.10
+    * Widgets for auto-remediations and incidents added. Counters updated for new CloudWatch metric dimensions.
+
 ## v1.9.9
     * Incident and Auto-Remediation metric data points changed: now works like tickets, i.e. complete data
       emitted every hour.

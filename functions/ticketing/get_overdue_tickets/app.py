@@ -94,6 +94,14 @@ def lambda_handler(_data, _context):
 
 # Emit autoremediation metrics
 def emit_autoremediation_metrics(items):
+    # Emit total count
+    emit_cloudwatch_metric(
+        metric_name='TotalAutoRemediations',
+        metric_value=len(items),
+        dimension_name='Action',
+        dimension_value='Performed'
+    )
+
     # Emit metrics for each dimension
     emit_metrics_for_dimension(items, 'severity_label', 'TotalAutoRemediationsBySeverity')
     emit_metrics_for_dimension(items, 'Environment', 'TotalAutoRemediationsByEnvironment')
@@ -103,6 +111,14 @@ def emit_autoremediation_metrics(items):
 
 # Emit incident metrics
 def emit_incident_metrics(items):
+    # Emit total count
+    emit_cloudwatch_metric(
+        metric_name='TotalIncidents',
+        metric_value=len(items),
+        dimension_name='Action',
+        dimension_value='Processed'
+    )
+
     # Emit metrics for each dimension
     emit_metrics_for_dimension(items, 'severity_label', 'TotalIncidentsBySeverity')
     emit_metrics_for_dimension(items, 'Environment', 'TotalIncidentsByEnvironment')

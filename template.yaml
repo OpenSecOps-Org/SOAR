@@ -2853,14 +2853,15 @@ Resources:
 
   #-------------------------------------------------------------------------------
   #
-  # State machine for overdue ticket reminders
+  # State machine for hourly tasks such as overdue ticket reminders and
+  # CloudWatch metrics.
   #
   #-------------------------------------------------------------------------------
   
-  SOAROverdueTicketReminders:
+  SOARHourlyTasks:
     Type: AWS::Serverless::StateMachine
     Properties:
-      DefinitionUri: statemachines/overdue_ticket_reminders.asl.yaml
+      DefinitionUri: statemachines/hourly_tasks.asl.yaml
       DefinitionSubstitutions:
         GetOverdueTicketsFunctionArn: !GetAtt GetOverdueTicketsFunction.Arn
         ConsiderOverdueTicketFunctionArn: !GetAtt ConsiderOverdueTicketFunction.Arn
@@ -2887,16 +2888,16 @@ Resources:
       Logging:
         Destinations:
           - CloudWatchLogsLogGroup:
-              LogGroupArn: !GetAtt SOAROverdueTicketRemindersLogGroup.Arn
+              LogGroupArn: !GetAtt SOARHourlyTasksLogGroup.Arn
         IncludeExecutionData: false
         Level: ERROR
       Events:
-        SyncControlsEvent:
+        SOARHourlyTasksEvent:
           Type: Schedule
           Properties:
             Schedule: cron(0 * * * ? *)  # Scheduled to run every hour
 
-  SOAROverdueTicketRemindersLogGroup:
+  SOARHourlyTasksLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       RetentionInDays: 30
@@ -3120,11 +3121,11 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       TreatMissingData: notBreaching
 
-  AlarmSOAROverdueTicketReminders:
+  AlarmSOARHourlyTasks:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: INFRA-SOAR-Overdue-Ticket-Reminders-SM-Failure-HIGH
-      AlarmDescription: The SOAROverdueTicketReminders state machine failed.
+      AlarmName: INFRA-SOAR-Hourly-Tasks-SM-Failure-HIGH
+      AlarmDescription: The SOARHourlyTasks state machine failed.
       ActionsEnabled: true
       OKActions: []
       AlarmActions: []
@@ -3134,7 +3135,7 @@ Resources:
       Statistic: Sum
       Dimensions:
         - Name: StateMachineArn
-          Value: !Ref SOAROverdueTicketReminders
+          Value: !Ref SOARHourlyTasks
       Period: 60
       EvaluationPeriods: 1
       DatapointsToAlarm: 1
@@ -3273,7 +3274,7 @@ Resources:
               "properties": {
                 "sparkline": false,
                 "metrics": [
-                    [ "DelegatSOAR", "AutoRemediation", "Action", "Successful", { "region": "eu-north-1" } ]
+                    [ "DelegatSOAR", "TotalAutoRemediations", "Action", "Performed", { "region": "${AWS::Region}" } ]
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
@@ -3281,8 +3282,7 @@ Resources:
                 "stat": "Sum",
                 "liveData": true,
                 "title": "Auto-Remediations",
-                "singleValueFullPrecision": false,
-                "setPeriodToTimeRange": true
+                "singleValueFullPrecision": false
               }
             },
 
@@ -3295,7 +3295,7 @@ Resources:
               "properties": {
                 "sparkline": false,
                 "metrics": [
-                    [ "DelegatSOAR", "Incident", "Action", "Processed", { "region": "eu-north-1" } ]
+                    [ "DelegatSOAR", "TotalIncidents", "Action", "Processed", { "region": "${AWS::Region}" } ]
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
@@ -3303,8 +3303,7 @@ Resources:
                 "stat": "Sum",
                 "liveData": true,
                 "title": "Incidents",
-                "singleValueFullPrecision": false,
-                "setPeriodToTimeRange": true
+                "singleValueFullPrecision": false
               }
             },
 
@@ -3330,7 +3329,7 @@ Resources:
                 "labels": {
                     "visible": true
                 },
-                "sparkline": true,
+                "sparkline": false,
                 "trend": true,
                 "title": "Open Ticket Severities",
                 "legend": {
@@ -3346,10 +3345,10 @@ Resources:
               "x": 6,
               "y": 4,
               "properties": {
-              "metrics": [
-                  [ { "expression": "SELECT SUM(TotalOpenTicketsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
-                      "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
-              ],
+                "metrics": [
+                    [ { "expression": "SELECT SUM(TotalOpenTicketsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
+                        "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
+                ],
                 "view": "pie",
                 "region": "${AWS::Region}",
                 "liveData": true,
@@ -3360,7 +3359,7 @@ Resources:
                 "labels": {
                     "visible": true
                 },
-                "sparkline": true,
+                "sparkline": false,
                 "trend": true,
                 "title": "Open Tickets per Environment",
                 "legend": {
@@ -3376,10 +3375,10 @@ Resources:
               "x": 12,
               "y": 4,
               "properties": {
-              "metrics": [
-                  [ { "expression": "SELECT MAX(TotalOpenTicketsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
-                      "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
-              ],
+                "metrics": [
+                    [ { "expression": "SELECT MAX(TotalOpenTicketsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
+                        "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
+                ],
                 "view": "pie",
                 "region": "${AWS::Region}",
                 "liveData": true,
@@ -3390,7 +3389,7 @@ Resources:
                 "labels": {
                     "visible": true
                 },
-                "sparkline": true,
+                "sparkline": false,
                 "trend": true,
                 "title": "Open Tickets per Account",
                 "legend": {
@@ -3406,10 +3405,10 @@ Resources:
               "x": 18,
               "y": 4,
               "properties": {
-              "metrics": [
-                  [ { "expression": "SELECT MAX(TotalOpenTicketsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
-                      "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
-              ],
+                "metrics": [
+                    [ { "expression": "SELECT MAX(TotalOpenTicketsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
+                        "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
+                ],
                 "view": "pie",
                 "region": "${AWS::Region}",
                 "liveData": true,
@@ -3420,7 +3419,7 @@ Resources:
                 "labels": {
                     "visible": true
                 },
-                "sparkline": true,
+                "sparkline": false,
                 "trend": true,
                 "title": "Open Tickets per Team",
                 "legend": {
@@ -3431,11 +3430,253 @@ Resources:
 
 
             {
+                "height": 7,
+                "width": 6,
+                "y": 11,
+                "x": 0,
+                "type": "metric",
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(TotalAutoRemediationsBySeverity) FROM SCHEMA(DelegatSOAR, severity_label) GROUP BY severity_label", 
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                    ],
+                    "view": "pie",
+                    "region": "${AWS::Region}",
+                    "liveData": true,
+                    "stacked": false,
+                    "setPeriodToTimeRange": false,
+                    "stat": "Maximum",
+                    "period": 300,
+                    "labels": {
+                        "visible": true
+                    },
+                    "sparkline": false,
+                    "trend": true,
+                    "title": "Auto-Remediation Severities",
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+
+            {
+                "height": 7,
+                "width": 6,
+                "y": 11,
+                "x": 6,
+                "type": "metric",
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(TotalAutoRemediationsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                    ],
+                    "view": "pie",
+                    "region": "${AWS::Region}",
+                    "liveData": true,
+                    "stacked": false,
+                    "setPeriodToTimeRange": false,
+                    "stat": "Maximum",
+                    "period": 300,
+                    "labels": {
+                        "visible": true
+                    },
+                    "sparkline": false,
+                    "trend": true,
+                    "title": "Auto-Remediations per Environment",
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+
+            {
+                "height": 7,
+                "width": 6,
+                "y": 11,
+                "x": 12,
+                "type": "metric",
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(TotalAutoRemediationsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                    ],
+                    "view": "pie",
+                    "region": "${AWS::Region}",
+                    "liveData": true,
+                    "stacked": false,
+                    "setPeriodToTimeRange": false,
+                    "stat": "Maximum",
+                    "period": 300,
+                    "labels": {
+                        "visible": true
+                    },
+                    "sparkline": false,
+                    "trend": true,
+                    "title": "Auto-Remediations per Account",
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+
+            {
+                "height": 7,
+                "width": 6,
+                "y": 11,
+                "x": 18,
+                "type": "metric",
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(TotalAutoRemediationsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                    ],
+                    "view": "pie",
+                    "region": "${AWS::Region}",
+                    "liveData": true,
+                    "stacked": false,
+                    "setPeriodToTimeRange": false,
+                    "stat": "Maximum",
+                    "period": 300,
+                    "labels": {
+                        "visible": true
+                    },
+                    "sparkline": false,
+                    "trend": true,
+                    "title": "Auto-Remediations per Team",
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+
+
+            {
+                "height": 7,
+                "width": 6,
+                "y": 18,
+                "x": 0,
+                "type": "metric",
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(TotalIncidentsBySeverity) FROM SCHEMA(DelegatSOAR, severity_label) GROUP BY severity_label", 
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                    ],
+                    "view": "pie",
+                    "region": "${AWS::Region}",
+                    "liveData": true,
+                    "stacked": false,
+                    "setPeriodToTimeRange": false,
+                    "stat": "Maximum",
+                    "period": 300,
+                    "labels": {
+                        "visible": true
+                    },
+                    "sparkline": false,
+                    "trend": true,
+                    "title": "Incident Severities",
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+
+            {
+                "height": 7,
+                "width": 6,
+                "y": 18,
+                "x": 6,
+                "type": "metric",
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(TotalIncidentsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                    ],
+                    "view": "pie",
+                    "region": "${AWS::Region}",
+                    "liveData": true,
+                    "stacked": false,
+                    "setPeriodToTimeRange": false,
+                    "stat": "Maximum",
+                    "period": 300,
+                    "labels": {
+                        "visible": true
+                    },
+                    "sparkline": false,
+                    "trend": true,
+                    "title": "Incidents per Environment",
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+
+            {
+                "height": 7,
+                "width": 6,
+                "y": 18,
+                "x": 12,
+                "type": "metric",
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(TotalIncidentsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                    ],
+                    "view": "pie",
+                    "region": "${AWS::Region}",
+                    "liveData": true,
+                    "stacked": false,
+                    "setPeriodToTimeRange": false,
+                    "stat": "Maximum",
+                    "period": 300,
+                    "labels": {
+                        "visible": true
+                    },
+                    "sparkline": false,
+                    "trend": true,
+                    "title": "Incidents per Account",
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+
+            {
+                "height": 7,
+                "width": 6,
+                "y": 18,
+                "x": 18,
+                "type": "metric",
+                "properties": {
+                    "metrics": [
+                        [ { "expression": "SELECT SUM(TotalIncidentsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
+                            "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Sum" } ]
+                    ],
+                    "view": "pie",
+                    "region": "${AWS::Region}",
+                    "liveData": true,
+                    "stacked": false,
+                    "setPeriodToTimeRange": false,
+                    "stat": "Maximum",
+                    "period": 300,
+                    "labels": {
+                        "visible": true
+                    },
+                    "sparkline": false,
+                    "trend": true,
+                    "title": "Incidents per Team",
+                    "legend": {
+                        "position": "hidden"
+                    }
+                }
+            },
+
+
+            {
               "type": "metric",
               "width": 8,
               "height": 4,
               "x": 0,
-              "y": 11,
+              "y": 25,
               "properties": {
                 "title": "Step Functions State Transitions (all)",
                 "metrics": [
@@ -3463,7 +3704,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 8,
-              "y": 11,
+              "y": 25,
               "properties": {
                 "title": "Delegat SOAR ASFF Processor Executions",
                 "metrics": [
@@ -3495,7 +3736,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 16,
-              "y": 11,
+              "y": 25,
               "properties": {
                 "title": "Delegat SOAR ASFF Processor Failures",
                 "metrics": [
@@ -3526,7 +3767,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 0,
-              "y": 15,
+              "y": 29,
               "properties": {
                 "title": "Incidents",
                 "metrics": [
@@ -3553,7 +3794,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 8,
-              "y": 15,
+              "y": 29,
               "properties": {
                 "title": "AutoRemediations",
                 "metrics": [
@@ -3575,12 +3816,13 @@ Resources:
               }
             },
 
+
             {
               "type": "metric",
               "width": 8,
               "height": 4,
               "x": 16,
-              "y": 15,
+              "y": 29,
               "properties": {
                 "title": "AI Report ExecutionTime, ExecutionsFailed",
                 "metrics": [
@@ -3616,7 +3858,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 0,
-              "y": 23,
+              "y": 37,
               "properties": {
                 "title": "Tickets Opened",
                 "metrics": [
@@ -3643,7 +3885,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 8,
-              "y": 23,
+              "y": 37,
               "properties": {
                 "title": "Tickets Closed",
                 "metrics": [
@@ -3670,7 +3912,7 @@ Resources:
               "width": 8,
               "height": 4,
               "x": 16,
-              "y": 23,
+              "y": 37,
               "properties": {
                 "title": "AI query execution time",
                 "metrics": [
