@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.9.17
+    * Corrected SUM to MAX aggregation operator where applicable for certain widgets.
+
 ## v1.9.16
     * Fully functional, deleting copy of orig script.
 
