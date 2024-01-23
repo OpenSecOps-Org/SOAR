@@ -1059,17 +1059,6 @@ Resources:
         AutoRemediationsSMArn: !Ref SOARAutoRemediations
         IncidentsSMArn: !Ref SOARIncidents
 
-      Events:
-        ASFFFindingImported:
-          Type: EventBridgeRule
-          Properties:
-            EventBusName: !Ref CustomEventBusName
-            Pattern:
-              source:
-                - aws.securityhub
-              detail-type:
-                - Security Hub Findings - Imported
-
       Policies:
         - Version: 2012-10-17
           Statement:
@@ -1150,6 +1139,39 @@ Resources:
             StateMachineName: !Ref SOARAutoRemediations
         - StepFunctionsExecutionPolicy:
             StateMachineName: !Ref SOARIncidents
+
+      Events:
+        ASFFFindingWorkflowStatusNew:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref CustomEventBusName
+            Pattern:
+              source:
+                - aws.securityhub
+              detail-type:
+                - Security Hub Findings - Imported
+              detail:
+                findings:
+                  Workflow:
+                    Status:
+                      - NEW
+                  RecordState:
+                    - ACTIVE
+
+        ASFFFindingTicketOpenYes:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref CustomEventBusName
+            Pattern:
+              source:
+                - aws.securityhub
+              detail-type:
+                - Security Hub Findings - Imported
+              detail:
+                findings:
+                  UserDefinedFields:
+                    TicketOpen:
+                      - "Yes"
 
       Logging:
         Destinations: 

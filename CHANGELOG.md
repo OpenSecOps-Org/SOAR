@@ -1,5 +1,12 @@
 # Change Log
 
+## v1.10.1
+    * Only running the ASFF processor for a NEW and ACTIVE finding, or when there is an open ticket,
+      regardless of state.
+
+## v1.10.0
+    * Only running the ASFF processor when Workflow.Status is NEW or there is an open ticket.
+
 ## v1.9.17
     * Corrected SUM to MAX aggregation operator where applicable for certain widgets.
 
