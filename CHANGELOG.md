@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.10.2
+    * Split the dashboard in two.
+
 ## v1.10.1
     * Only running the ASFF processor for a NEW and ACTIVE finding, or when there is an open ticket,
       regardless of state.

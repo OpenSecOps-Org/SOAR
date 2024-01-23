@@ -503,8 +503,13 @@ Parameters:
 
   DashboardName:
     Type: String
-    Description: The name of the dashboard. Set to 'CloudWatch-Default' to make it the default one.
-    Default: 'Delegat_SOAR'
+    Description: The name of the SOAR security status dashboard. Set to 'CloudWatch-Default' to make it the default one.
+    Default: 'Delegat_SOAR_Security_Status'
+
+  DashboardExecName:
+    Type: String
+    Description: The name of the SOAR execution metrics dashboard. Set to 'CloudWatch-Default' to make it the default one.
+    Default: 'Delegat_SOAR_Execution_Dashboard'
 
   MetricNamespace:
     Type: String
@@ -1141,6 +1146,7 @@ Resources:
             StateMachineName: !Ref SOARIncidents
 
       Events:
+        # All ASFF findings that are NEW and ACTIVE. No need to process ARCHIVED stuff.
         ASFFFindingWorkflowStatusNew:
           Type: EventBridgeRule
           Properties:
@@ -1158,6 +1164,7 @@ Resources:
                   RecordState:
                     - ACTIVE
 
+        # All ASFF findings with an open ticket, regardless of state
         ASFFFindingTicketOpenYes:
           Type: EventBridgeRule
           Properties:
@@ -3231,7 +3238,7 @@ Resources:
 
   #-------------------------------------------------------------------------------
   #
-  # CloudWatch SOAR dashboard
+  # CloudWatch SOAR dashboards
   #
   #-------------------------------------------------------------------------------
 
@@ -3690,14 +3697,25 @@ Resources:
                         "position": "hidden"
                     }
                 }
-            },
+            }            
+          ]
+        }
 
 
+  DashboardExec:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Ref DashboardExecName
+      DashboardBody: !Sub |
+        {
+          "start": "-P4W",
+          "periodOverride": "inherit",
+          "widgets": [
             {
               "type": "metric",
               "height": 4,
               "width": 8,
-              "y": 18,
+              "y": 0,
               "x": 0,
               "properties": {
                 "title": "Step Functions State Transitions (all)",
@@ -3725,7 +3743,7 @@ Resources:
               "type": "metric",
               "height": 4,
               "width": 8,
-              "y": 18,
+              "y": 0,
               "x": 8,
               "properties": {
                 "title": "Delegat SOAR ASFF Processor Executions",
@@ -3757,7 +3775,7 @@ Resources:
               "type": "metric",
               "height": 4,
               "width": 8,
-              "y": 18,
+              "y": 0,
               "x": 16,
               "properties": {
                 "title": "Delegat SOAR ASFF Processor Failures",
@@ -3788,7 +3806,7 @@ Resources:
               "type": "metric",
               "height": 4,
               "width": 8,
-              "y": 22,
+              "y": 4,
               "x": 0,
               "properties": {
                 "title": "Incidents",
@@ -3815,7 +3833,7 @@ Resources:
               "type": "metric",
               "height": 4,
               "width": 8,
-              "y": 22,
+              "y": 4,
               "x": 8,
               "properties": {
                 "title": "AutoRemediations",
@@ -3843,7 +3861,7 @@ Resources:
               "type": "metric",
               "height": 4,
               "width": 8,
-              "y": 22,
+              "y": 4,
               "x": 16,
               "properties": {
                 "title": "AI Report ExecutionTime, ExecutionsFailed",
@@ -3879,7 +3897,7 @@ Resources:
               "type": "metric",
               "height": 4,
               "width": 8,
-              "y": 26,
+              "y": 8,
               "x": 0,
               "properties": {
                 "title": "Tickets Opened",
@@ -3906,7 +3924,7 @@ Resources:
               "type": "metric",
               "height": 4,
               "width": 8,
-              "y": 26,
+              "y": 8,
               "x": 8,
               "properties": {
                 "title": "Tickets Closed",
@@ -3933,7 +3951,7 @@ Resources:
               "type": "metric",
               "height": 4,
               "width": 8,
-              "y": 26,
+              "y": 8,
               "x": 16,
               "properties": {
                 "title": "AI query execution time",
