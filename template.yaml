@@ -294,6 +294,34 @@ Parameters:
       - ALL       # Yes, all of them should
     Default: INFRA
 
+  # Microsoft Sentinel ---------------------------------------------------------------
+
+  IncidentsToSentinel:
+    Type: String
+    Description: Whether incidents should be ingested into Microsoft Sentinel
+    AllowedValues:
+      - NONE      # No, they shouldn't
+      - INFRA     # Yes, but only the infrastructural ones (GuardDuty, etc)
+      - APP       # Yes, but only for application-generated incidents
+      - ALL       # Yes, all of them should
+    Default: NONE
+
+  SentinelWorkspaceIdParameterPath:
+    Type: String
+    Description: The Microsoft Sentinel Workspace Id parameter path in Parameter Store.
+    Default: '/soar/ms-sentinel/workspace-id'
+
+  SentinelSharedKeyParameterPath:
+    Type: String
+    Description: The Microsoft Sentinel Workspace Id parameter path in Parameter Store.
+    Default: '/soar/ms-sentinel/shared-key'
+
+  SentinelLogTypeParameterPath:
+    Type: String
+    Description: The Microsoft Sentinel Workspace Id parameter path in Parameter Store.
+    Default: '/soar/ms-sentinel/log-type'
+
+
   # Tag keys -------------------------------------------------------------------------
 
   AccountTeamEmailTag:
@@ -593,6 +621,37 @@ Resources:
       Type: String
       Value: REPLACE_ME # Don't replace here, use the console or the CLI
       Description: The ServiceNow password.
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # Parameter Store for Microsoft Sentinel credentials and conf
+  #
+  #-------------------------------------------------------------------------------
+
+  SoarSentinelWorkspaceId:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref SentinelWorkspaceIdParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The Microsoft Sentinel workspace ID.
+
+  SoarSentinelSharedKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref SentinelSharedKeyParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The Microsoft Sentinel shared key.
+
+  SoarSentinelLogType:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Ref SentinelLogTypeParameterPath
+      Type: String
+      Value: REPLACE_ME # Don't replace here, use the console or the CLI
+      Description: The Microsoft Sentinel log type.
 
 
   #-------------------------------------------------------------------------------
@@ -2335,6 +2394,7 @@ Resources:
         QueryChatGPTFunctionArn: !GetAtt QueryChatGPTFunction.Arn
         RememberIncidentOpenedFunctionArn: !GetAtt RememberIncidentOpenedFunction.Arn
         ComputePenaltyScoreFunctionArn: !GetAtt ComputePenaltyScoreFunction.Arn
+        SaveToSentinelFunctionArn: !GetAtt SaveToSentinelFunction.Arn
 
         LocalIncidentSuppressionsName: !Ref LocalIncidentSuppressions
         LocalIncidentAutoRemSuppressionsName: !Ref LocalIncidentAutoRemSuppressions
@@ -2373,6 +2433,8 @@ Resources:
             FunctionName: !Ref RememberIncidentOpenedFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref ComputePenaltyScoreFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SaveToSentinelFunction
 
         - DynamoDBReadPolicy:
             TableName: !Ref LocalIncidentSuppressions
@@ -2514,6 +2576,25 @@ Resources:
         Variables:
           CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
           PRODUCT_NAME: !Ref ProductName
+
+
+  SaveToSentinelFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ticketing/save_to_ms_sentinel/
+      Policies:
+        - Statement:
+            - Sid: SSMParameterStore
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: '*'
+      Environment:
+        Variables:
+          INCIDENTS_TO_SENTINEL: !Ref IncidentsToSentinel
+          SENTINEL_WORKSPACE_ID_PARAMETER_PATH: !Ref SentinelWorkspaceIdParameterPath
+          SENTINEL_SHARED_KEY_PARAMETER_PATH: !Ref SentinelSharedKeyParameterPath
+          SENTINEL_LOG_TYPE_PARAMETER_PATH: !Ref SentinelLogTypeParameterPath
 
 
   #-------------------------------------------------------------------------------

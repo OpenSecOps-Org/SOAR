@@ -331,8 +331,22 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 100
                 BackoffRate: 3
-        Next:  Email to Whom?
+        Next:  Save to Sentinel?
 
+    Save to Sentinel?:
+        Type: Task
+        Resource: '${SaveToSentinelFunctionArn}'
+        ResultPath: null
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - DynamoDB.SdkClientException
+                    - DynamoDB.InternalServerErrorException
+                IntervalSeconds: 3
+                MaxAttempts: 100
+                BackoffRate: 3
+        Next: Email to Whom?
 
     Email to Whom?:
         Type: Choice

@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.11.0
+    * Support for Microsoft Sentinel as recipient of all incidents.
+
 ## v1.10.2
     * Split the dashboard in two.
 
