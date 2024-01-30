@@ -1541,11 +1541,18 @@ Resources:
       CodeUri: functions/chatgpt/query_chatgpt/
       Policies:
         - Statement:
-            - Sid: SSMParameterStore
+            - 
+              Sid: SSMParameterStore
               Effect: Allow
               Action:
                 - ssm:GetParameter
               Resource: '*'
+            - 
+              Sid: PublishToSNSTopic
+              Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref ExternalCallFailureSNSTopic
       Environment:
         Variables:
           USE_CHATGPT: !Ref UseChatGPT
@@ -1558,6 +1565,17 @@ Resources:
           CHATGPT_ANONYMIZE_HEX_STRINGS: !Ref ChatGPTAnonymizeHexStrings
           CHATGPT_REMOVE_ARNS: !Ref ChatGPTRemoveARNs
           CHATGPT_REMOVE_EMAIL_ADDRESSES: !Ref ChatGPTRemoveEmailAddresses
+          SNS_TOPIC_ARN: !Ref ExternalCallFailureSNSTopic
+
+
+  # External services such as OpenAI and Microsoft Sentinel must not create incidents or
+  # SOAR failures. Instead, we send a message to this SNS topic when errors involving
+  # external services occur.
+  ExternalCallFailureSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: DelegatSOARExternalCallFailures
+      DisplayName: Delegat SOAR External Call Failures
 
 
   #-------------------------------------------------------------------------------
@@ -2584,17 +2602,25 @@ Resources:
       CodeUri: functions/ticketing/save_to_ms_sentinel/
       Policies:
         - Statement:
-            - Sid: SSMParameterStore
+            - 
+              Sid: SSMParameterStore
               Effect: Allow
               Action:
                 - ssm:GetParameter
               Resource: '*'
+            - 
+              Sid: PublishToSNSTopic
+              Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref ExternalCallFailureSNSTopic
       Environment:
         Variables:
           INCIDENTS_TO_SENTINEL: !Ref IncidentsToSentinel
           SENTINEL_WORKSPACE_ID_PARAMETER_PATH: !Ref SentinelWorkspaceIdParameterPath
           SENTINEL_SHARED_KEY_PARAMETER_PATH: !Ref SentinelSharedKeyParameterPath
           SENTINEL_LOG_TYPE_PARAMETER_PATH: !Ref SentinelLogTypeParameterPath
+          SNS_TOPIC_ARN: !Ref ExternalCallFailureSNSTopic
 
 
   #-------------------------------------------------------------------------------

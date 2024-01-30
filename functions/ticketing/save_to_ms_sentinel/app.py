@@ -14,6 +14,11 @@ SENTINEL_WORKSPACE_ID_PARAMETER_PATH = os.environ['SENTINEL_WORKSPACE_ID_PARAMET
 SENTINEL_SHARED_KEY_PARAMETER_PATH = os.environ['SENTINEL_SHARED_KEY_PARAMETER_PATH']
 SENTINEL_LOG_TYPE_PARAMETER_PATH = os.environ['SENTINEL_LOG_TYPE_PARAMETER_PATH']
 
+SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
+
+
+# Initialize the SNS client
+sns_client = boto3.client('sns')
 
 # Create a boto3 client for AWS SSM
 client = boto3.client('ssm')
@@ -57,7 +62,9 @@ def lambda_handler(data, _context):
         print('Data was successfully ingested or failed silently.')
         return True
     else:
-        print(f"Failed to ingest data. Status code: {response.status_code}, Response text: {response.text}")
+        error_msg = f"Failed to ingest data. Status code: {response.status_code}, Response text: {response.text}"
+        print(error_msg)
+        send_sns_notification(error_msg)
         return False
 
 
@@ -126,3 +133,12 @@ def compose_json_data(data):
     # Remove keys with None values to avoid sending them to Azure Monitor
     log_data = {k: v for k, v in log_data.items() if v is not None}
     return [log_data]  # The API expects an array of log data objects
+
+
+# Helper function to send an SNS notification
+def send_sns_notification(message):
+    sns_client.publish(
+        TopicArn=SNS_TOPIC_ARN,
+        Message=message,
+        Subject="Microsoft Sentinel Call Error"
+    )

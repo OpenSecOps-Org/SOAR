@@ -29,6 +29,12 @@ CHATGPT_ANONYMIZE_HEX_STRINGS = os.environ['CHATGPT_ANONYMIZE_HEX_STRINGS']
 CHATGPT_REMOVE_ARNS = os.environ['CHATGPT_REMOVE_ARNS']
 CHATGPT_REMOVE_EMAIL_ADDRESSES = os.environ['CHATGPT_REMOVE_EMAIL_ADDRESSES']
 
+SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
+
+
+# Initialize the SNS client
+sns_client = boto3.client('sns')
+
 # Create a boto3 client for SSM
 ssm_client = boto3.client('ssm')
 
@@ -152,52 +158,57 @@ def call_openai_api(model, fallback_model, messages, temperature, top_p, frequen
         else:
             # For other bad request errors, log and raise the exception to be caught by the Step Functions state machine.
             logger.error(f"BadRequestError: {str(e)}")
+            send_sns_notification(f"BadRequestError occurred: {str(e)}")
             raise
 
     except RateLimitError as e:
         # RateLimitError indicates too many requests; it's transient and should be retried.
         # This will trigger the Retry policy in the Step Functions state machine.
         logger.error(f"RateLimitError: {str(e)}")
+        send_sns_notification(f"RateLimitError occurred: {str(e)}")
         raise_lambda_too_many_requests_exception(str(e))
 
     except APITimeoutError as e:
         # APITimeoutError indicates a timeout; it's transient and should be retried.
         # This will trigger the Retry policy in the Step Functions state machine.
         logger.error(f"APITimeoutError: {str(e)}")
+        send_sns_notification(f"APITimeoutError occurred: {str(e)}")
         raise_lambda_service_exception(str(e))
 
     except APIConnectionError as e:
         # APIConnectionError indicates a network connection error; it's transient and should be retried.
         # This will trigger the Retry policy in the Step Functions state machine.
         logger.error(f"APIConnectionError: {str(e)}")
+        send_sns_notification(f"APIConnectionError occurred: {str(e)}")
         raise_lambda_service_exception(str(e))
 
     except APIStatusError as e:
         # APIStatusError is raised for non-200 HTTP status codes from the API.
         # If the status code is >= 500, it's a server-side error and should be retried.
         # Other status codes indicate client-side errors and should not be retried.
+        logger.error(f"APIStatusError: {e.status_code} - {str(e.response)}")
+        send_sns_notification(f"APIStatusError occurred: {e.status_code} - {str(e.response)}")
         if e.status_code >= 500:
-            logger.error(f"InternalServerError: {str(e)}")
             raise_lambda_service_exception(str(e))
         else:
-            logger.error(f"APIStatusError: {e.status_code} - {str(e.response)}")
             raise
 
     except OpenAIError as e:
         # OpenAIError is a catch-all for any other OpenAI-related exceptions not explicitly caught above.
         # This will not be retried by the Step Functions state machine and will move to the Catch block.
         logger.error(f"Unexpected OpenAIError: {str(e)}")
+        send_sns_notification(f"OpenAIError occurred: {str(e)}")
         raise
 
     except botocore.exceptions.BotoCoreError as e:
         # BotoCoreError indicates an issue with the AWS SDK for Python (Boto3).
         # If the error message is "An unspecified error occurred", it's considered transient and should be retried.
         # Otherwise, it will not be retried by the Step Functions state machine and will move to the Catch block.
+        logger.error(f"BotoCoreError: {str(e)}")
+        send_sns_notification(f"BotoCoreError occurred: {str(e)}")
         if str(e) == "An unspecified error occurred":
-            logger.error("BotoCoreError: An unspecified error occurred")
             raise_lambda_service_exception("BotoCoreError: An unspecified error occurred")
         else:
-            logger.error(f"Unexpected BotoCoreError: {str(e)}")
             raise
 
 
@@ -210,6 +221,15 @@ def raise_lambda_too_many_requests_exception(error_message):
 def raise_lambda_service_exception(error_message):
     error_code = 'Lambda.ServiceException'
     raise botocore.exceptions.BotoCoreError(error_code=error_code, message=error_message)
+
+
+# Helper function to send an SNS notification
+def send_sns_notification(message):
+    sns_client.publish(
+        TopicArn=SNS_TOPIC_ARN,
+        Message=message,
+        Subject="OpenAI Call Error"
+    )
 
 
 # Helper function to anonymize input

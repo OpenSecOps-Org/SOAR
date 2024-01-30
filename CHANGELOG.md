@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.11.2
+    * SNS topic `DelegatSOARExternalCallFailures` now receives messages when external calls fail.
+      This includes OpenAI and Microsoft Sentinel.
+
 ## v1.11.1
     * The Sentinel call can now fail completely without affecting SOAR operation or generating new incidents.
 

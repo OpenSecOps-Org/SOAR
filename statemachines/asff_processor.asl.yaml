@@ -481,7 +481,7 @@ States:
                 ErrorEquals:
                 -   States.ALL
                 ResultPath: "$.openai-error-info"
-                Next: OpenAiFailState
+                Next: Send Ticketing Email
         Next: Send Ticketing Email
 
     Send Ticketing Email:
@@ -632,7 +632,7 @@ States:
                 ErrorEquals:
                 -   States.ALL
                 ResultPath: "$.openai-error-info"
-                Next: OpenAiFailState
+                Next: Send Remediation Email
         Next: Send Remediation Email
 
     Send Remediation Email:
@@ -833,7 +833,7 @@ States:
                 ErrorEquals:
                 -   States.ALL
                 ResultPath: "$.openai-error-info"
-                Next: OpenAiFailState
+                Next: Send Ticket Closed Email
         Next: Send Ticket Closed Email
 
     Send Ticket Closed Email:
@@ -874,11 +874,6 @@ States:
                 MaxAttempts: 10
                 BackoffRate: 3
         End: true
-
-
-    OpenAiFailState:
-        Type: Fail
-        Cause: "The call to the OpenAI API failed. See $.openai-error-info for more details."
 
     Do Nothing:
         Type: Succeed

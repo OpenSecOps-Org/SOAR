@@ -411,7 +411,7 @@ States:
                 ErrorEquals:
                 -   States.ALL
                 ResultPath: "$.openai-error-info"
-                Next: OpenAiFailState
+                Next: Send APP email
         Next: Send APP email
 
     Send APP email:
@@ -487,7 +487,7 @@ States:
                 ErrorEquals:
                 -   States.ALL
                 ResultPath: "$.openai-error-info"
-                Next: OpenAiFailState
+                Next: Send INFRA email
         Next: Send INFRA email
 
     Send INFRA email:
@@ -529,8 +529,3 @@ States:
                 MaxAttempts: 25
                 BackoffRate: 3
         End: true
-
-    OpenAiFailState:
-        Type: Fail
-        Cause: "The call to the OpenAI API failed. See $.openai-error-info for more details."
-
