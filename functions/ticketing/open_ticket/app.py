@@ -37,6 +37,19 @@ INCIDENTS_TO_SOC = os.environ['INCIDENTS_TO_SOC']
 # Create a boto3 client for AWS SSM
 client = boto3.client('ssm')
 
+# Get the JIRA server URL, username, and token from AWS SSM
+JIRA_SERVER_URL = client.get_parameter(Name=JIRA_SERVER_URL_PARAMETER_PATH)['Parameter']['Value']
+JIRA_BASIC_AUTH_USERNAME = client.get_parameter(Name=JIRA_BASIC_AUTH_USERNAME_PARAMETER_PATH)['Parameter']['Value']
+JIRA_BASIC_AUTH_TOKEN = client.get_parameter(Name=JIRA_BASIC_AUTH_TOKEN_PARAMETER_PATH)['Parameter']['Value']
+JIRA_CREDS = [JIRA_SERVER_URL, JIRA_BASIC_AUTH_USERNAME, JIRA_BASIC_AUTH_TOKEN]
+
+# Get the ServiceNow URL, username, and password from AWS SSM
+SERVICE_NOW_URL = client.get_parameter(Name=SERVICE_NOW_URL_PARAMETER_PATH)['Parameter']['Value']
+SERVICE_NOW_BASIC_AUTH_USERNAME = client.get_parameter(Name=SERVICE_NOW_BASIC_AUTH_USERNAME_PARAMETER_PATH)['Parameter']['Value']
+SERVICE_NOW_BASIC_AUTH_PASSWORD = client.get_parameter(Name=SERVICE_NOW_BASIC_AUTH_PASSWORD_PARAMETER_PATH)['Parameter']['Value']
+SERVICE_NOW_CREDS = [SERVICE_NOW_URL, SERVICE_NOW_BASIC_AUTH_USERNAME, SERVICE_NOW_BASIC_AUTH_PASSWORD]
+
+
 # Define the lambda_handler function
 def lambda_handler(data, _context):
     print(data)
@@ -70,14 +83,25 @@ def lambda_handler(data, _context):
 
     # Do the thang
     if TICKETING_SYSTEM == 'JIRA':
-        ticket_id = use_jira(data, project_id)
-        if also_to_soc:
-            use_jira(data, SOC)
+        if 'REPLACE_ME' not in JIRA_CREDS:
+            ticket_id = use_jira(data, project_id)
+            if also_to_soc:
+                use_jira(data, SOC)
+        else:
+            print("JIRA credentials not set up. Simulating Ticket ID.")
+            ticket_id = str(uuid.uuid4())  # Simulate
+
     elif TICKETING_SYSTEM == 'ServiceNow':
-        ticket_id = use_service_now(data, project_id, ticket_to_soc)
-        if also_to_soc:
-            use_service_now(data, SOC, True)
+        if 'REPLACE_ME' not in SERVICE_NOW_CREDS:
+            ticket_id = use_service_now(data, project_id, ticket_to_soc)
+            if also_to_soc:
+                use_service_now(data, SOC, True)
+        else:
+            print("ServiceNow credentials not set up. Simulating Ticket ID.")
+            ticket_id = str(uuid.uuid4())  # Simulate
+
     else:
+        print("No ticketing system selected. Simulating Ticket ID.")
         ticket_id = str(uuid.uuid4())  # Simulate
 
     return {
@@ -97,16 +121,9 @@ def use_jira(data, project_id):
     severity = data['finding']['Severity']['Label']
     print(f"Creating JIRA ticket for project {project_id}...")
 
-    # Get the JIRA server URL, username, and token from AWS SSM
-    url = client.get_parameter(Name=JIRA_SERVER_URL_PARAMETER_PATH)[
-        'Parameter']['Value']
-    username = client.get_parameter(Name=JIRA_BASIC_AUTH_USERNAME_PARAMETER_PATH)[
-        'Parameter']['Value']
-    token = client.get_parameter(Name=JIRA_BASIC_AUTH_TOKEN_PARAMETER_PATH)[
-        'Parameter']['Value']
-
     # Create a JIRA object with the provided credentials
-    jira = JIRA(basic_auth=(username, token), options={'server': url})
+    jira = JIRA(basic_auth=(JIRA_BASIC_AUTH_USERNAME, JIRA_BASIC_AUTH_TOKEN), 
+                options={'server': JIRA_SERVER_URL})
 
     # Check if the project_id is a valid JIRA project
     if nonexistent_jira_project(jira, project_id):
@@ -200,14 +217,7 @@ def use_service_now(data, project_id, ticket_to_soc):
     # Get the impact and urgency based on the severity and ticket destination
     impact, urgency = severity_to_impact_and_urgency(severity, ticket_to_soc)
 
-    # Get the ServiceNow URL, username, and password from AWS SSM
-    url = client.get_parameter(Name=SERVICE_NOW_URL_PARAMETER_PATH)[
-        'Parameter']['Value']
-    username = client.get_parameter(Name=SERVICE_NOW_BASIC_AUTH_USERNAME_PARAMETER_PATH)[
-        'Parameter']['Value']
-    password = client.get_parameter(Name=SERVICE_NOW_BASIC_AUTH_PASSWORD_PARAMETER_PATH)[
-        'Parameter']['Value']
-    auth = HTTPBasicAuth(username, password)
+    auth = HTTPBasicAuth(SERVICE_NOW_BASIC_AUTH_USERNAME, SERVICE_NOW_BASIC_AUTH_PASSWORD)
 
     # Create the request body for creating a ServiceNow ticket
     body = {
@@ -215,7 +225,7 @@ def use_service_now(data, project_id, ticket_to_soc):
         "u_ticket_type": "Incident",
         "u_category": "Security",
         "u_sub_category": "Policy Violation",
-        "u_caller_id": username,
+        "u_caller_id": SERVICE_NOW_BASIC_AUTH_USERNAME,
         "u_contact_type": "5",      # "Event Monitoring"
         "sys_import_state": "1",    # "New"
         "u_impact": impact,
@@ -230,7 +240,7 @@ def use_service_now(data, project_id, ticket_to_soc):
 
     # Send a POST request to create a ServiceNow ticket
     response = requests.post(
-        f"{url}/api/now/import/{SERVICE_NOW_TABLE}",
+        f"{SERVICE_NOW_URL}/api/now/import/{SERVICE_NOW_TABLE}",
         json=body,
         auth=auth)
 

@@ -337,16 +337,16 @@ States:
         Type: Task
         Resource: '${SaveToSentinelFunctionArn}'
         ResultPath: null
-        Retry:
-            -
-                ErrorEquals:
-                    - States.Timeout
-                    - DynamoDB.SdkClientException
-                    - DynamoDB.InternalServerErrorException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
         Next: Email to Whom?
+        Retry:
+            - ErrorEquals: ["States.Timeout", "States.TaskFailed"]
+              IntervalSeconds: 2
+              MaxAttempts: 30  # This sets the total retry duration to approximately 1 minute
+              BackoffRate: 1.0
+        Catch:
+            - ErrorEquals: ["States.ALL"]
+              ResultPath: null
+              Next: Email to Whom?
 
     Email to Whom?:
         Type: Choice

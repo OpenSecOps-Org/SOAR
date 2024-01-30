@@ -1,6 +1,7 @@
 import os
 import boto3
 import requests
+from requests.exceptions import RequestException
 import json
 import datetime
 import hashlib
@@ -45,14 +46,15 @@ def lambda_handler(data, _context):
 
     # Do the thing
     json_data = compose_json_data(data)
+    print(json_data)
+
     body = json.dumps(json_data)
     headers = authenticate(WORKSPACE_ID, SHARED_KEY, LOG_TYPE, body)
     response = send_data(WORKSPACE_ID, body, headers)
 
-    print(json_data)
-    
-    if response.status_code >= 200 and response.status_code <= 299:
-        print('Data was successfully ingested.')
+    # Check if the response is None (which indicates a silent fail)
+    if response is None or (200 <= response.status_code <= 299):
+        print('Data was successfully ingested or failed silently.')
         return True
     else:
         print(f"Failed to ingest data. Status code: {response.status_code}, Response text: {response.text}")
@@ -90,8 +92,12 @@ def authenticate(workspace_id, shared_key, log_type, body):
 # Send the data to the Azure Log Analytics workspace
 def send_data(workspace_id, body, headers):
     uri = f'https://{workspace_id}.ods.opinsights.azure.com/api/logs?api-version=2016-04-01'
-    response = requests.post(uri, data=body, headers=headers)
-    return response
+    try:
+        response = requests.post(uri, data=body, headers=headers, timeout=10)  # Set a reasonable timeout
+        return response
+    except RequestException as e:
+        print(f"An error occurred while sending data to Sentinel: {e}")
+        return None  # Return None or a custom response indicating a silent fail
 
 
 # Compose the JSON data from the input data

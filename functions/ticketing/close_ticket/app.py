@@ -24,6 +24,19 @@ SERVICE_NOW_FINAL_STATE = os.environ['SERVICE_NOW_FINAL_STATE']
 # Create a client for AWS SSM (Simple Systems Manager)
 client = boto3.client('ssm')
 
+# Get the JIRA server URL, username, and token from AWS SSM
+JIRA_SERVER_URL = client.get_parameter(Name=JIRA_SERVER_URL_PARAMETER_PATH)['Parameter']['Value']
+JIRA_BASIC_AUTH_USERNAME = client.get_parameter(Name=JIRA_BASIC_AUTH_USERNAME_PARAMETER_PATH)['Parameter']['Value']
+JIRA_BASIC_AUTH_TOKEN = client.get_parameter(Name=JIRA_BASIC_AUTH_TOKEN_PARAMETER_PATH)['Parameter']['Value']
+JIRA_CREDS = [JIRA_SERVER_URL, JIRA_BASIC_AUTH_USERNAME, JIRA_BASIC_AUTH_TOKEN]
+
+# Get the ServiceNow URL, username, and password from AWS SSM
+SERVICE_NOW_URL = client.get_parameter(Name=SERVICE_NOW_URL_PARAMETER_PATH)['Parameter']['Value']
+SERVICE_NOW_BASIC_AUTH_USERNAME = client.get_parameter(Name=SERVICE_NOW_BASIC_AUTH_USERNAME_PARAMETER_PATH)['Parameter']['Value']
+SERVICE_NOW_BASIC_AUTH_PASSWORD = client.get_parameter(Name=SERVICE_NOW_BASIC_AUTH_PASSWORD_PARAMETER_PATH)['Parameter']['Value']
+SERVICE_NOW_CREDS = [SERVICE_NOW_URL, SERVICE_NOW_BASIC_AUTH_USERNAME, SERVICE_NOW_BASIC_AUTH_PASSWORD]
+
+
 # Define the main lambda handler function
 def lambda_handler(data, _context):
     # Print the input data
@@ -31,10 +44,19 @@ def lambda_handler(data, _context):
 
     # Check the ticketing system and call the appropriate function
     if TICKETING_SYSTEM == 'JIRA':
-        return use_jira(data)
+        if 'REPLACE_ME' not in JIRA_CREDS:
+            return use_jira(data)
+        else:
+            print("JIRA credentials not set up.")
 
-    if TICKETING_SYSTEM == 'ServiceNow':
-        return use_service_now(data)
+    elif TICKETING_SYSTEM == 'ServiceNow':
+        if 'REPLACE_ME' not in SERVICE_NOW_CREDS:
+            return use_service_now(data)
+        else:
+            print("ServiceNow credentials not set up.")
+
+    else:
+        print("No ticketing system selected.")
 
     return True
 
@@ -52,15 +74,9 @@ def use_jira(data):
     # Print a message indicating the ticket is being closed
     print(f"Closing JIRA ticket {ticket_id}...")
 
-    # Get the JIRA server URL, username, and token from AWS SSM
-    url = client.get_parameter(Name=JIRA_SERVER_URL_PARAMETER_PATH)[
-        'Parameter']['Value']
-    username = client.get_parameter(Name=JIRA_BASIC_AUTH_USERNAME_PARAMETER_PATH)[
-        'Parameter']['Value']
-    token = client.get_parameter(Name=JIRA_BASIC_AUTH_TOKEN_PARAMETER_PATH)[
-        'Parameter']['Value']
     # Create a JIRA object with the authentication details
-    jira = JIRA(basic_auth=(username, token), options={'server': url})
+    jira = JIRA(basic_auth=(JIRA_BASIC_AUTH_USERNAME, JIRA_BASIC_AUTH_TOKEN), 
+                options={'server': JIRA_SERVER_URL})
 
     # Initialize the issue variable
     issue = None
@@ -116,14 +132,7 @@ def use_service_now(data):
 
     ticket_url = parts[1]
 
-    # Get the ServiceNow URL, username, and password from AWS SSM
-    url = client.get_parameter(Name=SERVICE_NOW_URL_PARAMETER_PATH)[
-        'Parameter']['Value']
-    username = client.get_parameter(Name=SERVICE_NOW_BASIC_AUTH_USERNAME_PARAMETER_PATH)[
-        'Parameter']['Value']
-    password = client.get_parameter(Name=SERVICE_NOW_BASIC_AUTH_PASSWORD_PARAMETER_PATH)[
-        'Parameter']['Value']
-    auth = HTTPBasicAuth(username, password)
+    auth = HTTPBasicAuth(SERVICE_NOW_BASIC_AUTH_USERNAME, SERVICE_NOW_BASIC_AUTH_PASSWORD)
 
     try:
         # Send a GET request to the ticket URL with authentication
@@ -145,7 +154,7 @@ def use_service_now(data):
 
     # Send a POST request to import the updated ticket to ServiceNow
     response = requests.post(
-        f"{url}/api/now/import/{SERVICE_NOW_TABLE}",
+        f"{SERVICE_NOW_URL}/api/now/import/{SERVICE_NOW_TABLE}",
         json=body,
         auth=auth)
 

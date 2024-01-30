@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.11.1
+    * The Sentinel call can now fail completely without affecting SOAR operation or generating new incidents.
+
 ## v1.11.0
     * Support for Microsoft Sentinel as recipient of all incidents.
 
