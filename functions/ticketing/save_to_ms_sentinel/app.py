@@ -7,6 +7,12 @@ import datetime
 import hashlib
 import hmac
 import base64
+import logging
+
+
+# Configure logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 INCIDENTS_TO_SENTINEL = os.environ['INCIDENTS_TO_SENTINEL']   # NONE/INFRA/APP/ALL
@@ -33,12 +39,6 @@ CREDS = [WORKSPACE_ID, SHARED_KEY, LOG_TYPE]
 
 # Define the lambda_handler function
 def lambda_handler(data, _context):
-    if 'REPLACE_ME' in CREDS:
-        print("Microsoft Sentinel WORKSPACE_ID, SHARED_KEY or LOG_TYPE not defined.")
-        return False
-
-    print(data)
-
     # The incident domain defaults to INFRA. Can be INFRA or APP.
     incident_domain = data['finding']['ProductFields'].get('IncidentDomain', 'INFRA')
 
@@ -46,26 +46,39 @@ def lambda_handler(data, _context):
     is_right_domain = (INCIDENTS_TO_SENTINEL == 'ALL' or INCIDENTS_TO_SENTINEL == incident_domain)
 
     if not is_right_domain:
-        # No, we shall not bother
+        # No, we shan't bother
+        logger.info(f"Skipping processing: {incident_domain} domain not covered by the setting '{INCIDENTS_TO_SENTINEL}'")
         return True
 
-    # Do the thing
+    # We shall bother. Are the credentials set up?
+    if 'REPLACE_ME' in CREDS:
+        error_msg = "Microsoft Sentinel WORKSPACE_ID, SHARED_KEY or LOG_TYPE not defined."
+        logger.error(error_msg)
+        send_sns_notification(error_msg)
+        return False
+
     json_data = compose_json_data(data)
-    print(json_data)
+    logger.info(json_data)
 
     body = json.dumps(json_data)
     headers = authenticate(WORKSPACE_ID, SHARED_KEY, LOG_TYPE, body)
     response = send_data(WORKSPACE_ID, body, headers)
 
-    # Check if the response is None (which indicates a silent fail)
-    if response is None or (200 <= response.status_code <= 299):
-        print('Data was successfully ingested or failed silently.')
+    # Check the response from send_data
+    if response is None:
+        # Silent fail has already been handled and notification sent in send_data
+        logger.error('Silent fail occurred, SNS notification has been sent.')
+        return False
+    elif 200 <= response.status_code <= 299:
+        logger.info('Data was successfully ingested.')
         return True
     else:
+        # For non-silent failures, log the error and send an SNS notification
         error_msg = f"Failed to ingest data. Status code: {response.status_code}, Response text: {response.text}"
-        print(error_msg)
+        logger.error(error_msg)
         send_sns_notification(error_msg)
         return False
+
 
 
 # Build the API signature
@@ -103,8 +116,10 @@ def send_data(workspace_id, body, headers):
         response = requests.post(uri, data=body, headers=headers, timeout=10)  # Set a reasonable timeout
         return response
     except RequestException as e:
-        print(f"An error occurred while sending data to Sentinel: {e}")
-        return None  # Return None or a custom response indicating a silent fail
+        error_msg = f"An error occurred while sending data to Sentinel: {e}"
+        logger.error(error_msg)
+        send_sns_notification(error_msg)  # Send SNS notification on silent fail
+        return None  # Return None to indicate a silent fail
 
 
 # Compose the JSON data from the input data

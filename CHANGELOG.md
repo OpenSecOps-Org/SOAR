@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.11.3
+    * Logging for Sentinel calls improved.
+
 ## v1.11.2
     * SNS topic `DelegatSOARExternalCallFailures` now receives messages when external calls fail.
       This includes OpenAI and Microsoft Sentinel.
