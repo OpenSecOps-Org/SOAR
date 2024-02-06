@@ -24,7 +24,8 @@ def lambda_handler(data, context):
         recipients = f"{team_email},{app_email}"
     data['email_recipients'] = recipients
 
-    data['email_title'] = f"Account '{account}' Delegat SOAR Weekly Security Report"
+    base_title = data['base_title']
+    data['email_title'] = f"Account '{account}' " + base_title
 
     html = data['messages']['report']['html']
     data['messages']['report']['html'] = ''

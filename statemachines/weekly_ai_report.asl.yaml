@@ -9,14 +9,16 @@ States:
       WeeklyReportEmailRecipients: "${WeeklyReportEmailRecipients}"
       OpenAIReportTable: "${OpenAIReportTable}"
       no_html_post_processing: "True"
+      base_title: "Delegat SOAR Weekly Security Report"
+      add_week_number: "${WeeklyReportWeekNumbers}"
       bb: {}
       html_substitutions: {}
       model: "${WeeklyReportChatGPTDefaultModel}"
       fallback_model: "${WeeklyReportChatGPTFallbackModel}"
-      temperature: 0.5
+      temperature: 0.3
       top_p: 0.3
       frequency_penalty: 0.3
-      presence_penalty: 0
+      presence_penalty: 0.1
       system: ""
       user: ""
 
@@ -337,7 +339,7 @@ States:
     Resource: '${SendEmailFunctionArn}'
     Parameters:
       Recipient.$: $.WeeklyReportEmailRecipients
-      Subject: Delegat SOAR Weekly Security Report
+      Subject.$: $.base_title
       HtmlArn.$: $.report_arn
     ResultPath: null
     Retry:

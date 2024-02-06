@@ -505,6 +505,12 @@ Parameters:
     AllowedValues: ['Yes', 'No']
     Default: 'No'
 
+  WeeklyReportWeekNumbers:
+    Type: String
+    Description: ISO if include the ISO week number in report email titles
+    AllowedValues: ['No', 'ISO']
+    Default: 'No'
+
   WeeklyReportIndividualAccounts:
     Type: String
     Description: Yes if also send the weekly AI-based security report to individual accounts.
@@ -2646,6 +2652,7 @@ Resources:
         SetupToSendToAccountFunctionArn: !GetAtt SetupToSendToAccountFunction.Arn
 
         WeeklyReport: !Ref WeeklyReport
+        WeeklyReportWeekNumbers: !Ref WeeklyReportWeekNumbers
         WeeklyReportIndividualAccounts: !Ref WeeklyReportIndividualAccounts
         WeeklyReportEmailRecipients: !Ref WeeklyReportEmailRecipients
         OpenAIReportTable: !Ref OpenAIReportTable
@@ -3301,7 +3308,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt OpenAIPromptsSyncerFunction.Arn
       FunctionName: !Ref OpenAIPromptsSyncerFunction
-      DummyProperty: 'zzzesw'  # Change this value whenever openai-prompts changes
+      DummyProperty: 'djhfg'  # Change this value whenever openai-prompts changes
       
 
   #-------------------------------------------------------------------------------

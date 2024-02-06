@@ -1,5 +1,10 @@
 # Change Log
 
+## v1.11.4
+    * Full titles used in ticket emails.
+    * Logic to include ISO week numbers in the Weekly AI Report email title.
+    * Modified the OpenAI settings slightly (temperature lowered, etc).
+
 ## v1.11.3
     * Logging for Sentinel calls improved.
 

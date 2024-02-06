@@ -1,7 +1,7 @@
 import os
 import datetime as dt
 import boto3
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from dateutil import parser
 import pandas as pd
 import humanize
@@ -277,6 +277,9 @@ def lambda_handler(data, _context):
     # Handle Decimal objects properly using a helper function.
     data['user'] = json.dumps(data['user'], default=decimal_default)
 
+    # Add the current week number to the base_title if required
+    data['base_title'] = maybe_add_week_number(data)
+
     return data
 
 
@@ -284,6 +287,18 @@ def decimal_default(obj):
     if isinstance(obj, decimal.Decimal):
         return float(obj)
     raise TypeError("Object of type '%s' is not JSON serializable" % type(obj).__name__)
+
+
+def maybe_add_week_number(data):
+    base_title = data['base_title']
+    add_week_number = data['add_week_number']
+    
+    if add_week_number == 'ISO':
+        today = date.today()
+        current_week_number = today.isocalendar().week
+        base_title += f" (Wk {current_week_number})"
+
+    return base_title
 
 
 def account_mapping(account_data, accounts_with_issues):

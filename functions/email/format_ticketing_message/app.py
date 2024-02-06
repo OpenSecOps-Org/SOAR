@@ -14,10 +14,9 @@ def lambda_handler(data, _context):
     finding_id = finding['Id']
     organizational_unit = data['account']['OrganizationalUnit']
     title = finding['Title']
-    title_short = title.split(' ', 1)[1] if ' ' in title else title
+    #title_short = title.split(' ', 1)[1] if ' ' in title else title
     description = finding['Description']
-    annotation = finding['ProductFields'].get(
-        'aws/securityhub/annotation', False)
+    annotation = finding['ProductFields'].get('aws/securityhub/annotation', False)
     description_and_annotation = description
     if annotation:
         description_and_annotation += f"\n\n{annotation}"
@@ -44,7 +43,7 @@ def lambda_handler(data, _context):
     team_email = data['account']['TeamEmail']
     account_data = data['account']
 
-    subject = f"TEAM FIX: {title_short}"
+    subject = f"TEAM FIX: {title}"
     body = f'''\
 {severity} issue in account "{account_name}" ({account_id}, OU: {organizational_unit}), region {resource_region}:
 

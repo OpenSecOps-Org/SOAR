@@ -2,4 +2,4 @@ Provide a detailed expert analysis of the user input, which is a newly found sec
 
 Then give a detailed expert overview of the possible forms of impact on security until the issue is resolved. Emphasise that the recipient is responsible for addressing the issue in a timely manner according to its severity level.
 
-Finally, give exhaustive and expert instructions in a friendly tutorial format on how to avoid the issue happening again. Include [[IAC_SNIPPETS]] snippets, if relevant. When presenting code snippets, make sure you format them well using <pre>.
+Finally, give exhaustive and expert instructions in a friendly tutorial format on how to avoid the issue from happening again. Include [[IAC_SNIPPETS]] snippets, if relevant. Double-check, then triple-check that the code you generate is up-to-date and correct, and that all parameters exist and have legal values. When presenting code snippets, make sure you format them well using <pre>.
