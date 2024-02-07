@@ -9,7 +9,7 @@ States:
       WeeklyReportEmailRecipients: "${WeeklyReportEmailRecipients}"
       OpenAIReportTable: "${OpenAIReportTable}"
       no_html_post_processing: "True"
-      base_title: "Delegat SOAR Weekly Security Report"
+      base_title: "${WeeklyReportTitle}"
       add_week_number: "${WeeklyReportWeekNumbers}"
       bb: {}
       html_substitutions: {}

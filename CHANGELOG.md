@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.11.5
+    * Modified the severities of a few of the alarms.
+    * The name of the weekly AI report is now configurable (`WeeklyReportTitle`).
+
 ## v1.11.4
     * Full titles used in ticket emails.
     * Logic to include ISO week numbers in the Weekly AI Report email title.

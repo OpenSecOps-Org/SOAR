@@ -505,6 +505,11 @@ Parameters:
     AllowedValues: ['Yes', 'No']
     Default: 'No'
 
+  WeeklyReportTitle:
+    Type: String
+    Description: The base name of the weekly AI report.
+    Default: 'Delegat SOAR Weekly Security Report'
+
   WeeklyReportWeekNumbers:
     Type: String
     Description: ISO if include the ISO week number in report email titles
@@ -2652,6 +2657,7 @@ Resources:
         SetupToSendToAccountFunctionArn: !GetAtt SetupToSendToAccountFunction.Arn
 
         WeeklyReport: !Ref WeeklyReport
+        WeeklyReportTitle: !Ref WeeklyReportTitle
         WeeklyReportWeekNumbers: !Ref WeeklyReportWeekNumbers
         WeeklyReportIndividualAccounts: !Ref WeeklyReportIndividualAccounts
         WeeklyReportEmailRecipients: !Ref WeeklyReportEmailRecipients
@@ -3223,7 +3229,7 @@ Resources:
   AlarmWeeklyAIReport:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: INFRA-SOAR-Weekly-AI-Report-SM-Failure-HIGH
+      AlarmName: INFRA-SOAR-Weekly-AI-Report-SM-Failure-MEDIUM
       AlarmDescription: The SOARWeeklyAIReport state machine failed.
       ActionsEnabled: true
       OKActions: []
@@ -3245,7 +3251,7 @@ Resources:
   AlarmSyncEnabledControlsTable:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: INFRA-SOAR-Sync-Enabled-Controls-Table-SM-Failure-HIGH
+      AlarmName: INFRA-SOAR-Sync-Enabled-Controls-Table-SM-Failure-LOW
       AlarmDescription: The SOARSyncEnabledControlsTable state machine failed.
       ActionsEnabled: true
       OKActions: []
@@ -3267,7 +3273,7 @@ Resources:
   AlarmSOARHourlyTasks:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: INFRA-SOAR-Hourly-Tasks-SM-Failure-HIGH
+      AlarmName: INFRA-SOAR-Hourly-Tasks-SM-Failure-MEDIUM
       AlarmDescription: The SOARHourlyTasks state machine failed.
       ActionsEnabled: true
       OKActions: []
