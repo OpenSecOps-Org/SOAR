@@ -1,5 +1,10 @@
 # Change Log
 
+## v1.12.0
+    * Multi-regional invocation of snapshotter updated. Now, `DiskForensicsInvoke` should
+      be either 'Yes' or 'No'. The regional ARN is constructed during the call. This means
+      that DiskForensicsInvokeARN no longer is needed and has been removed.
+
 ## v1.11.5
     * Modified the severities of a few of the alarms.
     * The name of the weekly AI report is now configurable (`WeeklyReportTitle`).

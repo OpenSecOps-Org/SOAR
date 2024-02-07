@@ -97,16 +97,16 @@ Parameters:
     Description: The name of the custom event bus. There is no need to change this value.
     Default: SOAR-events
 
-  DiskForensicsInvokeARN:
+  DiskForensicsInvoke:
     Type: String
     Description:
       If the SAM version of the Disk Forensics Collection project is installed,
-      enter the ARN of its invocation lambda which can be found as the output
-      DiskForensicsInvokeARN in the Security account. If this parameter is left blank,
-      rogue EC2 instances will simply be terminated. If the value of DiskForensicsInvokeARN
-      is entered here, the Disk Forensics Collection project will snapshot and terminate
-      them instead. Ticketing and emailing remains the same.
-    Default: ''
+      enter 'Yes'.  If 'Yes', the Disk Forensics Collection project will be invoked (in
+      the same region as the misbehaving EC2 server) to snapshot and terminate it.
+      If this parameter is 'No', rogue EC2 instances will simply be terminated. Ticketing 
+      and emailing remains the same in either case.
+    AllowedValues: ['Yes', 'No']
+    Default: 'No'
 
   # Mail ----------------------------------------------------------------------------
 
@@ -554,21 +554,6 @@ Parameters:
     Type: String
     Description: The CloudWatch metric namespace. There is no reason to change this value.
     Default: 'DelegatSOAR'
-
-
-
-#-------------------------------------------------------------------------------
-#
-# Conditions
-#
-#-------------------------------------------------------------------------------
-
-Conditions:
-  DiskForensicsInvokeARNBlank: !Equals
-    - !Ref DiskForensicsInvokeARN
-    - ''
-  InvokeDiskForensics: !Not
-    - !Condition DiskForensicsInvokeARNBlank
 
 
 Resources:
@@ -2429,7 +2414,7 @@ Resources:
         LocalIncidentAutoRemSuppressionsName: !Ref LocalIncidentAutoRemSuppressions
         OpenAIPromptsTableName: !Ref OpenAIPromptsTable
 
-        DiskForensicsInvokeArn: !Ref DiskForensicsInvokeARN
+        DiskForensicsInvoke: !Ref DiskForensicsInvoke
 
       Policies:
         - LambdaInvokePolicy:
@@ -2496,18 +2481,15 @@ Resources:
     Properties:
       CodeUri: functions/rogue_servers/call_disk_forensics_collection/
       Policies:
-        - !If
-          - InvokeDiskForensics
-          - Statement:
-              - Sid: InvokeDiskForensicsCrossAccount
-                Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
-                Resource: !Ref DiskForensicsInvokeARN
-          - !Ref 'AWS::NoValue'
+        - Statement:
+          - Sid: MayInvoke
+            Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource: !Sub "arn:aws:lambda:*:${SecurityAccountId}:function:DiskForensicsInvoke"
       Environment:
         Variables:
-          FUNCTION_ARN: !Ref DiskForensicsInvokeARN
+          ARN_TEMPLATE: !Sub "arn:aws:lambda:<REGION>:${SecurityAccountId}:function:DiskForensicsInvoke"
 
   TerminateInstanceFunction:
     Type: AWS::Serverless::Function

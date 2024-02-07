@@ -144,10 +144,10 @@ States:
         Type: Choice
         Choices:
             -
-                Variable: $.DiskForensicsInvokeArn
-                StringEquals: ''
-                Next: Just terminate the instance
-        Default: Snapshot and terminate the instance
+                Variable: $.DiskForensicsInvoke
+                StringEquals: 'Yes'
+                Next: Snapshot and terminate the instance
+        Default:  Just terminate the instance
 
     Just terminate the instance:
         Type: Task
