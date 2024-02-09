@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.12.1
+    * Included the ASFF event and the account data in the data sent to Microsoft Sentinel.
+
 ## v1.12.0
     * Multi-regional invocation of snapshotter updated. Now, `DiskForensicsInvoke` should
       be either 'Yes' or 'No'. The regional ARN is constructed during the call. This means

@@ -127,23 +127,25 @@ def compose_json_data(data):
     finding = data['finding']
     account = finding.get('account', {})
     log_data = {
-        "CreatedAt": finding.get('CreatedAt'),                  # ISO 8601 UTC
-        "UpdatedAt": finding.get('UpdatedAt'),                  # ISO 8601 UTC
-        "ProcessedAt": finding.get('ProcessedAt'),              # ISO 8601 UTC
-        "FindingId": finding.get('Id'),                         # Long URL-like or ARN
-        "GeneratorId": finding.get('GeneratorId'),              # Text string
+        "CreatedAt": finding.get('CreatedAt'),                   # ISO 8601 UTC
+        "UpdatedAt": finding.get('UpdatedAt'),                   # ISO 8601 UTC
+        "ProcessedAt": finding.get('ProcessedAt'),               # ISO 8601 UTC
+        "FindingId": finding.get('Id'),                          # Long URL-like or ARN
+        "GeneratorId": finding.get('GeneratorId'),               # Text string
         "Type": (finding.get('FindingProviderFields', {}).get('Types') or [None])[0],   # Text string
-        "ProductName": finding.get('ProductName'),              # Text string ("GuardDuty")
-        "Severity": finding.get('Severity', {}).get('Label'),   # Text string: CRITICAL, HIGH, MEDIUM, LOW, INFORMATIONAL
-        "Title": finding.get('Title'),                          # Text string
-        "Description": finding.get('Description'),              # Text string
-        "Region": finding.get('Region'),                        # Text string (eu-north-1, etc)
-        "AwsAccountName": finding.get('AwsAccountName'),        # Text string ("Blahonga-account")
-        "AwsAccountId": finding.get('AwsAccountId'),            # Text string, 12 decimal characters
-        "Team": account.get('Team'),                            # Text string ("Infra")
-        "TeamEmail": account.get('TeamEmail'),                  # Text string ("some-email@lynxhedge.se")
-        "Environment": account.get('Environment'),              # Text string (DEV/PROD/PREPROD)
-        "OrganizationalUnit": account.get('OrganizationalUnit') # Text string ("Sandbox")
+        "ProductName": finding.get('ProductName'),               # Text string ("GuardDuty")
+        "Severity": finding.get('Severity', {}).get('Label'),    # Text string: CRITICAL, HIGH, MEDIUM, LOW, INFORMATIONAL
+        "Title": finding.get('Title'),                           # Text string
+        "Description": finding.get('Description'),               # Text string
+        "Region": finding.get('Region'),                         # Text string (eu-north-1, etc)
+        "AwsAccountName": finding.get('AwsAccountName'),         # Text string ("Blahonga-account")
+        "AwsAccountId": finding.get('AwsAccountId'),             # Text string, 12 decimal characters
+        "Team": account.get('Team'),                             # Text string ("Infra")
+        "TeamEmail": account.get('TeamEmail'),                   # Text string ("some-email@lynxhedge.se")
+        "Environment": account.get('Environment'),               # Text string (DEV/PROD/PREPROD)
+        "OrganizationalUnit": account.get('OrganizationalUnit'), # Text string ("Sandbox")
+        "ASFFFinding": json.dumps(finding, indent=4),            # JSON string, pretty-printed
+        "AccountData": json.dumps(account, indent=4)             # JSON string, pretty-printed
     }
     # Remove keys with None values to avoid sending them to Azure Monitor
     log_data = {k: v for k, v in log_data.items() if v is not None}
