@@ -555,6 +555,23 @@ Parameters:
     Description: The CloudWatch metric namespace. There is no reason to change this value.
     Default: 'DelegatSOAR'
 
+  # Environment Names ------------------------------------------------------------------
+
+  DevEnvNames:
+    Type: String
+    Description: Comma-separated list of names for the development environment(s). The comparison is case-insensitive.
+    Default: "DEV, DEVELOPMENT, DEVINT, DI"
+
+  StagingEnvNames:
+    Type: String
+    Description: Comma-separated list of names for the staging and testing environment(s). The comparison is case-insensitive.
+    Default: "STAGING, STG, PREPROD, PP, TEST, TESTING, QA, UAT, SIT, SYSTEMTEST, INTEGRATION"
+
+  ProdEnvNames:
+    Type: String
+    Description: Comma-separated list of names for the production environment(s). The comparison is case-insensitive.
+    Default: "PROD, PRD, PRODUCTION, LIVE"
+
 
 Resources:
   #-------------------------------------------------------------------------------
@@ -1499,6 +1516,11 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: functions/findings/compute_penalty_score/
+      Environment:
+        Variables:
+          DEV_ENVS: !Ref DevEnvNames
+          STAGING_ENVS: !Ref StagingEnvNames
+          PROD_ENVS: !Ref ProdEnvNames
 
   SuppressLocallyFunction:
     Type: AWS::Serverless::Function

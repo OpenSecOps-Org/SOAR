@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.14.0
+    * Parametrised the environment names and made them case-insensitive for the 
+      calculation of issue severities.
+
 ## v1.13.0
     * Added ProductName and GeneratorId to the data stored for an incident in DynamoDB.
       For human interaction and completeness; not required by any programmatic logic.
