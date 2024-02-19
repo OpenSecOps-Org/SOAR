@@ -25,6 +25,8 @@ def lambda_handler(event, _context):
     item = {
         'id': event['Id'],
         'Account': event['Account'],
+        'ProductName': event['ProductName'],
+        'GeneratorId': event['GeneratorId'],
         'IncidentType': event['IncidentType'],
         'Title': event['Title'],
         'Description': event['Description'],

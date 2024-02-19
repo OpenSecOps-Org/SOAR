@@ -311,6 +311,8 @@ States:
         Parameters:
             Id.$: $.finding.Id
             Account.$: $.account.Name
+            ProductName.$: $.finding.ProductName
+            GeneratorId.$: $.finding.GeneratorId
             IncidentType.$: $.incident.finding_type
             Title.$: $.finding.Title
             Description.$: $.finding.Description

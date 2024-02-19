@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.13.0
+    * Added ProductName and GeneratorId to the data stored for an incident in DynamoDB.
+      For human interaction and completeness; not required by any programmatic logic.
+
 ## v1.12.1
     * Included the ASFF event and the account data in the data sent to Microsoft Sentinel.
 
