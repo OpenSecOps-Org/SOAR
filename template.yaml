@@ -1132,6 +1132,7 @@ Resources:
         DeferIncidents: !Ref DeferIncidents
         DeferAutoRemediations: !Ref DeferAutoRemediations
         DeferTeamFixes: !Ref DeferTeamFixes
+        DiskForensicsInvoke: !Ref DiskForensicsInvoke
 
         AutoRemediationsSMArn: !Ref SOARAutoRemediations
         IncidentsSMArn: !Ref SOARIncidents
@@ -2435,8 +2436,6 @@ Resources:
         LocalIncidentSuppressionsName: !Ref LocalIncidentSuppressions
         LocalIncidentAutoRemSuppressionsName: !Ref LocalIncidentAutoRemSuppressions
         OpenAIPromptsTableName: !Ref OpenAIPromptsTable
-
-        DiskForensicsInvoke: !Ref DiskForensicsInvoke
 
       Policies:
         - LambdaInvokePolicy:

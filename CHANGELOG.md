@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.14.4
+    * Passing DiskForensicsInvoke now correct: we set it up in the ASFF processor, then pass it to the
+      incident SM.
+
 ## v1.14.3
     * Added missing ".$" characters in param passing in ASL.
 
