@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.14.2
+    * Corrected DiskForensicsInvokeArn to DiskForensicsInvoke when calling the incident SM.
+
 ## v1.14.1
     * Added missing parameter reference passing in state machine.
 
