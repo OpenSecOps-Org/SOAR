@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.14.5
+    * Added missing dollar sign.
+
 ## v1.14.4
     * Passing DiskForensicsInvoke now correct: we set it up in the ASFF processor, then pass it to the
       incident SM.
