@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.14.1
+    * Added missing parameter reference passing in state machine.
+
 ## v1.14.0
     * Parametrised the environment names and made them case-insensitive for the 
       calculation of issue severities.

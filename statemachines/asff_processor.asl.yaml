@@ -283,6 +283,7 @@ States:
             table: local-control-autoremediation-suppressions
             db.$: $.db
             region.$: $.finding.Resources[0].Region
+            resource.$: $.finding.Resources[0]
         ResultPath: $.suppress_locally
         Retry:
             -
