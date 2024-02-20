@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.14.3
+    * Added missing ".$" characters in param passing in ASL.
+
 ## v1.14.2
     * Corrected DiskForensicsInvokeArn to DiskForensicsInvoke when calling the incident SM.
 

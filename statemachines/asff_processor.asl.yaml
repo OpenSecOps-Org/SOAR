@@ -706,7 +706,7 @@ States:
                 actions.$: $.actions
                 messages.$: $.messages
                 db.$: $.db
-                DiskForensicsInvoke: '${DiskForensicsInvoke}'
+                DiskForensicsInvoke.$: '${DiskForensicsInvoke}'
                 AWS_STEP_FUNCTIONS_STARTED_BY_EXECUTION_ID.$: $$.Execution.Id
             StateMachineArn: '${IncidentsSMArn}'
         Retry:
