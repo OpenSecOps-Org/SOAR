@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.14.6
+    * SecHub controls sync now correctly handles controls removed by AWS (having no associations to
+      any standards any more).
+
 ## v1.14.5
     * Added missing dollar sign.
 

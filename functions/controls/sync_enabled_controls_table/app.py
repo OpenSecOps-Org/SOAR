@@ -107,10 +107,16 @@ def get_standards_control_associations(sec_hub_client, security_control_id):
 def write_to_table(global_security_controls, account_id):
     # Iterate over each security control and its associations
     for security_control_id, associations in global_security_controls.items():
-        association_status = associations[0]['AssociationStatus']
-        
+
         # Construct the control identifier with account ID and control ID
         control_identifier = f"{account_id}#{security_control_id}"
+        
+        if len(associations) == 0:
+            print(f"The control {security_control_id} has no associations (deleted by AWS)")
+            delete_control(control_identifier)
+            continue
+
+        association_status = associations[0]['AssociationStatus']
         
         # If the association status is enabled, put the control in the DynamoDB table
         if association_status == 'ENABLED':
