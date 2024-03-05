@@ -3317,7 +3317,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt OpenAIPromptsSyncerFunction.Arn
       FunctionName: !Ref OpenAIPromptsSyncerFunction
-      DummyProperty: 'djhfg'  # Change this value whenever openai-prompts changes
+      DummyProperty: 'gjhufghhd'  # Change this value whenever openai-prompts changes
       
 
   #-------------------------------------------------------------------------------

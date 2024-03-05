@@ -1,5 +1,10 @@
 # Change Log
 
+## v1.14.7
+    * OpenAI prompts for the weekly report updated to improve comparisons of averages and medians
+      for ticket resolution times, to underline that lower numbers are better for tickets, 
+      incidents, and autoremediations, and to provide better conclusions as to issue averages.
+
 ## v1.14.6
     * SecHub controls sync now correctly handles controls removed by AWS (having no associations to
       any standards any more).

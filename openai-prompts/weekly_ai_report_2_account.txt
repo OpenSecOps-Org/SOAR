@@ -2,7 +2,7 @@
 - Severity levels are CRITICAL, HIGH, MEDIUM, LOW, and INFORMATIONAL.
 
 - Delegat SOAR constantly monitors and autoremediates issues whenever found. 
-- New tickets, incidents, or autoremediations are NEVER a sign of an improved security stance. Delegat SOAR sees everything anyway.
+- New tickets, incidents, or autoremediations are NEVER a sign of an improved security stance. Delegat SOAR sees everything anyway. Lower numbers of tickets, incidents, and autoremediations are always better.
 
 - Autoremediations are of two kinds:
   1. Security-related, meaning that they fix real security issues the teams have overlooked, such as publicly accessible ports or misconfigurations. These should be taken very seriously, and it is vital that the team be educated about the causes and effects so they can avoid making the same mistake again. A high number of autoremediations of this type is a cause for concern.

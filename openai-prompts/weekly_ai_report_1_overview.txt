@@ -65,20 +65,32 @@
 - Be sure to end each Tickets/Autoremediations/Incidents/Accounts Breakdown subsection with the correct [[INSERT ...]] placeholder.
 
 [GENERAL]
-- To determine whether security has improved or deteriorated, you will consider ONLY this_week.total_penalty and last_week.total_penalty. Other factors such as the number of tickets identified, autoremediations, or the work of the security team should not be weighed in, as they are already included in the total_penalty.
-- You will double-check that you have fetched the correct values for total_penalty for this_week and last_week.
-  - If this_week.total_penalty is greater than last_week.total_penalty, it proves a deterioration in the security situation.
-  - If this_week.total_penalty is smaller than last_week.total_penalty, it proves an improvement in the security situation.
+This section contains two pieces of information:
+1. To determine whether security has improved or deteriorated, you will consider ONLY this_week.total_penalty and last_week.total_penalty. Other factors such as the number of tickets identified, autoremediations, or the work of the security team should not be weighed in, as they are already included in the total_penalty.
+  - You will double-check, then triple-check, that you have fetched the correct values for this_week.total_penalty and last_week.total_penalty.
+  - If this_week.total_penalty is greater than last_week.total_penalty, it indicates a deterioration in the security situation.
+  - If this_week.total_penalty is smaller than last_week.total_penalty, it indicates an improvement in the security situation.
   - You will provide figures to elaborate on this information.
-- Additionally, you will compare avg_penalty for this_week and last_week, ensuring that you have fetched the correct values. 
+2. The second piece of information is optional. It is based on this_week.avg_penalty and last_week.avg_penalty.
+  - You will double-check, then triple-check, that you have fetched the correct values for this_week.avg_penalty and last_week.avg_penalty. If they are the same, check a fourth time.
+  - If either of these is 0, there is nothing that can be said about how the average severities have changed as there were no issues for one or both weeks.
+  - If both are non-zero, compare them and draw conclusions.
+  - The maximum possible average value is 25.6. The higher, the more critical the severity.
+    - An average above 5 indicates that the majority of issues have occurred in production environment accounts, which is a cause for concern.
+    - An average below 2.5 indicates that the majority of issues have occurred in development environment accounts, which is not a cause for concern.
+    - Average values between 2.5 and 5 indicate a mix of environments and severities.
   - You will provide figures to elaborate on this information.
-  - It is important to note that an increase in avg_penalty signifies that ticketed issues have become more serious but does not directly impact the security posture.
 
 [TICKETS]
 1. Provide information on n_open_tickets, n_overdue_tickets (if any), n_opened_tickets, and n_closed_tickets for this week and last week. Make sure you fetch the correct values for each week. Elaborate.
   - Please note that the tickets that were closed may not be the same as the ones opened. It is possible that some of them were opened earlier, and/or that some of the tickets opened this week may still be open (unless there are no open tickets this week).
 2. Provide information about how many accounts had open tickets this week.
-3. Provide information about closed_tickets_avg_duration_seconds and closed_tickets_mdn_duration_seconds for this_week and last_week.
+3. Provide statistics for closed tickets, remembering that lower values are better:
+  - Average: Compare this_week.closed_tickets_avg_duration_seconds to last_week.closed_tickets_avg_duration_seconds.
+  - Median: Compare this_week.closed_tickets_mdn_duration_seconds to last_week.closed_tickets_mdn_duration_seconds.
+  - If the average and median values for a week differ substantially, comment on what this means.
+  - If there are no closed tickets, the average and median values will be 0.
+  - If there are exactly 1 or 2 closed tickets, average and median values will be equal.
   - Use human-readable format for all values. They should not be given in seconds.
 4. Use the instructions under "Area Summaries" to analyze this_week.open_tickets_redux and summarize all general areas they pertain to in one sentence. Do not use bullet lists or tables. Brevity is of the essence.
 5. Output the literal string "[[INSERT open_tickets_severity_level_breakdown_html_table]]", without the quotes as a placeholder.
