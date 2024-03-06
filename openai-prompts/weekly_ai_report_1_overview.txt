@@ -60,26 +60,45 @@
 
 - Reminder: This is about capturing the gist. Too much detail or direct quotes will defeat the purpose. Double and triple-check your work!
 
+[HOW TO INTERPRET AVERAGE PENALTIES]
+- Use the average penalty value to assess where most issues occurred:
+  - An average penalty greater than 5 suggests many issues happened in production environments. This is a critical concern as it directly impacts system reliability and user experience.
+  - An average penalty less than or equal to 2.5 suggests issues were primarily in development or testing environments. These issues are less critical as they were caught before reaching production.
+
+- When discussing average penalties in your report, explicitly state whether issues occurred mainly in production or development/testing based on the above criteria.
+
 [INSTRUCTIONS]
 - The section should have subsections for the general security level, tickets, autoremediations, incidents, and accounts breakdown.
 - Be sure to end each Tickets/Autoremediations/Incidents/Accounts Breakdown subsection with the correct [[INSERT ...]] placeholder.
 
 [GENERAL]
-This section contains two pieces of information:
-1. To determine whether security has improved or deteriorated, you will consider ONLY this_week.total_penalty and last_week.total_penalty. Other factors such as the number of tickets identified, autoremediations, or the work of the security team should not be weighed in, as they are already included in the total_penalty.
-  - You will double-check, then triple-check, that you have fetched the correct values for this_week.total_penalty and last_week.total_penalty.
-  - If this_week.total_penalty is greater than last_week.total_penalty, it indicates a deterioration in the security situation.
-  - If this_week.total_penalty is smaller than last_week.total_penalty, it indicates an improvement in the security situation.
-  - You will provide figures to elaborate on this information.
-2. The second piece of information is optional. It is based on this_week.avg_penalty and last_week.avg_penalty.
-  - You will double-check, then triple-check, that you have fetched the correct values for this_week.avg_penalty and last_week.avg_penalty. If they are the same, check a fourth time.
-  - If either of these is 0, there is nothing that can be said about how the average severities have changed as there were no issues for one or both weeks.
-  - If both are non-zero, compare them and draw conclusions.
-  - The maximum possible average value is 25.6. The higher, the more critical the severity.
-    - An average above 5 indicates that the majority of issues have occurred in production environment accounts, which is a cause for concern.
-    - An average below 2.5 indicates that the majority of issues have occurred in development environment accounts, which is not a cause for concern.
-    - Average values between 2.5 and 5 indicate a mix of environments and severities.
-  - You will provide figures to elaborate on this information.
+This section provides a general overview of the security situation, focusing on the total and average penalties accrued both this week and last week.
+
+Before you output anything perform these two steps:
+
+1. **Retrieve Penalty Values**: Start by fetching the following values:
+   - `this_week.total_penalty`
+   - `last_week.total_penalty`
+   - `this_week.avg_penalty`
+   - `last_week.avg_penalty`
+   
+Carefully verify these values twice to ensure accuracy. Then triple-check them. You must make an effort to fetch the correct values at all times.
+
+2. **Zero vs. Non-Zero Analysis**: Carefully determine if the total penalties for both weeks are zero or non-zero. This distinction is crucial for guiding how we discuss average penalties and understand the overall security posture.
+
+When you have determined the above, there are four possible situations. Carefully select the correct one, and then proceed accordingly:
+
+**Situation 1 – Both `this_week.total_penalty` and `last_week.total_penalty` are zero**:
+- Elaborate on the fact that there has been no issues this week or the last week.
+
+**Situation 2 – `this_week.total_penalty` is zero and `last_week.total_penalty` is non-zero**:
+- Elaborate on the fact that there were no security issues at all this week as compared to last week which had security issues. Give the average penalty of last week and comment on it, using the instructions under HOW TO INTERPRET AVERAGE PENALTIES.
+
+**Situation 3 – `this_week.total_penalty` is non-zero and `last_week.total_penalty` is zero**:
+- Elaborate on the fact that last week the system had no issues, but this week there have been issues. Give the average penalty for this week and comment on it, using the instructions under HOW TO INTERPRET AVERAGE PENALTIES.
+
+**Situation 4 – Both `this_week.total_penalty` and `last_week.total_penalty` are non-zero**:
+- Elaborate on how the total penalty has changed from last week, reflecting the overall security posture of the system. Also comment on how the average penalties have changed, reflecting the individual severities of issues, using the instructions under HOW TO INTERPRET AVERAGE PENALTIES.
 
 [TICKETS]
 1. Provide information on n_open_tickets, n_overdue_tickets (if any), n_opened_tickets, and n_closed_tickets for this week and last week. Make sure you fetch the correct values for each week. Elaborate.

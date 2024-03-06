@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.15.0
+    * OpenAI weekly report prompt for the overview section now takes into account the environments
+      where issues occurred.
+
 ## v1.14.7
     * OpenAI prompts for the weekly report updated to improve comparisons of averages and medians
       for ticket resolution times, to underline that lower numbers are better for tickets, 
