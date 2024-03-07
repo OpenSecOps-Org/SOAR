@@ -24,8 +24,10 @@ def lambda_handler(data, _context):
 
     finding = data['finding']
 
+    normalized_severity = finding['Severity']['Normalized']
+
     # severity == ~0.64 for LOW, ~1.0 for MEDIUM, ~1.44 for HIGH, ~2.56 for CRITICAL
-    severity = ((finding['Severity']['Normalized'] + 60.0) / 100.0) ** 2.0
+    severity = ((normalized_severity + 60.0) / 100.0) ** 2.0
 
     # Convert environment to uppercase for case-insensitive comparison
     environment = data['account']['Environment'].upper()
@@ -40,5 +42,9 @@ def lambda_handler(data, _context):
     else:
         env_factor = 1.0
 
+    penalty_score = severity * env_factor
+
+    print(f"Normalized severity: {normalized_severity}, calculated severity: {severity}, env factor: {env_factor}, penalty score: {penalty_score}")
+
     # The DynamoDB integration needs this in string format
-    return str(severity * env_factor)
+    return str(penalty_score)

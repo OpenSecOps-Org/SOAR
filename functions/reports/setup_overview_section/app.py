@@ -104,9 +104,6 @@ def lambda_handler(data, _context):
     TW_opened_tickets = retrieve_opened_tickets_between(last_week, current_time)
     TW_n_opened_tickets = len(TW_opened_tickets)
 
-    TW_total_penalty = sum_penalty_scores(TW_opened_tickets)
-    TW_avg_penalty = TW_total_penalty / TW_n_opened_tickets if TW_n_opened_tickets > 0 else 0
-
     TW_closed_tickets = retrieve_closed_tickets_between(last_week, current_time)
     TW_closed_tickets_avg_duration, TW_closed_tickets_mdn_duration = closed_tickets_stats(TW_closed_tickets)
     TW_n_closed_tickets = len(TW_closed_tickets)
@@ -131,6 +128,11 @@ def lambda_handler(data, _context):
         account_data, org_account_name
     )
 
+    TW_total_penalty = sum_penalty_scores(TW_opened_tickets) + sum_penalty_scores(TW_incidents)  # + sum_penalty_scores(TW_autoremediations) 
+    TW_n_issues = TW_n_opened_tickets + TW_n_incidents  # + TW_n_autoremediations
+    TW_avg_penalty = TW_total_penalty / TW_n_issues if TW_n_issues > 0 else 0
+    
+
     # LAST WEEK
     LW_open_tickets = sort_on_severity(set_age_and_overdue(retrieve_tickets_open_at_PIT(last_week)))
     LW_n_open_tickets = len(LW_open_tickets)
@@ -145,9 +147,6 @@ def lambda_handler(data, _context):
 
     LW_opened_tickets = retrieve_opened_tickets_between(two_weeks, last_week)
     LW_n_opened_tickets = len(LW_opened_tickets)
-
-    LW_total_penalty = sum_penalty_scores(LW_opened_tickets)
-    LW_avg_penalty = LW_total_penalty / LW_n_opened_tickets if LW_n_opened_tickets > 0 else 0
 
     LW_closed_tickets = retrieve_closed_tickets_between(two_weeks, last_week)
     LW_closed_tickets_avg_duration, LW_closed_tickets_mdn_duration = closed_tickets_stats(LW_closed_tickets)
@@ -165,6 +164,11 @@ def lambda_handler(data, _context):
     LW_accounts_with_incidents = count_accounts(LW_incidents)
     LW_n_accounts_with_incidents = len(LW_accounts_with_incidents)
 
+    LW_total_penalty = sum_penalty_scores(LW_opened_tickets) + sum_penalty_scores(LW_incidents)  # + sum_penalty_scores(LW_autoremediations)
+    LW_n_issues = LW_n_opened_tickets + LW_n_incidents  # + LW_n_autoremediations
+    LW_avg_penalty = LW_total_penalty / LW_n_issues if LW_n_issues > 0 else 0
+
+
     # TWO WEEKS AGO
     L2W_open_tickets = sort_on_severity(set_age_and_overdue(retrieve_tickets_open_at_PIT(two_weeks)))
     L2W_ticket_severity_level_breakdown = get_severity_level_breakdown(L2W_open_tickets)
@@ -173,6 +177,7 @@ def lambda_handler(data, _context):
     L2W_incidents = retrieve_incidents_between(three_weeks, two_weeks)
     L2W_incidents_severity_level_breakdown = get_severity_level_breakdown(L2W_incidents)
 
+
     # THREE WEEKS AGO
     L3W_open_tickets = sort_on_severity(set_age_and_overdue(retrieve_tickets_open_at_PIT(three_weeks)))
     L3W_ticket_severity_level_breakdown = get_severity_level_breakdown(L3W_open_tickets)
@@ -180,6 +185,7 @@ def lambda_handler(data, _context):
     L3W_autoremediations_severity_level_breakdown = get_severity_level_breakdown(L3W_autoremediations)
     L3W_incidents = retrieve_incidents_between(four_weeks, three_weeks)
     L3W_incidents_severity_level_breakdown = get_severity_level_breakdown(L3W_incidents)
+
 
     # ALL WEEKS
     open_tickets_severity_level_breakdown_html_table = severity_breakdown_html_table(
@@ -200,6 +206,7 @@ def lambda_handler(data, _context):
         L2W_incidents_severity_level_breakdown,
         L3W_incidents_severity_level_breakdown
     )
+
 
     # Convert to CSV for compactness, to save tokens. Max 10 items per list.
     TW_open_tickets_redux = pd.DataFrame(TW_open_tickets_redux[0:10]).to_csv(index=False)

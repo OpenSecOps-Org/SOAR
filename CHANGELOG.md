@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.15.1
+    * Incidents now included in the penalty calculations. Autoremediations are not included by design.
+
 ## v1.15.0
     * OpenAI weekly report prompt for the overview section now takes into account the environments
       where issues occurred.
