@@ -1,7 +1,13 @@
 # Change Log
 
+## v1.16.0
+    * Python v3.12.2.
+    * `.python-version` file to support `pyenv`.
+    * `boto3` version no longer bundled.
+
 ## v1.15.1
-    * Incidents now included in the penalty calculations. Autoremediations are not included by design.
+    * Incidents now included in the penalty calculations. Autoremediations are not included by design,
+      as their underlying issues are fixed and not necessarily something that needs attention.
 
 ## v1.15.0
     * OpenAI weekly report prompt for the overview section now takes into account the environments

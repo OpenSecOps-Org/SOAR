@@ -1,4 +1,3 @@
 cfnresponse
 requests
 urllib3<2
-boto3==1.33.12

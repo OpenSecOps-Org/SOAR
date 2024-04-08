@@ -2,5 +2,4 @@ jira
 requests
 urllib3<2
 charset_normalizer
-boto3==1.33.12
 

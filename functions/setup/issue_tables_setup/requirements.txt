@@ -1,2 +1,1 @@
 cfnresponse
-boto3==1.33.12
