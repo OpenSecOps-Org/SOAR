@@ -6,6 +6,11 @@ States:
         Type: Task
         Resource: '${GetTicketAndDecideFunctionArn}'
         Parameters:
+            SOAREnabled: '${SOAREnabled}'
+            DeferIncidents: '${DeferIncidents}'
+            DeferAutoRemediations: '${DeferAutoRemediations}'
+            DeferTeamFixes: '${DeferTeamFixes}'
+            DiskForensicsInvoke: '${DiskForensicsInvoke}'
             account: {}
             finding.$: '$.detail.findings[0]'
             tags: {}
@@ -22,11 +27,6 @@ States:
                     plaintext: ''
                     html: ''
             db: {}
-            SOAREnabled: '${SOAREnabled}'
-            DeferIncidents: '${DeferIncidents}'
-            DeferAutoRemediations: '${DeferAutoRemediations}'
-            DeferTeamFixes: '${DeferTeamFixes}'
-            DiskForensicsInvoke: '${DiskForensicsInvoke}'
         Retry:
             -
                 ErrorEquals:
@@ -321,6 +321,7 @@ States:
         Resource: 'arn:aws:states:::states:startExecution.sync:2'
         Parameters:
             Input:
+                DeferTeamFixes.$: $.DeferTeamFixes
                 account.$: $.account
                 finding.$: $.finding
                 tags.$: $.tags
@@ -371,7 +372,7 @@ States:
     Defer Team fixes?:
         Type: Choice
         Choices:
-        - Variable: "$.DeferTeamFixes"
+        - Variable: $.DeferTeamFixes
           StringEquals: "Yes"
           Next: Do Nothing
         Default: Format Ticketing Message

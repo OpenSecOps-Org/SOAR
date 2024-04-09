@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.16.1
+    * Auto-remediations now correctly pass DeferTeamFixes back to the calling ASFF processor, 
+      so we can decide whether to ticket teams or not.
+
 ## v1.16.0
     * Python v3.12.2.
     * `.python-version` file to support `pyenv`.
