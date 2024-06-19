@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.16.2
+    * Hourly task now handles non-ASCII team names without bombing, using ASCII replacement techniques.
+
 ## v1.16.1
     * Auto-remediations now correctly pass DeferTeamFixes back to the calling ASFF processor, 
       so we can decide whether to ticket teams or not.

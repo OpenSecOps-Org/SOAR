@@ -1,7 +1,5 @@
 import os
 
-# Takes the ENV vars DEV_ENVS, STAGING_ENVS, and PROD_ENVS
-
 # Default values for each environment variable string
 DEFAULT_DEV_ENVS = "DEV, DEVELOPMENT, DEVINT, DI"
 DEFAULT_STAGING_ENVS = "STAGING, STG, PREPROD, PP, TEST, QA, UAT, SIT, SYSTEMTEST, INTEGRATION"
@@ -10,13 +8,9 @@ DEFAULT_PROD_ENVS = "PROD, PRD, PRODUCTION, LIVE"
 
 # Function to convert comma-separated string to a set, with a default value if the environment variable is not set
 def env_var_to_set(env_var, default):
-    return {item.strip().upper() for item in os.getenv(env_var, default).split(',')}
-
-
-# Read and process environment variables with defaults
-DEV_ENVS = env_var_to_set('DEV_ENVS', DEFAULT_DEV_ENVS)
-STAGING_ENVS = env_var_to_set('STAGING_ENVS', DEFAULT_STAGING_ENVS)
-PROD_ENVS = env_var_to_set('PROD_ENVS', DEFAULT_PROD_ENVS)
+    result_set = {item.strip().upper() for item in os.getenv(env_var, default).split(',')}
+    print(f"{env_var} set: {result_set}")
+    return result_set
 
 
 def lambda_handler(data, _context):
@@ -31,6 +25,17 @@ def lambda_handler(data, _context):
 
     # Convert environment to uppercase for case-insensitive comparison
     environment = data['account']['Environment'].upper()
+
+    # Read and process environment variables with defaults
+    DEV_ENVS = env_var_to_set('DEV_ENVS', DEFAULT_DEV_ENVS)
+    STAGING_ENVS = env_var_to_set('STAGING_ENVS', DEFAULT_STAGING_ENVS)
+    PROD_ENVS = env_var_to_set('PROD_ENVS', DEFAULT_PROD_ENVS)
+
+    # Debug prints for environment and sets
+    print(f"Environment: {environment}")
+    print(f"DEV_ENVS: {DEV_ENVS}")
+    print(f"STAGING_ENVS: {STAGING_ENVS}")
+    print(f"PROD_ENVS: {PROD_ENVS}")
 
     # Determine env_factor based on environment group membership
     if environment in DEV_ENVS:

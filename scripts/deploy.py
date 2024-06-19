@@ -871,7 +871,7 @@ def monitor_stackset_stacks_until_complete(stackset_name, account_id, region, ro
     cf_client = get_client('cloudformation', account_id, region, role)
     
     # Define terminal states for CloudFormation stacks
-    terminal_states = ["CREATE_COMPLETE", "ROLLBACK_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "DELETE_COMPLETE", "CURRENT"]
+    terminal_states = ["CREATE_COMPLETE", "ROLLBACK_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "DELETE_COMPLETE", "CURRENT", "FAILED", "OUTDATED"]
 
     # Get the status of all stacks deployed by the StackSet
     stack_instances = cf_client.list_stack_instances(StackSetName=stackset_name)

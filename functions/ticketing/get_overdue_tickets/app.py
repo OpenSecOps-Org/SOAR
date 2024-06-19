@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from dateutil import parser
 import humanize
 import datetime as dt
+from unidecode import unidecode
 
 
 # Get environment variables
@@ -441,6 +442,14 @@ def emit_cloudwatch_metric(metric_name, metric_value, dimension_name, dimension_
     :param dimension_name: The name of the dimension.
     :param dimension_value: The value for the dimension.
     """
+
+    # Ensure dimension_value is pure ASCII and remove diacritics
+    dimension_value = unidecode(dimension_value)
+
+    # Debug printout BEFORE the operation
+    print(f"Metric emitted: {metric_name} - {dimension_name}: {dimension_value}, Value: {metric_value}")
+
+    # Put the data
     cloudwatch_client.put_metric_data(
         Namespace=METRIC_NAMESPACE,       # 'DelegatSOAR' as passed in via an ENV var
         MetricData=[
@@ -457,7 +466,6 @@ def emit_cloudwatch_metric(metric_name, metric_value, dimension_name, dimension_
             },
         ]
     )
-    print(f"Metric emitted: {metric_name} - {dimension_name}: {dimension_value}, Value: {metric_value}")
 
 
 # Helper function to emit metrics for each unique value in a dimension
