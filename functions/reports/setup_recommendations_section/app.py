@@ -10,24 +10,24 @@ logger.setLevel(logging.INFO)
 
 
 # Get environment variables
-OPENAI_PROMPTS_TABLE = os.environ['OPENAI_PROMPTS_TABLE']
-OPENAI_REPORT_TABLE = os.environ['OPENAI_REPORT_TABLE']
+AI_PROMPTS_TABLE = os.environ['AI_PROMPTS_TABLE']
+AI_REPORT_TABLE = os.environ['AI_REPORT_TABLE']
 
 dynamodb = boto3.resource('dynamodb')
-openai_prompts = dynamodb.Table(OPENAI_PROMPTS_TABLE)
-openai_report = dynamodb.Table(OPENAI_REPORT_TABLE)
+ai_prompts = dynamodb.Table(AI_PROMPTS_TABLE)
+ai_report = dynamodb.Table(AI_REPORT_TABLE)
 
 
 # Lambda handler
 def lambda_handler(data, _context):
     logger.info(data)
 
-    system = retrieve_db_item(openai_prompts, 'weekly_ai_report_0_common')['instructions'] + "\n"
-    system += retrieve_db_item(openai_prompts, 'weekly_ai_report_3_recommendations')['instructions']
+    system = retrieve_db_item(ai_prompts, 'weekly_ai_report_0_common')['instructions'] + "\n"
+    system += retrieve_db_item(ai_prompts, 'weekly_ai_report_3_recommendations')['instructions']
 
     # Concatenate all the generated account summaries into one string
     accounts = data['bb']['accounts_with_issues']
-    summaries = concatenate_account_summaries(openai_report, accounts)
+    summaries = concatenate_account_summaries(ai_report, accounts)
 
     # Prepare the return data
     data['messages']['report']['html'] = ''

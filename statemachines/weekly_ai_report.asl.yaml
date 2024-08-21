@@ -7,18 +7,12 @@ States:
       WeeklyReport: "${WeeklyReport}"
       WeeklyReportIndividualAccounts: "${WeeklyReportIndividualAccounts}"
       WeeklyReportEmailRecipients: "${WeeklyReportEmailRecipients}"
-      OpenAIReportTable: "${OpenAIReportTable}"
+      AIReportTable: "${AIReportTable}"
       no_html_post_processing: "True"
       base_title: "${WeeklyReportTitle}"
       add_week_number: "${WeeklyReportWeekNumbers}"
       bb: {}
       html_substitutions: {}
-      model: "${WeeklyReportChatGPTDefaultModel}"
-      fallback_model: "${WeeklyReportChatGPTFallbackModel}"
-      temperature: 0.3
-      top_p: 0.3
-      frequency_penalty: 0.3
-      presence_penalty: 0.1
       system: ""
       user: ""
 
@@ -69,7 +63,7 @@ States:
 
   Create Overview Section:
     Type: Task
-    Resource: '${QueryChatGPTFunctionArn}'
+    Resource: '${QueryAIFunctionArn}'
     TimeoutSeconds: 900
     Retry:
       -
@@ -92,8 +86,8 @@ States:
       -   
         ErrorEquals:
           - States.ALL
-        ResultPath: "$.openai-error-info"
-        Next: OpenAiFailState
+        ResultPath: "$.ai-error-info"
+        Next: AIFailState
     Next: Postprocess Overview Section
 
   Postprocess Overview Section:
@@ -105,7 +99,7 @@ States:
     Type: Task
     Resource: "arn:aws:states:::dynamodb:putItem"
     Parameters:
-      TableName.$: $.OpenAIReportTable
+      TableName.$: $.AIReportTable
       Item:
         id: 
           S: "overview"
@@ -145,7 +139,7 @@ States:
 
         Create Account Segment:
           Type: Task
-          Resource: '${QueryChatGPTFunctionArn}'
+          Resource: '${QueryAIFunctionArn}'
           TimeoutSeconds: 900
           Retry:
             -
@@ -168,8 +162,8 @@ States:
             -   
               ErrorEquals:
                 - States.ALL
-              ResultPath: "$.openai-error-info"
-              Next: OpenAiFailStateAccountSegment
+              ResultPath: "$.ai-error-info"
+              Next: AIFailStateAccountSegment
           Next: Store Account Segment Summary
 
         Store Account Segment Summary:
@@ -202,7 +196,7 @@ States:
           Type: Task
           Resource: "arn:aws:states:::dynamodb:putItem"
           Parameters:
-            TableName.$: $.OpenAIReportTable
+            TableName.$: $.AIReportTable
             Item:
               id: 
                 S.$: "$.account"
@@ -247,9 +241,9 @@ States:
         Account Done:
           Type: Succeed
 
-        OpenAiFailStateAccountSegment:
+        AIFailStateAccountSegment:
           Type: Fail
-          Cause: "The call to the OpenAI API failed. See $.openai-error-info for more details."
+          Cause: "The call to the GenAI API failed. See $.ai-error-info for more details."
 
     Next: Setup Recommendations Section
 
@@ -272,7 +266,7 @@ States:
 
   Create Recommendations Section:
     Type: Task
-    Resource: '${QueryChatGPTFunctionArn}'
+    Resource: '${QueryAIFunctionArn}'
     TimeoutSeconds: 900
     Retry:
       -
@@ -295,8 +289,8 @@ States:
       -   
         ErrorEquals:
           - States.ALL
-        ResultPath: "$.openai-error-info"
-        Next: OpenAiFailState
+        ResultPath: "$.ai-error-info"
+        Next: AIFailState
     Next: Postprocess Recommendations Section
 
   Postprocess Recommendations Section:
@@ -308,7 +302,7 @@ States:
     Type: Task
     Resource: "arn:aws:states:::dynamodb:putItem"
     Parameters:
-      TableName.$: $.OpenAIReportTable
+      TableName.$: $.AIReportTable
       Item:
         id: 
           S: "recommendations"
@@ -357,6 +351,6 @@ States:
   Succeed:
     Type: Succeed
 
-  OpenAiFailState:
+  AIFailState:
     Type: Fail
-    Cause: "The call to the OpenAI API failed. See $.openai-error-info for more details."
+    Cause: "The call to the GenAI API failed. See $.ai-error-info for more details."

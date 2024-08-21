@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.17.0
+    * Bedrock supported as the (enabled) default. OpenAI is still available.
+
 ## v1.16.2
     * Hourly task now handles non-ASCII team names without bombing, using ASCII replacement techniques.
 

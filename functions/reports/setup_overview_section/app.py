@@ -35,7 +35,7 @@ SERVICE_NOW_DEFAULT_PROJECT_QUEUE = os.environ['SERVICE_NOW_DEFAULT_PROJECT_QUEU
 TICKETS_TABLE = os.environ['TICKETS_TABLE']
 AUTOREMEDIATIONS_TABLE = os.environ['AUTOREMEDIATIONS_TABLE']
 INCIDENTS_TABLE = os.environ['INCIDENTS_TABLE']
-OPENAI_PROMPTS_TABLE = os.environ['OPENAI_PROMPTS_TABLE']
+AI_PROMPTS_TABLE = os.environ['AI_PROMPTS_TABLE']
 
 SEVERITY_ALLOWED_AGE_IN_HOURS_CRITICAL = int(os.environ['SEVERITY_ALLOWED_AGE_IN_HOURS_CRITICAL'])
 SEVERITY_ALLOWED_AGE_IN_HOURS_HIGH = int(os.environ['SEVERITY_ALLOWED_AGE_IN_HOURS_HIGH'])
@@ -64,13 +64,13 @@ dynamodb = boto3.resource('dynamodb')
 tickets = dynamodb.Table(TICKETS_TABLE)
 autoremediations = dynamodb.Table(AUTOREMEDIATIONS_TABLE)
 incidents = dynamodb.Table(INCIDENTS_TABLE)
-openai_prompts = dynamodb.Table(OPENAI_PROMPTS_TABLE)
+ai_prompts = dynamodb.Table(AI_PROMPTS_TABLE)
 
 
 # Lambda handler
 def lambda_handler(data, _context):
-    system = retrieve_db_item(openai_prompts, 'weekly_ai_report_0_common')['instructions'] + "\n"
-    system += retrieve_db_item(openai_prompts, 'weekly_ai_report_1_overview')['instructions']
+    system = retrieve_db_item(ai_prompts, 'weekly_ai_report_0_common')['instructions'] + "\n"
+    system += retrieve_db_item(ai_prompts, 'weekly_ai_report_1_overview')['instructions']
 
     # Current UTC datetime
     current_time = datetime.utcnow()

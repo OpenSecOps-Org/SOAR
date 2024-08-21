@@ -4,13 +4,13 @@ from datetime import datetime, timezone, timedelta
 
 
 # Get environment variables
-OPENAI_REPORT_TABLE = os.environ['OPENAI_REPORT_TABLE']
+AI_REPORT_TABLE = os.environ['AI_REPORT_TABLE']
 BUCKET = os.environ['BUCKET']
 
 # Boto3 resources and clients
 dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
-openai_report = dynamodb.Table(OPENAI_REPORT_TABLE)
+openai_report = dynamodb.Table(AI_REPORT_TABLE)
 
 
 h2 = '<h2 style="background-color: #d9c8e3; width: 100%; height: 50px; line-height: 50px; padding-left: 20px; margin-top: 70px;">'

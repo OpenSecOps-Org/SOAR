@@ -368,7 +368,7 @@ States:
         Type: Task
         Resource: arn:aws:states:::dynamodb:getItem
         Parameters:
-            TableName: "${OpenAIPromptsTableName}"
+            TableName: "${AIPromptsTableName}"
             Key:
                 id: "incident_app"
             ProjectionExpression: "instructions"
@@ -389,7 +389,7 @@ States:
 
     AddAiDataForAppIncident:
         Type: Task
-        Resource: '${QueryChatGPTFunctionArn}'
+        Resource: '${QueryAIFunctionArn}'
         TimeoutSeconds: 600
         Retry:
             -
@@ -412,7 +412,7 @@ States:
             -   
                 ErrorEquals:
                 -   States.ALL
-                ResultPath: "$.openai-error-info"
+                ResultPath: "$.ai-error-info"
                 Next: Send APP email
         Next: Send APP email
 
@@ -444,7 +444,7 @@ States:
         Type: Task
         Resource: arn:aws:states:::dynamodb:getItem
         Parameters:
-            TableName: "${OpenAIPromptsTableName}"
+            TableName: "${AIPromptsTableName}"
             Key:
                 id: "incident_infra"
             ProjectionExpression: "instructions"
@@ -465,7 +465,7 @@ States:
 
     AddAiDataForInfraIncident:
         Type: Task
-        Resource: '${QueryChatGPTFunctionArn}'
+        Resource: '${QueryAIFunctionArn}'
         TimeoutSeconds: 600
         Retry:
             -
@@ -488,7 +488,7 @@ States:
             -   
                 ErrorEquals:
                 -   States.ALL
-                ResultPath: "$.openai-error-info"
+                ResultPath: "$.ai-error-info"
                 Next: Send INFRA email
         Next: Send INFRA email
 

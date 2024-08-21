@@ -3,6 +3,8 @@ import boto3
 import cfnresponse
 import logging
 
+AI_PROMPTS_TABLE = os.environ['AI_PROMPTS_TABLE']
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
@@ -12,13 +14,13 @@ def lambda_handler(event, context):
     try:
         logger.info('Received event: %s', event)
 
-        table_name = 'openai-prompts'
+        table_name = AI_PROMPTS_TABLE
         table = dynamodb.Table(table_name)
 
         # Retrieve the files from the deployment package
         request_type = event.get('RequestType', '')
         if request_type == 'Create' or request_type == 'Update':
-            data_dir = 'openai-prompts'
+            data_dir = 'ai-prompts'
 
             # Insert new items from the files
             for filename in os.listdir(data_dir):

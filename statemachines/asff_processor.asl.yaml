@@ -133,24 +133,6 @@ States:
               Next: Suppress Finding
         Default: Get Enabled Controls Local Suppressions Table Entry
 
-#    Already Has or Has Had Ticket?:
-#        Type: Choice
-#        Choices:
-#            -
-#                Variable: $.finding.UserDefinedFields.TicketId
-#                IsPresent: true
-#                Next: Suppress Finding
-#        Default: New clone of already ticketed issue?
-#
-#    New clone of already ticketed issue?:
-#        Type: Choice
-#        Choices:
-#            -
-#                Variable: $.db.tickets.Item
-#                IsPresent: true
-#                Next: Suppress Finding
-#        Default: Get Enabled Controls Local Suppressions Table Entry
-
     Get Enabled Controls Local Suppressions Table Entry:
         Type: Task
         Resource: 'arn:aws:states:::dynamodb:getItem'
@@ -439,7 +421,7 @@ States:
         Type: Task
         Resource: arn:aws:states:::dynamodb:getItem
         Parameters:
-            TableName: "${OpenAIPromptsTableName}"
+            TableName: "${AIPromptsTableName}"
             Key:
                 id: "ticket_opened"
             ProjectionExpression: "instructions"
@@ -460,7 +442,7 @@ States:
 
     AddAiDataForOpenedTickets:
         Type: Task
-        Resource: '${QueryChatGPTFunctionArn}'
+        Resource: '${QueryAIFunctionArn}'
         TimeoutSeconds: 600
         Retry:
             -
@@ -483,7 +465,7 @@ States:
             -   
                 ErrorEquals:
                 -   States.ALL
-                ResultPath: "$.openai-error-info"
+                ResultPath: "$.ai-error-info"
                 Next: Send Ticketing Email
         Next: Send Ticketing Email
 
@@ -590,7 +572,7 @@ States:
         Type: Task
         Resource: arn:aws:states:::dynamodb:getItem
         Parameters:
-            TableName: "${OpenAIPromptsTableName}"
+            TableName: "${AIPromptsTableName}"
             Key:
                 id: "autoremediation"
             ProjectionExpression: "instructions"
@@ -611,7 +593,7 @@ States:
 
     AddAiDataForAutoremediation:
         Type: Task
-        Resource: '${QueryChatGPTFunctionArn}'
+        Resource: '${QueryAIFunctionArn}'
         TimeoutSeconds: 600
         Retry:
             -
@@ -634,7 +616,7 @@ States:
             -   
                 ErrorEquals:
                 -   States.ALL
-                ResultPath: "$.openai-error-info"
+                ResultPath: "$.ai-error-info"
                 Next: Send Remediation Email
         Next: Send Remediation Email
 
@@ -791,7 +773,7 @@ States:
         Type: Task
         Resource: arn:aws:states:::dynamodb:getItem
         Parameters:
-            TableName: "${OpenAIPromptsTableName}"
+            TableName: "${AIPromptsTableName}"
             Key:
                 id: "ticket_closed"
             ProjectionExpression: "instructions"
@@ -812,7 +794,7 @@ States:
 
     AddAiDataForClosedTickets:
         Type: Task
-        Resource: '${QueryChatGPTFunctionArn}'
+        Resource: '${QueryAIFunctionArn}'
         TimeoutSeconds: 600
         Retry:
             -
@@ -835,7 +817,7 @@ States:
             -   
                 ErrorEquals:
                 -   States.ALL
-                ResultPath: "$.openai-error-info"
+                ResultPath: "$.ai-error-info"
                 Next: Send Ticket Closed Email
         Next: Send Ticket Closed Email
 

@@ -11,10 +11,10 @@ logger.setLevel(logging.INFO)
 
 
 # Get environment variables
-OPENAI_REPORT_TABLE = os.environ['OPENAI_REPORT_TABLE']
+AI_REPORT_TABLE = os.environ['AI_REPORT_TABLE']
 
 dynamodb = boto3.resource('dynamodb')
-openai_report = dynamodb.Table(OPENAI_REPORT_TABLE)
+openai_report = dynamodb.Table(AI_REPORT_TABLE)
 
 
 # Lambda handler

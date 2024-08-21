@@ -3,6 +3,7 @@ import re
 import boto3
 import botocore
 import botocore.exceptions
+import json
 from openai import OpenAI
 from openai import BadRequestError, RateLimitError, APITimeoutError, APIConnectionError, APIStatusError, OpenAIError
 import html2text
@@ -15,22 +16,22 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Get environment variables
-USE_CHATGPT = os.environ['USE_CHATGPT']
+AI_PROVIDER = os.environ['AI_PROVIDER']
+AI_IAC_SNIPPETS = os.environ['AI_IAC_SNIPPETS']
+AI_ANONYMIZE_ACCOUNT_NUMBERS = os.environ['AI_ANONYMIZE_ACCOUNT_NUMBERS']
+AI_ANONYMIZE_HEX_STRINGS = os.environ['AI_ANONYMIZE_HEX_STRINGS']
+AI_REMOVE_ARNS = os.environ['AI_REMOVE_ARNS']
+AI_REMOVE_EMAIL_ADDRESSES = os.environ['AI_REMOVE_EMAIL_ADDRESSES']
+
+BEDROCK_REGION = os.environ['BEDROCK_REGION']
+BEDROCK_MODEL = os.environ['BEDROCK_MODEL']
+
 CHATGPT_DEFAULT_MODEL = os.environ['CHATGPT_DEFAULT_MODEL']
 CHATGPT_FALLBACK_MODEL = os.environ['CHATGPT_FALLBACK_MODEL']
-
 CHATGPT_ORGANIZATION_ID_PARAMETER_PATH = os.environ['CHATGPT_ORGANIZATION_ID_PARAMETER_PATH']
 CHATGPT_API_KEY_PARAMETER_PATH = os.environ['CHATGPT_API_KEY_PARAMETER_PATH']
 
-CHATGPT_IAC_SNIPPETS = os.environ['CHATGPT_IAC_SNIPPETS']
-
-CHATGPT_ANONYMIZE_ACCOUNT_NUMBERS = os.environ['CHATGPT_ANONYMIZE_ACCOUNT_NUMBERS']
-CHATGPT_ANONYMIZE_HEX_STRINGS = os.environ['CHATGPT_ANONYMIZE_HEX_STRINGS']
-CHATGPT_REMOVE_ARNS = os.environ['CHATGPT_REMOVE_ARNS']
-CHATGPT_REMOVE_EMAIL_ADDRESSES = os.environ['CHATGPT_REMOVE_EMAIL_ADDRESSES']
-
 SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
-
 
 # Initialize the SNS client
 sns_client = boto3.client('sns')
@@ -38,31 +39,27 @@ sns_client = boto3.client('sns')
 # Create a boto3 client for SSM
 ssm_client = boto3.client('ssm')
 
-# Get the OpenAI parameters from SSM
-openai_organization = ssm_client.get_parameter(Name=CHATGPT_ORGANIZATION_ID_PARAMETER_PATH)['Parameter']['Value']
-openai_api_key = ssm_client.get_parameter(Name=CHATGPT_API_KEY_PARAMETER_PATH)['Parameter']['Value']
+# Conditional client initialization
+if AI_PROVIDER == 'OPENAI':
+    # Get the OpenAI parameters from SSM
+    openai_organization = ssm_client.get_parameter(Name=CHATGPT_ORGANIZATION_ID_PARAMETER_PATH)['Parameter']['Value']
+    openai_api_key = ssm_client.get_parameter(Name=CHATGPT_API_KEY_PARAMETER_PATH)['Parameter']['Value']
+    # Create the OpenAI client
+    openai_client = OpenAI(organization=openai_organization, api_key=openai_api_key)
 
-# Create the OpenAI client
-openai_client = OpenAI(organization=openai_organization, 
-                       api_key=openai_api_key
-                      )
+elif AI_PROVIDER == 'BEDROCK':
+    # Create the Bedrock client
+    bedrock_client = boto3.client('bedrock-runtime', region_name=BEDROCK_REGION)
+
 
 # Define the lambda_handler function
 def lambda_handler(data, _context):
-    # Check if USE_CHATGPT is set to 'No'
-    if USE_CHATGPT == 'No':
+    # Return immediately if AI isn't to be used
+    if AI_PROVIDER == 'NONE':
         return data
     
     # Should we post-process the html?
     no_html_post_processing = data.get('no_html_post_processing')
-
-    # Get the model, temperature, top_p, frequency_penalty, and presence_penalty from the input data
-    model = data.get('model', CHATGPT_DEFAULT_MODEL)
-    fallback_model = data.get('model', CHATGPT_FALLBACK_MODEL)
-    temperature = data.get('temperature', 0.2)
-    top_p = data.get('top_p', 0.7)
-    frequency_penalty = data.get('frequency_penalty', 0.3)
-    presence_penalty = data.get('presence_penalty', 0.3)
 
     # Get the system_text and instructions from the input data
     system_text = data.get('system')
@@ -83,33 +80,18 @@ def lambda_handler(data, _context):
         system_text += instructions
 
     # Insert the desired IaC snippet languages
-    system_text = system_text.replace('[[IAC_SNIPPETS]]', CHATGPT_IAC_SNIPPETS)
+    system_text = system_text.replace('[[IAC_SNIPPETS]]', AI_IAC_SNIPPETS)
 
     # Get the user_text from the input data or anonymize the email body
     user_text = data.get('user') or anonymise(data['messages']['email']['body'].split("====================")[0])
 
-    # Create a list of messages
-    messages = []
+    # Call the right API and model and set the HTML result
+    if AI_PROVIDER == 'BEDROCK':
+        html = call_bedrock_api(BEDROCK_MODEL, system_text, user_text)
+    else:  # OPENAI
+        html = call_openai_api(CHATGPT_DEFAULT_MODEL, CHATGPT_FALLBACK_MODEL, system_text, user_text)
 
-    # Add the system message to the messages list
-    messages.append({
-        "role": "system",
-        "content": system_text
-    })
-
-    # Add the user message to the messages list
-    messages.append({
-        "role": "user",
-        "content": user_text
-    })
-
-    response = call_openai_api(model, fallback_model, messages, temperature, top_p, frequency_penalty, presence_penalty)
-    response = response.model_dump()
-    logger.info(response)
-
-    # Get the message and html from the response
-    message = response['choices'][0]['message']
-    html = message['content']
+    # Post-processing galore
     if not no_html_post_processing:
         html = format_tables_inline(html)
         html = format_pre_sections(html)
@@ -129,23 +111,75 @@ def lambda_handler(data, _context):
     return data
 
 
+# Call the Bedrock API
+def call_bedrock_api(model, system_text, user_text):
+    """
+    Call the Bedrock API with the specified model (right now only the Anthropic format is supported).
+    """
+    messages = [{"role": "user", "content": [{"type": "text", "text": f"{system_text}\n\n{user_text}"}]}]
+    logger.info(f"Bedrock API input: {messages}")
+
+    try:
+        # Prepare the request body
+        body = json.dumps({
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 8192,
+            "messages": messages,
+            "temperature": 0.3,
+            "top_p": 0.7,
+            "top_k": 250
+        })
+
+        # Call the Bedrock API
+        response = bedrock_client.invoke_model(
+            modelId=model,
+            contentType='application/json',
+            accept='application/json',
+            body=body
+        )
+        
+        # Parse the response
+        response_body = json.loads(response['body'].read())
+        logger.info(f"Bedrock API response: {response_body}")
+        completion = response_body['content'][0]['text']
+        logger.info(f"Completion: {completion}")
+        return completion
+
+    except Exception as e:
+        logger.error(f"Error calling Bedrock API: {str(e)}")
+        send_sns_notification(f"Bedrock API Error: {str(e)}")
+        raise
+
+
 # Call the OpenAI API, with fallback
-def call_openai_api(model, fallback_model, messages, temperature, top_p, frequency_penalty, presence_penalty):
+def call_openai_api(model, fallback_model, system_text, user_text):
     """
     Call OpenAI API with the provided model. If token limit is exceeded,
     and a fallback model is provided, it retries with the fallback model.
     """
+    messages = [
+        {"role": "system", "content": system_text},
+        {"role": "user", "content": user_text}
+    ]
+    logger.info(f"OpenAI API input: {messages}")
+
     try:
         # Attempt to create a chat completion with the OpenAI API
         response = openai_client.chat.completions.create(
             model=model,
             messages=messages,
-            temperature=temperature,
-            top_p=top_p,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty
+            temperature=0.3,
+            top_p=0.7,
+            frequency_penalty=0.3,
+            presence_penalty=0.1
         )
-        return response
+        response = response.model_dump()
+        logger.info(f"OpenAI API response: {response}")
+        # Get the message and html from the response
+        message = response['choices'][0]['message']
+        html = message['content']
+        logger.info(f"HTML: {html}")
+        return html
 
     except BadRequestError as e:
         # BadRequestError indicates a problem with the request; it might not be transient.
@@ -154,7 +188,7 @@ def call_openai_api(model, fallback_model, messages, temperature, top_p, frequen
             # If the error is due to token limit and a fallback model is provided,
             # retry with the fallback model.
             logger.info("Token limit exceeded, trying fallback model")
-            return call_openai_api(fallback_model, None, messages, temperature, top_p, frequency_penalty, presence_penalty)
+            return call_openai_api(fallback_model, None, messages)
         else:
             # For other bad request errors, log and raise the exception to be caught by the Step Functions state machine.
             logger.error(f"BadRequestError: {str(e)}")
@@ -228,25 +262,25 @@ def send_sns_notification(message):
     sns_client.publish(
         TopicArn=SNS_TOPIC_ARN,
         Message=message,
-        Subject="OpenAI Call Error"
+        Subject="GenAI Call Error"
     )
 
 
 # Helper function to anonymize input
 def anonymise(input):
-    if CHATGPT_ANONYMIZE_ACCOUNT_NUMBERS == 'Yes':
+    if AI_ANONYMIZE_ACCOUNT_NUMBERS == 'Yes':
         aws_account_number_pattern = r"\b\d{12}\b"
         input = re.sub(aws_account_number_pattern, '[suppressed-account]', input)
 
-    if CHATGPT_REMOVE_ARNS == 'Yes':
+    if AI_REMOVE_ARNS == 'Yes':
         aws_arn_pattern = r"arn:(aws[a-zA-Z0-9-]*):([a-zA-Z0-9-\.\_]*):([a-zA-Z0-9-\.\_]*):([0-9]*):([a-zA-Z0-9-\.\_\/]*)"
         input = re.sub(aws_arn_pattern, '[suppressed-arn]', input)
 
-    if CHATGPT_REMOVE_EMAIL_ADDRESSES == 'Yes':
+    if AI_REMOVE_EMAIL_ADDRESSES == 'Yes':
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         input = re.sub(email_pattern, '[suppressed-email]', input)
 
-    if CHATGPT_ANONYMIZE_HEX_STRINGS == 'Yes':
+    if AI_ANONYMIZE_HEX_STRINGS == 'Yes':
         uuid_pattern = r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
         input = re.sub(uuid_pattern, '[suppressed-uuid]', input)
 

@@ -444,60 +444,43 @@ Parameters:
 
   # AI -------------------------------------------------------------------------
 
-  UseChatGPT:
+  AIProvider:
     Type: String
-    Description: Yes if use OpenAI's API for ChatGPT.
-    AllowedValues: ['Yes', 'No']
-    Default: 'Yes'
+    Default: BEDROCK
+    AllowedValues:
+      - BEDROCK
+      - OPENAI
+      - NONE
+    Description: The AI provider to use (BEDROCK, OPENAI, or NONE)
 
-  ChatGPTDefaultModel:
-    Type: String
-    Description: The GPT model to use by default.
-    Default: 'gpt-4'
-
-  ChatGPTFallbackModel:
-    Type: String
-    Description: The fallback GPT model.
-    Default: 'gpt-3.5-turbo-16k'
-
-  ChatGPTOrganizationIdParameterPath:
-    Type: String
-    Description: The ChatGPT Organization ID.
-    Default: '/soar/chatgpt/organization-id'
-
-  ChatGPTAPIKeyParameterPath:
-    Type: String
-    Description: The ChatGPT API key.
-    Default: '/soar/chatgpt/api-key'
-
-  ChatGPTIaCSnippets:
+  AIIaCSnippets:
     Type: String
     Description: The IaC languages you want snippet suggestions for builders in.
     Default: "Cloudformation YAML, Terraform, and Python CDK"
 
-  ChatGPTAnonymizeAccountNumbers:
+  AIAnonymizeAccountNumbers:
     Type: String
     Description: Yes if all 12-digit numbers are to be replaced with 000000000000.
     AllowedValues: ['Yes', 'No']
-    Default: 'Yes'
+    Default: 'No'
 
-  ChatGPTAnonymizeHexStrings:
+  AIAnonymizeHexStrings:
     Type: String
     Description: Yes if all hex strings are to be replaced with zeros.
     AllowedValues: ['Yes', 'No']
-    Default: 'Yes'
+    Default: 'No'
 
-  ChatGPTRemoveARNs:
+  AIRemoveARNs:
     Type: String
     Description: Yes if all ARNs are to be removed.
     AllowedValues: ['Yes', 'No']
     Default: 'No'
 
-  ChatGPTRemoveEmailAddresses:
+  AIRemoveEmailAddresses:
     Type: String
     Description: Yes if all email addresses are to be removed.
     AllowedValues: ['Yes', 'No']
-    Default: 'Yes'
+    Default: 'No'
 
   WeeklyReport:
     Type: String
@@ -522,21 +505,41 @@ Parameters:
     AllowedValues: ['Yes', 'No']
     Default: 'Yes'
 
-  WeeklyReportChatGPTDefaultModel:
-    Type: String
-    Description: The GPT model to use by default for the weekly AI-based security report.
-    Default: 'gpt-4'
-
-  WeeklyReportChatGPTFallbackModel:
-    Type: String
-    Description: The GPT fallback model to use for the weekly AI-based security report.
-    Default: 'gpt-3.5-turbo-16k'
-
   WeeklyReportEmailRecipients:
     Type: String
     Description: The recipient or recipients of the weekly AI-based security report.
     Default: ''
 
+  ChatGPTDefaultModel:
+    Type: String
+    Description: The GPT model to use by default.
+    Default: 'gpt-4o'
+
+  ChatGPTFallbackModel:
+    Type: String
+    Description: The fallback GPT model.
+    Default: 'gpt-3.5-turbo-16k'
+
+  ChatGPTOrganizationIdParameterPath:
+    Type: String
+    Description: The ChatGPT Organization ID.
+    Default: '/soar/chatgpt/organization-id'
+
+  ChatGPTAPIKeyParameterPath:
+    Type: String
+    Description: The ChatGPT API key.
+    Default: '/soar/chatgpt/api-key'
+
+  BedrockRegion:
+    Type: String
+    Default: us-east-1
+    Description: The AWS region where Bedrock is available
+
+  BedrockModel:
+    Type: String
+    Description: The Bedrock model to use
+    Default: anthropic.claude-3-5-sonnet-20240620-v1:0
+             
 
   # Dashboard ------------------------------------------------------------------
 
@@ -930,16 +933,16 @@ Resources:
 
   #-------------------------------------------------------------------------------
   #
-  # The DynamoDB table containing OpenAI API prompts
+  # The DynamoDB table containing AI API prompts
   #
   #-------------------------------------------------------------------------------
 
-  OpenAIPromptsTable:
+  AIPromptsTable:
     Type: AWS::Serverless::SimpleTable
     Properties:
       SSESpecification:
         SSEEnabled: true
-      TableName: openai-prompts
+      TableName: ai-prompts
       PrimaryKey:
         Name: id
         Type: String
@@ -949,16 +952,16 @@ Resources:
 
   #-------------------------------------------------------------------------------
   #
-  # The DynamoDB table containing OpenAI report segments during report generation
+  # The DynamoDB table containing AI report segments during report generation
   #
   #-------------------------------------------------------------------------------
 
-  OpenAIReportTable:
+  AIReportTable:
     Type: AWS::Serverless::SimpleTable
     Properties:
       SSESpecification:
         SSEEnabled: true
-      TableName: openai-report
+      TableName: ai-report
       PrimaryKey:
         Name: id
         Type: String
@@ -1114,7 +1117,7 @@ Resources:
         CloseTicketFunctionArn: !GetAtt CloseTicketFunction.Arn
         ComputePenaltyScoreFunctionArn: !GetAtt ComputePenaltyScoreFunction.Arn
         SuppressLocallyFunctionArn: !GetAtt SuppressLocallyFunction.Arn
-        QueryChatGPTFunctionArn: !GetAtt QueryChatGPTFunction.Arn
+        QueryAIFunctionArn: !GetAtt QueryAIFunction.Arn
         RememberTicketOpenedFunctionArn: !GetAtt RememberTicketOpenedFunction.Arn
         RememberTicketClosedFunctionArn: !GetAtt RememberTicketClosedFunction.Arn
         RememberAutoRemediationDoneFunctionArn: !GetAtt RememberAutoRemediationDoneFunction.Arn
@@ -1125,7 +1128,7 @@ Resources:
         LocalControlAutoRemSuppressionsName: !Ref LocalControlAutoRemSuppressions
         TicketsName: !Ref Tickets
         CachedAccountDataName: !Ref CachedAccountData
-        OpenAIPromptsTableName: !Ref OpenAIPromptsTable
+        AIPromptsTableName: !Ref AIPromptsTable
         EnabledControlsName: !Ref EnabledControls
 
         SOAREnabled: !Ref SOAREnabled
@@ -1188,7 +1191,7 @@ Resources:
         - LambdaInvokePolicy:
             FunctionName: !Ref SuppressLocallyFunction
         - LambdaInvokePolicy:
-            FunctionName: !Ref QueryChatGPTFunction
+            FunctionName: !Ref QueryAIFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref RememberTicketOpenedFunction
         - LambdaInvokePolicy:
@@ -1209,7 +1212,7 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref CachedAccountData
         - DynamoDBCrudPolicy:
-            TableName: !Ref OpenAIPromptsTable
+            TableName: !Ref AIPromptsTable
         - DynamoDBReadPolicy:
             TableName: !Ref EnabledControls
 
@@ -1553,11 +1556,11 @@ Resources:
         Variables:
           CACHED_ACCOUNT_DATA_TABLE_NAME: !Ref CachedAccountData
 
-  QueryChatGPTFunction:
+  QueryAIFunction:
     Type: AWS::Serverless::Function
     MemorySize: 256
     Properties:
-      CodeUri: functions/chatgpt/query_chatgpt/
+      CodeUri: functions/ai/query_ai/
       Policies:
         - Statement:
             - 
@@ -1572,18 +1575,26 @@ Resources:
               Action:
                 - sns:Publish
               Resource: !Ref ExternalCallFailureSNSTopic
+            - 
+              Sid: BedrockPermissions
+              Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: '*'
       Environment:
         Variables:
-          USE_CHATGPT: !Ref UseChatGPT
+          AI_PROVIDER: !Ref AIProvider
+          AI_IAC_SNIPPETS: !Ref AIIaCSnippets
+          AI_ANONYMIZE_ACCOUNT_NUMBERS: !Ref AIAnonymizeAccountNumbers
+          AI_ANONYMIZE_HEX_STRINGS: !Ref AIAnonymizeHexStrings
+          AI_REMOVE_ARNS: !Ref AIRemoveARNs
+          AI_REMOVE_EMAIL_ADDRESSES: !Ref AIRemoveEmailAddresses
+          BEDROCK_REGION: !Ref BedrockRegion
+          BEDROCK_MODEL: !Ref BedrockModel
           CHATGPT_DEFAULT_MODEL: !Ref ChatGPTDefaultModel
           CHATGPT_FALLBACK_MODEL: !Ref ChatGPTFallbackModel
           CHATGPT_ORGANIZATION_ID_PARAMETER_PATH: !Ref ChatGPTOrganizationIdParameterPath
           CHATGPT_API_KEY_PARAMETER_PATH: !Ref ChatGPTAPIKeyParameterPath
-          CHATGPT_IAC_SNIPPETS: !Ref ChatGPTIaCSnippets
-          CHATGPT_ANONYMIZE_ACCOUNT_NUMBERS: !Ref ChatGPTAnonymizeAccountNumbers
-          CHATGPT_ANONYMIZE_HEX_STRINGS: !Ref ChatGPTAnonymizeHexStrings
-          CHATGPT_REMOVE_ARNS: !Ref ChatGPTRemoveARNs
-          CHATGPT_REMOVE_EMAIL_ADDRESSES: !Ref ChatGPTRemoveEmailAddresses
           SNS_TOPIC_ARN: !Ref ExternalCallFailureSNSTopic
 
 
@@ -2428,14 +2439,14 @@ Resources:
         SendEmailFunctionArn: !GetAtt SendEmailFunction.Arn
         OpenTicketFunctionArn: !GetAtt OpenTicketFunction.Arn
         SuppressLocallyFunctionArn: !GetAtt SuppressLocallyFunction.Arn
-        QueryChatGPTFunctionArn: !GetAtt QueryChatGPTFunction.Arn
+        QueryAIFunctionArn: !GetAtt QueryAIFunction.Arn
         RememberIncidentOpenedFunctionArn: !GetAtt RememberIncidentOpenedFunction.Arn
         ComputePenaltyScoreFunctionArn: !GetAtt ComputePenaltyScoreFunction.Arn
         SaveToSentinelFunctionArn: !GetAtt SaveToSentinelFunction.Arn
 
         LocalIncidentSuppressionsName: !Ref LocalIncidentSuppressions
         LocalIncidentAutoRemSuppressionsName: !Ref LocalIncidentAutoRemSuppressions
-        OpenAIPromptsTableName: !Ref OpenAIPromptsTable
+        AIPromptsTableName: !Ref AIPromptsTable
 
       Policies:
         - LambdaInvokePolicy:
@@ -2463,7 +2474,7 @@ Resources:
         - LambdaInvokePolicy:
             FunctionName: !Ref SuppressLocallyFunction
         - LambdaInvokePolicy:
-            FunctionName: !Ref QueryChatGPTFunction
+            FunctionName: !Ref QueryAIFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref RememberIncidentOpenedFunction
         - LambdaInvokePolicy:
@@ -2476,7 +2487,7 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref LocalIncidentAutoRemSuppressions
         - DynamoDBReadPolicy:
-            TableName: !Ref OpenAIPromptsTable
+            TableName: !Ref AIPromptsTable
             
         - Version: 2012-10-17
           Statement:
@@ -2653,7 +2664,7 @@ Resources:
         SetupAccountFunctionArn: !GetAtt SetupAccountFunction.Arn
         StoreAccountSummaryFunctionArn: !GetAtt StoreAccountSummaryFunction.Arn
         SetupRecommendationsSectionFunctionArn: !GetAtt SetupRecommendationsSectionFunction.Arn
-        QueryChatGPTFunctionArn: !GetAtt QueryChatGPTFunction.Arn
+        QueryAIFunctionArn: !GetAtt QueryAIFunction.Arn
         PostprocessHtmlFunctionArn: !GetAtt PostprocessHtmlFunction.Arn
         StitchTogetherSegmentsFunctionArn: !GetAtt StitchTogetherSegmentsFunction.Arn
         SendEmailFunctionArn: !GetAtt SendEmailFunction.Arn
@@ -2664,9 +2675,7 @@ Resources:
         WeeklyReportWeekNumbers: !Ref WeeklyReportWeekNumbers
         WeeklyReportIndividualAccounts: !Ref WeeklyReportIndividualAccounts
         WeeklyReportEmailRecipients: !Ref WeeklyReportEmailRecipients
-        OpenAIReportTable: !Ref OpenAIReportTable
-        WeeklyReportChatGPTDefaultModel: !Ref WeeklyReportChatGPTDefaultModel
-        WeeklyReportChatGPTFallbackModel: !Ref WeeklyReportChatGPTFallbackModel
+        AIReportTable: !Ref AIReportTable
 
       Policies:
         - LambdaInvokePolicy:
@@ -2680,7 +2689,7 @@ Resources:
         - LambdaInvokePolicy:
             FunctionName: !Ref SetupRecommendationsSectionFunction
         - LambdaInvokePolicy:
-            FunctionName: !Ref QueryChatGPTFunction
+            FunctionName: !Ref QueryAIFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref PostprocessHtmlFunction
         - LambdaInvokePolicy:
@@ -2690,7 +2699,7 @@ Resources:
         - LambdaInvokePolicy:
             FunctionName: !Ref SetupToSendToAccountFunction
         - DynamoDBCrudPolicy:
-            TableName: !Ref OpenAIReportTable
+            TableName: !Ref AIReportTable
         - Version: 2012-10-17
           Statement:
             - Effect: Allow
@@ -2727,10 +2736,10 @@ Resources:
                 - dynamodb:Scan
                 - dynamodb:DeleteItem
               Resource: 
-                - !GetAtt OpenAIReportTable.Arn
+                - !GetAtt AIReportTable.Arn
       Environment:
         Variables:
-          OPENAI_REPORT_TABLE: !Ref OpenAIReportTable
+          AI_REPORT_TABLE: !Ref AIReportTable
 
 
   SetupOverviewSectionFunction:
@@ -2761,7 +2770,7 @@ Resources:
                 - !Sub "${AutoRemediations.Arn}/index/*"
                 - !GetAtt Incidents.Arn
                 - !Sub "${Incidents.Arn}/index/*"
-                - !GetAtt OpenAIPromptsTable.Arn
+                - !GetAtt AIPromptsTable.Arn
             - Sid: SecurityHubPermissions
               Effect: Allow
               Action:
@@ -2772,9 +2781,9 @@ Resources:
         Variables:
           ACCOUNT_TEAM_EMAIL_TAG_APP: !Ref AccountTeamEmailTagApp
           ACCOUNT_TEAM_EMAIL_TAG: !Ref AccountTeamEmailTag
+          AI_PROMPTS_TABLE: !Ref AIPromptsTable
           AUTOREMEDIATIONS_TABLE: !Ref AutoRemediations
           CLIENT_TAG: !Ref ClientTag
-          PRODUCT_NAME: !Ref ProductName
           CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
           DEFAULT_TEAM_EMAIL: !Ref DefaultTeamEmail
           ENVIRONMENT_TAG: !Ref EnvironmentTag
@@ -2782,7 +2791,7 @@ Resources:
           JIRA_DEFAULT_PROJECT_KEY: !Ref JiraDefaultProjectKey
           JIRA_PROJECT_KEY_TAG_APP: !Ref JiraProjectKeyTagApp
           JIRA_PROJECT_KEY_TAG: !Ref JiraProjectKeyTag
-          OPENAI_PROMPTS_TABLE: !Ref OpenAIPromptsTable
+          PRODUCT_NAME: !Ref ProductName
           PROJECT_TAG: !Ref ProjectTag
           SERVICE_NOW_DEFAULT_PROJECT_QUEUE: !Ref ServiceNowDefaultProjectQueue
           SERVICE_NOW_PROJECT_QUEUE_TAG_APP: !Ref ServiceNowProjectQueueTagApp
@@ -2814,12 +2823,12 @@ Resources:
                 - !Sub "${AutoRemediations.Arn}/index/*"
                 - !GetAtt Incidents.Arn
                 - !Sub "${Incidents.Arn}/index/*"
-                - !GetAtt OpenAIPromptsTable.Arn
+                - !GetAtt AIPromptsTable.Arn
       Environment:
         Variables:
           AUTOREMEDIATIONS_TABLE: !Ref AutoRemediations
           INCIDENTS_TABLE: !Ref Incidents
-          OPENAI_PROMPTS_TABLE: !Ref OpenAIPromptsTable
+          AI_PROMPTS_TABLE: !Ref AIPromptsTable
           SEVERITY_ALLOWED_AGE_IN_HOURS_CRITICAL: !Ref SeverityAllowedAgeInHoursCritical
           SEVERITY_ALLOWED_AGE_IN_HOURS_HIGH: !Ref SeverityAllowedAgeInHoursHigh
           SEVERITY_ALLOWED_AGE_IN_HOURS_LOW: !Ref SeverityAllowedAgeInHoursLow
@@ -2841,10 +2850,10 @@ Resources:
                 - dynamodb:PutItem
                 - dynamodb:UpdateItem
               Resource: 
-                - !GetAtt OpenAIReportTable.Arn
+                - !GetAtt AIReportTable.Arn
       Environment:
         Variables:
-          OPENAI_REPORT_TABLE: !Ref OpenAIReportTable
+          AI_REPORT_TABLE: !Ref AIReportTable
 
 
   SetupToSendToAccountFunction:
@@ -2865,12 +2874,12 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:Query
               Resource: 
-                - !GetAtt OpenAIPromptsTable.Arn
-                - !GetAtt OpenAIReportTable.Arn
+                - !GetAtt AIPromptsTable.Arn
+                - !GetAtt AIReportTable.Arn
       Environment:
         Variables:
-          OPENAI_PROMPTS_TABLE: !Ref OpenAIPromptsTable
-          OPENAI_REPORT_TABLE: !Ref OpenAIReportTable
+          AI_PROMPTS_TABLE: !Ref AIPromptsTable
+          AI_REPORT_TABLE: !Ref AIReportTable
 
 
   PostprocessHtmlFunction:
@@ -2891,7 +2900,7 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:Query
               Resource: 
-                - !GetAtt OpenAIReportTable.Arn
+                - !GetAtt AIReportTable.Arn
             - Sid: S3BucketCRUDPermissions
               Effect: Allow
               Action:
@@ -2904,7 +2913,7 @@ Resources:
                 - !Sub arn:aws:s3:::${SOARWeeklyAIReportBucket}    # For bucket-level actions like ListBucket
       Environment:
         Variables:
-          OPENAI_REPORT_TABLE: !Ref OpenAIReportTable
+          AI_REPORT_TABLE: !Ref AIReportTable
           BUCKET: !Ref SOARWeeklyAIReportBucket
 
 
@@ -3298,26 +3307,29 @@ Resources:
 
   #-------------------------------------------------------------------------------
   #
-  # Custom resource to maintain the OpenAiPrompts table
+  # Custom resource to maintain the AI prompts table
   #
   #-------------------------------------------------------------------------------
 
-  OpenAIPromptsSyncerFunction:
+  AIPromptsSyncerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/chatgpt/openai-prompts-syncer/
+      CodeUri: functions/ai/ai-prompts-syncer/
       Handler: app.lambda_handler
       Timeout: 30
       Policies:
         - DynamoDBCrudPolicy:
-            TableName: !Ref OpenAIPromptsTable
+            TableName: !Ref AIPromptsTable
+      Environment:
+        Variables:
+          AI_PROMPTS_TABLE: !Ref AIPromptsTable
 
-  OpenAIPromptsSyncerCustomResource:
+  AIPromptsSyncerCustomResource:
     Type: AWS::CloudFormation::CustomResource
     Properties:
-      ServiceToken: !GetAtt OpenAIPromptsSyncerFunction.Arn
-      FunctionName: !Ref OpenAIPromptsSyncerFunction
-      DummyProperty: 'frfefr'  # Change this value whenever openai-prompts changes
+      ServiceToken: !GetAtt AIPromptsSyncerFunction.Arn
+      FunctionName: !Ref AIPromptsSyncerFunction
+      DummyProperty: 'efewf'  # Change this value whenever ai-prompts changes
       
 
   #-------------------------------------------------------------------------------
@@ -4080,7 +4092,7 @@ Resources:
                 "title": "AI query execution time",
                 "metrics": [
                     [ "AWS/States", "LambdaFunctionRunTime", 
-                      "LambdaFunctionArn", "${QueryChatGPTFunction.Arn}", 
+                      "LambdaFunctionArn", "${QueryAIFunction.Arn}", 
                       { "region": "${AWS::Region}" } ]
                 ],
                 "view": "timeSeries",
