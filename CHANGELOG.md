@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.17.1
+    * Auto-remediations for ELB.1 and ELB.4 updated to cater for changes in ASFF format for these events.
+
 ## v1.17.0
     * Bedrock supported as the (enabled) default. OpenAI is still available.
 

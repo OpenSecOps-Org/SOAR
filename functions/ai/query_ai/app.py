@@ -36,11 +36,10 @@ SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
 # Initialize the SNS client
 sns_client = boto3.client('sns')
 
-# Create a boto3 client for SSM
-ssm_client = boto3.client('ssm')
-
 # Conditional client initialization
 if AI_PROVIDER == 'OPENAI':
+    # Create a boto3 client for SSM
+    ssm_client = boto3.client('ssm')
     # Get the OpenAI parameters from SSM
     openai_organization = ssm_client.get_parameter(Name=CHATGPT_ORGANIZATION_ID_PARAMETER_PATH)['Parameter']['Value']
     openai_api_key = ssm_client.get_parameter(Name=CHATGPT_API_KEY_PARAMETER_PATH)['Parameter']['Value']

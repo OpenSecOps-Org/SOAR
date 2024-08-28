@@ -17,14 +17,9 @@ def lambda_handler(data, _context):
     account_id = finding['AwsAccountId']
     resource = finding['Resources'][0]
     region = resource['Region']
-    elb_type = resource['Type']
-
     alb_arn = resource['Id']
-    alb_dns_name = resource['Details'][elb_type]['DNSName']
-    alb_name = alb_dns_name.split('.')[0][0:50]
 
-    print(f"alb_dns_name: {alb_dns_name}")
-    print(f"alb_name: {alb_name}")
+    print(f"alb_arn: {alb_arn}")
 
     elbv2_client = get_client('elbv2', account_id, region)
 
