@@ -1,5 +1,10 @@
 # Change Log
 
+## v1.17.2
+    * When the system is flooded with incidents, for instance after generating CVE vulnerabilities, the
+      Suppress Findings lambda can overburden the ASFF update API on AWS. Increased the number of retries
+      from 25 to 250, with larger backoff and interval.
+
 ## v1.17.1
     * Auto-remediations for ELB.1 and ELB.4 updated to cater for changes in ASFF format for these events.
 
