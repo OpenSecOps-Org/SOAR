@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.17.3
+    * Increased the number of retries for Suppress Findings further.
+
 ## v1.17.2
     * When the system is flooded with incidents, for instance after generating CVE vulnerabilities, the
       Suppress Findings lambda can overburden the ASFF update API on AWS. Increased the number of retries

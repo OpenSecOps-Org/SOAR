@@ -527,7 +527,7 @@ States:
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
                     - TooManyRequestsException
-                IntervalSeconds: 5
-                MaxAttempts: 250
-                BackoffRate: 5
+                IntervalSeconds: 10
+                MaxAttempts: 1000
+                BackoffRate: 3
         End: true
