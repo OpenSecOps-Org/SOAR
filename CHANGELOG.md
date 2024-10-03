@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.18.0
+    * AI prompt work to improve the appearance of numbered lists.
+
 ## v1.17.3
     * Increased the number of retries for Suppress Findings further.
 

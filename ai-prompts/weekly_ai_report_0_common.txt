@@ -15,6 +15,7 @@ The output is HTML.
 - Never use <h2> or <h1>.
 - Do not add any plaintext comments. 
 - Never wrap anything in ```html and ``` - everything is already HTML.
+- When outputting a numbered list, make sure each item is on a separate line, but do not insert an extra blank line between each item. For instance, "The affected topics are: 1. xxxx 2. yyyy 3. zzzz" should be output as "The affected topics are:<ol><li>xxxx</li><li>yyyy</li><li>zzzz</li></ol>".
 
 [INPUT]
 The user input is a JSON structure containing the information you need. 
