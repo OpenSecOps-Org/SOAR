@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.18.2
+    * Throttling handled for possibly overloaded Bedrock.
+
+## v1.18.1
+    * Added file processing info log message
+
 ## v1.18.0
     * AI prompt work to improve the appearance of numbered lists.
 

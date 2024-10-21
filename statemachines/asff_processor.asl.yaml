@@ -449,8 +449,9 @@ States:
                 ErrorEquals:
                     - Lambda.TooManyRequestsException
                     - Lambda.ServiceException
-                IntervalSeconds: 5
-                MaxAttempts: 5
+                    - ThrottlingException
+                IntervalSeconds: 10
+                MaxAttempts: 25
                 BackoffRate: 2
         Catch:
             -   
@@ -461,6 +462,7 @@ States:
                 ErrorEquals:
                     - Lambda.TooManyRequestsException
                     - Lambda.ServiceException
+                    - ThrottlingException
                 Next: Send Ticketing Email
             -   
                 ErrorEquals:
@@ -600,8 +602,9 @@ States:
                 ErrorEquals:
                     - Lambda.TooManyRequestsException
                     - Lambda.ServiceException
-                IntervalSeconds: 5
-                MaxAttempts: 5
+                    - ThrottlingException
+                IntervalSeconds: 10
+                MaxAttempts: 25
                 BackoffRate: 2
         Catch:
             -   
@@ -612,6 +615,7 @@ States:
                 ErrorEquals:
                     - Lambda.TooManyRequestsException
                     - Lambda.ServiceException
+                    - ThrottlingException
                 Next: Send Remediation Email
             -   
                 ErrorEquals:
@@ -801,8 +805,9 @@ States:
                 ErrorEquals:
                     - Lambda.TooManyRequestsException
                     - Lambda.ServiceException
-                IntervalSeconds: 5
-                MaxAttempts: 5
+                    - ThrottlingException
+                IntervalSeconds: 10
+                MaxAttempts: 25
                 BackoffRate: 2
         Catch:
             -   
@@ -813,6 +818,7 @@ States:
                 ErrorEquals:
                     - Lambda.TooManyRequestsException
                     - Lambda.ServiceException
+                    - ThrottlingException
                 Next: Send Ticket Closed Email
             -   
                 ErrorEquals:

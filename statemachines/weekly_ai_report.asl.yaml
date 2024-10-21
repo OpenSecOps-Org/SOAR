@@ -70,8 +70,9 @@ States:
         ErrorEquals:
           - Lambda.TooManyRequestsException
           - Lambda.ServiceException
-        IntervalSeconds: 5
-        MaxAttempts: 5
+          - ThrottlingException
+        IntervalSeconds: 10
+        MaxAttempts: 25
         BackoffRate: 2
     Catch:
       -   
@@ -82,6 +83,7 @@ States:
         ErrorEquals:
           - Lambda.TooManyRequestsException
           - Lambda.ServiceException
+          - ThrottlingException
         Next: Postprocess Overview Section
       -   
         ErrorEquals:
@@ -146,8 +148,9 @@ States:
               ErrorEquals:
                 - Lambda.TooManyRequestsException
                 - Lambda.ServiceException
-              IntervalSeconds: 5
-              MaxAttempts: 5
+                - ThrottlingException
+              IntervalSeconds: 10
+              MaxAttempts: 25
               BackoffRate: 2
           Catch:
             -   
@@ -158,6 +161,7 @@ States:
               ErrorEquals:
                 - Lambda.TooManyRequestsException
                 - Lambda.ServiceException
+                - ThrottlingException
               Next: Store Account Segment Summary
             -   
               ErrorEquals:
@@ -273,8 +277,9 @@ States:
         ErrorEquals:
           - Lambda.TooManyRequestsException
           - Lambda.ServiceException
-        IntervalSeconds: 5
-        MaxAttempts: 5
+          - ThrottlingException
+        IntervalSeconds: 10
+        MaxAttempts: 25
         BackoffRate: 2
     Catch:
       -   
@@ -285,6 +290,7 @@ States:
         ErrorEquals:
           - Lambda.TooManyRequestsException
           - Lambda.ServiceException
+          - ThrottlingException
         Next: Postprocess Recommendations Section
       -   
         ErrorEquals:
