@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.19.0
+    * AWS Bedrock service failures and throttling after the timeout now sends the email without AI enhancements.
+
 ## v1.18.2
     * Throttling handled for possibly overloaded Bedrock.
 

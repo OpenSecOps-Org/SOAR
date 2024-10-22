@@ -390,7 +390,7 @@ States:
     AddAiDataForAppIncident:
         Type: Task
         Resource: '${QueryAIFunctionArn}'
-        TimeoutSeconds: 600
+        TimeoutSeconds: 120
         Retry:
             -
                 ErrorEquals:
@@ -399,22 +399,12 @@ States:
                     - ThrottlingException
                 IntervalSeconds: 10
                 MaxAttempts: 25
-                BackoffRate: 2
+                BackoffRate: 1.5
         Catch:
             -   
                 ErrorEquals:
                     - States.Timeout
-                Next: Send APP email
-            -   
-                ErrorEquals:
-                    - Lambda.TooManyRequestsException
-                    - Lambda.ServiceException
-                    - ThrottlingException
-                Next: Send APP email
-            -   
-                ErrorEquals:
-                -   States.ALL
-                ResultPath: "$.ai-error-info"
+                ResultPath: null
                 Next: Send APP email
         Next: Send APP email
 
@@ -468,7 +458,7 @@ States:
     AddAiDataForInfraIncident:
         Type: Task
         Resource: '${QueryAIFunctionArn}'
-        TimeoutSeconds: 600
+        TimeoutSeconds: 120
         Retry:
             -
                 ErrorEquals:
@@ -477,22 +467,12 @@ States:
                     - ThrottlingException
                 IntervalSeconds: 10
                 MaxAttempts: 25
-                BackoffRate: 2
+                BackoffRate: 1.5
         Catch:
             -   
                 ErrorEquals:
                     - States.Timeout
-                Next: Send INFRA email
-            -   
-                ErrorEquals:
-                    - Lambda.TooManyRequestsException
-                    - Lambda.ServiceException
-                    - ThrottlingException
-                Next: Send INFRA email
-            -   
-                ErrorEquals:
-                -   States.ALL
-                ResultPath: "$.ai-error-info"
+                ResultPath: null
                 Next: Send INFRA email
         Next: Send INFRA email
 

@@ -66,30 +66,14 @@ States:
     Resource: '${QueryAIFunctionArn}'
     TimeoutSeconds: 900
     Retry:
-      -
-        ErrorEquals:
-          - Lambda.TooManyRequestsException
-          - Lambda.ServiceException
-          - ThrottlingException
-        IntervalSeconds: 10
-        MaxAttempts: 25
-        BackoffRate: 2
-    Catch:
-      -   
-        ErrorEquals:
-          - States.Timeout
-        Next: Postprocess Overview Section
-      -   
-        ErrorEquals:
-          - Lambda.TooManyRequestsException
-          - Lambda.ServiceException
-          - ThrottlingException
-        Next: Postprocess Overview Section
-      -   
-        ErrorEquals:
-          - States.ALL
-        ResultPath: "$.ai-error-info"
-        Next: AIFailState
+        -
+            ErrorEquals:
+                - Lambda.TooManyRequestsException
+                - Lambda.ServiceException
+                - ThrottlingException
+            IntervalSeconds: 10
+            MaxAttempts: 25
+            BackoffRate: 1.5
     Next: Postprocess Overview Section
 
   Postprocess Overview Section:
@@ -111,7 +95,7 @@ States:
     Next: Account Segments
 
   Account Segments:
-    Type: Map
+    Type: Map 
     MaxConcurrency: 1
     ItemsPath: $.bb.accounts_with_issues
     ItemSelector:
@@ -140,35 +124,19 @@ States:
           Next: Create Account Segment
 
         Create Account Segment:
-          Type: Task
-          Resource: '${QueryAIFunctionArn}'
-          TimeoutSeconds: 900
-          Retry:
-            -
-              ErrorEquals:
-                - Lambda.TooManyRequestsException
-                - Lambda.ServiceException
-                - ThrottlingException
-              IntervalSeconds: 10
-              MaxAttempts: 25
-              BackoffRate: 2
-          Catch:
-            -   
-              ErrorEquals:
-                - States.Timeout
-              Next: Store Account Segment Summary
-            -   
-              ErrorEquals:
-                - Lambda.TooManyRequestsException
-                - Lambda.ServiceException
-                - ThrottlingException
-              Next: Store Account Segment Summary
-            -   
-              ErrorEquals:
-                - States.ALL
-              ResultPath: "$.ai-error-info"
-              Next: AIFailStateAccountSegment
-          Next: Store Account Segment Summary
+            Type: Task
+            Resource: '${QueryAIFunctionArn}'
+            TimeoutSeconds: 900
+            Retry:
+                -
+                    ErrorEquals:
+                        - Lambda.TooManyRequestsException
+                        - Lambda.ServiceException
+                        - ThrottlingException
+                    IntervalSeconds: 10
+                    MaxAttempts: 25
+                    BackoffRate: 1.5
+            Next: Store Account Segment Summary
 
         Store Account Segment Summary:
           Type: Task
@@ -245,10 +213,6 @@ States:
         Account Done:
           Type: Succeed
 
-        AIFailStateAccountSegment:
-          Type: Fail
-          Cause: "The call to the GenAI API failed. See $.ai-error-info for more details."
-
     Next: Setup Recommendations Section
 
   Setup Recommendations Section:
@@ -274,29 +238,13 @@ States:
     TimeoutSeconds: 900
     Retry:
       -
-        ErrorEquals:
-          - Lambda.TooManyRequestsException
-          - Lambda.ServiceException
-          - ThrottlingException
-        IntervalSeconds: 10
-        MaxAttempts: 25
-        BackoffRate: 2
-    Catch:
-      -   
-        ErrorEquals:
-          - States.Timeout
-        Next: Postprocess Recommendations Section
-      -   
-        ErrorEquals:
-          - Lambda.TooManyRequestsException
-          - Lambda.ServiceException
-          - ThrottlingException
-        Next: Postprocess Recommendations Section
-      -   
-        ErrorEquals:
-          - States.ALL
-        ResultPath: "$.ai-error-info"
-        Next: AIFailState
+          ErrorEquals:
+              - Lambda.TooManyRequestsException
+              - Lambda.ServiceException
+              - ThrottlingException
+          IntervalSeconds: 10
+          MaxAttempts: 25
+          BackoffRate: 1.5
     Next: Postprocess Recommendations Section
 
   Postprocess Recommendations Section:
@@ -356,7 +304,3 @@ States:
 
   Succeed:
     Type: Succeed
-
-  AIFailState:
-    Type: Fail
-    Cause: "The call to the GenAI API failed. See $.ai-error-info for more details."

@@ -452,22 +452,12 @@ States:
                     - ThrottlingException
                 IntervalSeconds: 10
                 MaxAttempts: 25
-                BackoffRate: 2
+                BackoffRate: 1.5
         Catch:
             -   
                 ErrorEquals:
                     - States.Timeout
-                Next: Send Ticketing Email
-            -   
-                ErrorEquals:
-                    - Lambda.TooManyRequestsException
-                    - Lambda.ServiceException
-                    - ThrottlingException
-                Next: Send Ticketing Email
-            -   
-                ErrorEquals:
-                -   States.ALL
-                ResultPath: "$.ai-error-info"
+                ResultPath: null
                 Next: Send Ticketing Email
         Next: Send Ticketing Email
 
@@ -605,22 +595,12 @@ States:
                     - ThrottlingException
                 IntervalSeconds: 10
                 MaxAttempts: 25
-                BackoffRate: 2
+                BackoffRate: 1.5
         Catch:
             -   
                 ErrorEquals:
                     - States.Timeout
-                Next: Send Remediation Email
-            -   
-                ErrorEquals:
-                    - Lambda.TooManyRequestsException
-                    - Lambda.ServiceException
-                    - ThrottlingException
-                Next: Send Remediation Email
-            -   
-                ErrorEquals:
-                -   States.ALL
-                ResultPath: "$.ai-error-info"
+                ResultPath: null
                 Next: Send Remediation Email
         Next: Send Remediation Email
 
@@ -808,22 +788,12 @@ States:
                     - ThrottlingException
                 IntervalSeconds: 10
                 MaxAttempts: 25
-                BackoffRate: 2
+                BackoffRate: 1.5
         Catch:
             -   
                 ErrorEquals:
                     - States.Timeout
-                Next: Send Ticket Closed Email
-            -   
-                ErrorEquals:
-                    - Lambda.TooManyRequestsException
-                    - Lambda.ServiceException
-                    - ThrottlingException
-                Next: Send Ticket Closed Email
-            -   
-                ErrorEquals:
-                -   States.ALL
-                ResultPath: "$.ai-error-info"
+                ResultPath: null
                 Next: Send Ticket Closed Email
         Next: Send Ticket Closed Email
 
