@@ -1,5 +1,6 @@
 import os
 import boto3
+from botocore.exceptions import ClientError
 
 # Get the table name and cross-account role from environment variables
 TABLE_NAME = os.environ['TABLE_NAME']
@@ -15,11 +16,20 @@ def lambda_handler(data, _context):
     account_id = data.get('account_id')
     if not account_id:
         raise ValueError("Account ID not provided in input data")
-
-    # Get the Security Hub client for the provided account ID
-    sec_hub_client = get_client('securityhub', account_id)
     
-    # Get the enabled standards for the security account
+    try:
+        # Get the Security Hub client for the provided account ID
+        sec_hub_client = get_client('securityhub', account_id)
+    except ClientError as error:
+        # Check if the exception is an AccessDenied error
+        if error.response.get("Error", {}).get("Code") == "AccessDenied":
+            print(f"Access denied for account {account_id} - skipping")
+            return True
+        raise  # Re-raise the error if it's not AccessDenied
+
+    print(f"Processing account {account_id}...")
+
+    # Get the enabled standards for the account
     global_enabled_standards = get_enabled_standards(sec_hub_client)
     
     # Get the security controls for the enabled standards
