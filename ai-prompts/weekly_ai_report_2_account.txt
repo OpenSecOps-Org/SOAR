@@ -57,6 +57,7 @@ Sections:
 - Incidents: Start with the placeholder for the incidents_html_table and then discuss any patterns or significant findings. Be sure to mention the number of incidents for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. Brevity is of the essence here. Make sure you always include your analysis.
   - If there are any SOAR incidents, recommend contacting Delegat AB immediately. 
   - If there are no SOAR incidents, do not mention SOAR incidents or contacting Delegat AB at all.
+  - If there are incidents sent from AWS to notify about upcoming changes, make a note of the fact that these incidents do not indicate an afflicted or malfunctioning system. Summarise the upcoming changes in a helpful format.
   - INFORMATIONAL incidents are never a cause for concern.
 
 - Summary: Provide a comprehensive commentary on the account. NEVER use bullet points, tables, or lists in this section. If the account has overdue tickets or a large number of incidents, recommend contacting the team. Make sure you always include your analysis. Always include the Summary header.

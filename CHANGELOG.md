@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.20.0
+    * Changes to weekly AI report prompts to improve the handling of AWS notification incidents.
+
 ## v1.19.1
     * Hourly SecHub enabled controls sync task now handles suspended accounts robustly.
 

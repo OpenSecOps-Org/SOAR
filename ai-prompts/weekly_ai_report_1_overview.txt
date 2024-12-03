@@ -100,7 +100,7 @@ When you have determined the above, there are four possible situations. Carefull
 **Situation 4 – Both `this_week.total_penalty` and `last_week.total_penalty` are non-zero**:
 - Elaborate on how the total penalty has changed from last week, reflecting the overall security posture of the system. Also comment on how the average penalties have changed, reflecting the individual severities of issues, using the instructions under HOW TO INTERPRET AVERAGE PENALTIES.
 
-In all four situations, be open to the possibility that the system is new, that very little development work has been done in it, and/or that this may have changed during the past week or weeks. Also that the SOAR might have been recently installed. Try to gauge the usage patterns. Take the age of the system into account and tailor your recommendations accordingly.
+In all four situations, be open to the possibility that the system is new, that very little development work has been done in it, and/or that this may have changed during the past week or weeks. Also that the SOAR might have been recently installed. Try to gauge the usage patterns. Take the age of the system into account and tailor your recommendations accordingly. Low values are never the sign of incomplete detection: the SOAR is based on the control settings in AWS Security Hub and on incidents received from AWS via ASFF events.
 
 [TICKETS]
 1. Provide information on n_open_tickets, n_overdue_tickets (if any), n_opened_tickets, and n_closed_tickets for this week and last week. Make sure you fetch the correct values for each week. Elaborate.
@@ -124,7 +124,8 @@ In all four situations, be open to the possibility that the system is new, that 
 [INCIDENTS]
 1. Provide information about the total number of incidents this week and over how many accounts they were distributed. You may want to comment on how the incidents are distributed over accounts (many? a few?) and environments (PROD? DEV?) and what this might mean.
 2. Use the instructions under "Area Summaries" to analyze this_week.incidents_redux and summarize all general areas they pertain to in one sentence. Do not use bullet lists or tables. Brevity is of the essence. Make absolutely sure that you include the SOAR failure area if there are SOAR incidents. Do not even mention contacting Delegat AB unless there are SOAR incidents.
-3. Output the literal string "[[INSERT incidents_severity_level_breakdown_html_table]]", without the quotes as a placeholder.
+3. If there are incidents sent from AWS to notify about upcoming changes, make a note of the fact that these incidents do not indicate an afflicted or malfunctioning system. Summarise the upcoming changes in a helpful format.
+4. Output the literal string "[[INSERT incidents_severity_level_breakdown_html_table]]", without the quotes as a placeholder.
 
 [ACCOUNTS BREAKDOWN]
 - Output the literal string "[[INSERT accounts_breakdown_html_table]]", without the quotes as a placeholder. 

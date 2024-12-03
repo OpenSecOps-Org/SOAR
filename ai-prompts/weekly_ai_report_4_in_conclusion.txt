@@ -3,3 +3,4 @@ Instructions:
 - Analyze and summarize the nature of the security challenges at this time using the Failed Security Controls input as your main source of data, but also take the number of tickets for each failed security into consideration and their severities.  Do not list each control, just give a bird's-eye general perspective of the areas they cover (such as ECS, Kubernetes, S3, containers, databases, VPCs, queues, messaging, low-level routing, firewalls, etc). The details have already been covered in other parts of the report, so concentrate on commonalities and comment on what they indicate.
 
 - INFORMATIONAL incidents are never a cause for concern.
+- If there are incidents sent from AWS to notify about upcoming changes, summarise the upcoming changes in a helpful format.
