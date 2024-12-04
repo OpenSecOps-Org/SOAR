@@ -59,14 +59,20 @@ def lambda_handler(data, _context):
     s3_client = get_client('s3', account_id, region)
     elbv2_client = get_client('elbv2', account_id, region)
 
-    print(f"Creating bucket '{bucket_name}'...")
-    response = s3_client.create_bucket(
-        Bucket=bucket_name,
-        CreateBucketConfiguration={
-            'LocationConstraint': region,
-        },
-    )
-    print(response)
+    try:
+        print(f"Creating bucket '{bucket_name}'...")
+        response = s3_client.create_bucket(
+            Bucket=bucket_name,
+            CreateBucketConfiguration={
+                'LocationConstraint': region,
+            },
+        )
+        print(response)
+    except s3_client.exceptions.BucketAlreadyExists:
+        print(f"Warning: The bucket '{bucket_name}' already exists.")
+    except s3_client.exceptions.BucketAlreadyOwnedByYou:
+        print(f"Warning: Bucket '{bucket_name}' is already owned by you.")
+
 
     print(f"Enabling versioning for bucket '{bucket_name}'...")
     response = s3_client.put_bucket_versioning(

@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.20.1
+    * Edge case for recreated S3 log bucket handled.
+
 ## v1.20.0
     * Changes to weekly AI report prompts to improve the handling of AWS notification incidents.
 
