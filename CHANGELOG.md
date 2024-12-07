@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.21.0
+    * For Anthropic Claude, removed the top_k parameter. Now only using a temperature of 0.3 which is
+      optimal in this context.
+
 ## v1.20.1
     * Edge case for recreated S3 log bucket handled.
 

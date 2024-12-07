@@ -125,7 +125,7 @@ def call_bedrock_api(model, system_text, user_text):
             "max_tokens": 8192,
             "messages": messages,
             "temperature": 0.3,
-            "top_p": 0.7,
+            # "top_p": 0.7,
             "top_k": 250
         })
 
