@@ -3329,7 +3329,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt AIPromptsSyncerFunction.Arn
       FunctionName: !Ref AIPromptsSyncerFunction
-      DummyProperty: 'eufygvlks'  # Change this value whenever ai-prompts changes
+      DummyProperty: 'eiuiyugq'  # Change this value whenever ai-prompts changes
       
 
   #-------------------------------------------------------------------------------

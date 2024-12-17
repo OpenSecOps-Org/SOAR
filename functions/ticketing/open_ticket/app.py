@@ -182,7 +182,8 @@ def use_jira(data, project_id):
 def nonexistent_jira_project(jira, project_key):
     try:
         jira.project(project_key)
-    except JIRAError:
+    except JIRAError as err:
+        print(f"ERROR: JIRA error at initial check for nonexistence: {err}")
         return True
     return False
 
@@ -193,8 +194,7 @@ def transition_to_initial_jira_state(jira, issue, ticket_id):
         try:
             jira.transition_issue(issue, state)
         except JIRAError as err:
-            print(
-                f"ERROR: Could not transition issue {ticket_id} to '{state}': {err}.")
+            print(f"ERROR: Could not transition issue {ticket_id} to '{state}': {err}.")
             continue
         print(f"Ticket {ticket_id} transitioned to state '{state}'.")
         return

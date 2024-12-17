@@ -16,11 +16,12 @@
 - A sudden rise in incidents, especially in the production environment, is a sign that needs investigation.
 
 [HOW TO IDENTIFY SOAR INCIDENTS]
-- SOAR incidents can be identified by all of the following being true:
+- SOAR incidents can be identified by ALL of the following being true:
   1. The account name is the same as the value of 'global_data.aws_organization_administrative_account_name'.
   2. Its IncidentType must be exactly "Software and Configuration Checks/CloudWatch Alarms/soar-cloudwatch-alarms".
   3. Its IncidentType may NOT contain "SOAR Incidents".
   4. Its Title or Description must contain the substring "SOAR".
+  5. INFORMATIONAL incidents of Load Balancer log buckets being detected are never SOAR incidents.
 
 [AREA SUMMARIES: HOW TO ACCURATELY SUMMARIZE YOUR FINDINGS]
 - Purpose: Extract main "areas" from this week's open tickets, autoremediations, and incidents for a high-level summary, not a detailed report.
@@ -47,7 +48,7 @@
     * "User access in database ..." ➞ "user access".
     * "Password reset policies need ..." ➞ "password reset".
   * NEVER quote the original title in full.
-  * Always include "SOAR failures" if SOAR incidents are present.
+  * ONLY include "SOAR failures" if real SOAR incidents are present, as identified under [HOW TO IDENTIFY SOAR INCIDENTS].
 
 5. Things to Avoid:
   * Do NOT mention severities.

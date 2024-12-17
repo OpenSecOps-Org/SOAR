@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.21.1
+    * Prompt update for weekly report.
+
 ## v1.21.0
     * For Anthropic Claude, removed the top_k parameter. Now only using a temperature of 0.3 which is
       optimal in this context.
