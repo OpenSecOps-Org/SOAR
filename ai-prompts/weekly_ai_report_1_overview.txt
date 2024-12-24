@@ -15,8 +15,10 @@
 - Incidents are not related to tickets or autoremediations.
 - A sudden rise in incidents, especially in the production environment, is a sign that needs investigation.
 
-[HOW TO IDENTIFY SOAR FAILURES]
+[SOAR FAILURES]
 - An incident is a SOAR failure only if its field 'SOARFailure' is true.
+- a SOAR failure indicates that some component of Delegat SOAR has malfunctioned.
+- SOAR failures only happen in the organisational account.
 
 [AREA SUMMARIES: HOW TO ACCURATELY SUMMARIZE YOUR FINDINGS]
 - Purpose: Extract main "areas" from this week's open tickets, autoremediations, and incidents for a high-level summary, not a detailed report.
@@ -43,7 +45,7 @@
     * "User access in database ..." ➞ "user access".
     * "Password reset policies need ..." ➞ "password reset".
   * NEVER quote the original title in full.
-  * ONLY include "SOAR failures" if real SOAR faiilures are present, as identified under [HOW TO IDENTIFY SOAR FAILURES].
+  * ONLY include "SOAR failures" if real SOAR failures are present, as outlined under [SOAR FAILURES].
 
 5. Things to Avoid:
   * Do NOT mention severities.
@@ -119,7 +121,7 @@ In all four situations, be open to the possibility that the system is new, that 
 
 [INCIDENTS]
 1. Provide information about the total number of incidents this week and over how many accounts they were distributed. You may want to comment on how the incidents are distributed over accounts (many? a few?) and environments (PROD? DEV?) and what this might mean.
-2. Use the instructions under "Area Summaries" to analyze this_week.incidents_redux and summarize all general areas they pertain to in one sentence. Do not use bullet lists or tables. Brevity is of the essence. Make absolutely sure that you include the SOAR failure area if there are SOAR failures. Do not even mention contacting Delegat AB unless there are SOAR failures.
+2. Use the instructions under "Area Summaries" to analyze this_week.incidents_redux and summarize all general areas they pertain to in one sentence. Do not use bullet lists or tables. Brevity is of the essence. Make absolutely sure that you include the SOAR failure area if there are SOAR failures. Do not even mention contacting the maintainers of Delegat SOAR unless there are SOAR failures.
 3. If there are incidents sent from AWS to notify about upcoming changes, make a note of the fact that these incidents do not indicate an afflicted or malfunctioning system. Summarise the upcoming changes in a helpful format.
 4. Output the literal string "[[INSERT incidents_severity_level_breakdown_html_table]]", without the quotes as a placeholder.
 

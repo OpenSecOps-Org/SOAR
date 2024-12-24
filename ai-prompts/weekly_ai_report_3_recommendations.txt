@@ -6,19 +6,19 @@ Generate recommendations and action points to security management based on the s
 - Only include relevant information related to security risks.
 - Ensure that the name of the account is mentioned for each summary.
 - Avoid using phrases like "In the first summary..." to refer to specific summaries.
-- If there are issues pertaining to the SOAR system itself, ALWAYS recommend contacting Delegat AB. NB: SOAR failures only occur in the AWS Organization admin account.
+- If there are issues pertaining to the SOAR system itself, ALWAYS recommend contacting the maintainers of Delegat SOAR. NB: SOAR failures only occur in the AWS Organization admin account.
 - If there are incidents sent from AWS to notify about upcoming changes, make a note of the fact that these incidents do not indicate an afflicted or malfunctioning system. Summarise the upcoming changes in a helpful format.
 - INFORMATIONAL incidents are never a cause for concern.
 
 For issues pertaining to the SOAR system itself:
-- If there are any issues related to the SOAR system mentioned in the summaries, ALWAYS recommend contacting Delegat AB for further investigation and resolution.
+- If there are any issues related to the SOAR system mentioned in the summaries, ALWAYS recommend contacting the maintainers of Delegat SOAR for further investigation and resolution.
 - If there are no issues related to the SOAR system mentioned in the summaries, do not even mention SOAR failures.
-- SOAR failures only occur in the AWS Organization admin account.
 - An incident is a SOAR failure only if its field 'SOARFailure' is true.
-- Do not even mention SOAR failures in any other account than the AWS Organization admin account.
+- SOAR failures indicate that there is a problem with Delegat SOAR itself.
+- SOAR failures only occur in the AWS Organization admin account. Do not even mention SOAR failures in any other account than the AWS Organization admin account.
 - A Stack or StackSet drift incident is not a SOAR failure, even if the stackset or stack that has drifted is a SOAR stackset or stack.
-- Never advise contacting Delegat AB for Stack or StackSet drift, as this is not Delegat AB's responsibility and can only be fixed locally.
-- Do not mention contacting Delegat AB unless there is a direct cause to contact Delegat AB. Don't say "There's no reason to contact Delegat AB."
+- Never advise contacting the maintainers of Delegat SOAR for Stack or StackSet drift, as this is not the maintainers of Delegat SOAR's responsibility and can only be fixed locally.
+- Do not mention contacting the maintainers of Delegat SOAR unless there is a direct cause to contact the maintainers of Delegat SOAR. Don't say "There's no reason to contact the maintainers of Delegat SOAR."
 
 For other security-related issues:
 - Provide recommendations and action points based on the information provided in the summaries, addressing any vulnerabilities or incidents mentioned.
@@ -34,7 +34,7 @@ For other security-related issues:
 - A team can manage more than one account.
 - An account is managed by exactly one team.
 
-- Issues pertaining to the SOAR are not the responsibility of the team for the account where they happen. They know nothing about how to fix SOAR issues. Instead, you must always recommend contacting Delegat AB for such issues. If there are no SOAR issues, don't mention the fact. Do not draw attention to the absence of SOAR issues.
+- Issues pertaining to the SOAR are not the responsibility of the team for the account where they happen. They know nothing about how to fix SOAR issues. Instead, you must always recommend contacting the maintainers of Delegat SOAR for such issues. If there are no SOAR issues, don't mention the fact. Do not draw attention to the absence of SOAR issues.
 
 
 

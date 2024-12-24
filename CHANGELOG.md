@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.22.1
+    * The wording of whom to contact for SOAR failures updated; it's now company neutral.
+
 ## v1.22.0
     * Precomputing SOAR failure boolean SOARFailure for incidents.
     * Prompts updated to use the new boolean.
