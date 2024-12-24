@@ -55,6 +55,9 @@ def lambda_handler(data, _context):
 
     account_data = data['bb']['account_map'][account]
 
+    # Retrieve the name of the organization account
+    org_account_name = data['bb']['aws_organization_administrative_account_name']
+
     # Current UTC datetime
     current_time = datetime.utcnow()
 
@@ -83,7 +86,7 @@ def lambda_handler(data, _context):
     TW_autoremediations = sort_on_severity(retrieve_autoremediations_between(last_week, current_time, account=account))
     TW_n_autoremediations = len(TW_autoremediations)
 
-    TW_incidents = sort_on_severity(retrieve_incidents_between(last_week, current_time, account=account))
+    TW_incidents = sort_on_severity(retrieve_incidents_between(last_week, current_time, org_account_name, account=account))
     TW_n_incidents = len(TW_incidents)
 
     open_tickets_html_table = get_ticket_html_table(TW_open_tickets)
@@ -108,7 +111,7 @@ def lambda_handler(data, _context):
     LW_autoremediations = sort_on_severity(retrieve_autoremediations_between(two_weeks, last_week, account=account))
     LW_n_autoremediations = len(LW_autoremediations)
 
-    LW_incidents = sort_on_severity(retrieve_incidents_between(two_weeks, last_week, account=account))
+    LW_incidents = sort_on_severity(retrieve_incidents_between(two_weeks, last_week, org_account_name, account=account))
     LW_n_incidents = len(LW_incidents)
 
     # Convert to CSV for compactness, to save tokens.
@@ -377,6 +380,26 @@ def closed_tickets_stats(tickets):
     return avg_duration, median_duration
 
 
+# Massage the incidents
+def massage_incidents(incidents, org_account_name):
+    # Add SOAR failure field
+    # - SOAR failures can be identified by ALL of the following being true:
+    #   1. The account name is the same as the value of 'global_data.aws_organization_administrative_account_name'.
+    #   2. The severity_label is not INFORMATIONAL.
+    #   3. Its IncidentType must be exactly "Software and Configuration Checks/CloudWatch Alarms/soar-cloudwatch-alarms".
+    #   4. Its Title or Description must contain the substring "SOAR".
+    for incident in incidents:
+        if (incident['Account'] == org_account_name and 
+            incident['severity_label'] != 'INFORMATIONAL' and
+            incident['IncidentType'] == 'Software and Configuration Checks/CloudWatch Alarms/soar-cloudwatch-alarms' and
+            ('SOAR' in incident['Title'] or 'SOAR' in incident['Description'])
+           ):
+            incident['SOARFailure'] = True
+        else:
+            incident['SOARFailure'] = False
+    return incidents
+
+
 # ----------------------------------------------------------------
 #
 #   DynamoDB queries
@@ -490,7 +513,7 @@ def retrieve_autoremediations_between(start_time: datetime, end_time: datetime, 
     return results
 
 
-def retrieve_incidents_between(start_time: datetime, end_time: datetime, account=None):
+def retrieve_incidents_between(start_time: datetime, end_time: datetime, org_account_name, account=None):
     """Retrieve all incidents that occurred between the given start_time and end_time."""
     
     # Convert datetime objects to strings for querying
@@ -512,7 +535,7 @@ def retrieve_incidents_between(start_time: datetime, end_time: datetime, account
     if account:
         results = [incident for incident in results if incident.get('Account') == account]
     
-    return results
+    return massage_incidents(results, org_account_name)
 
 
 def retrieve_opened_tickets_between(start_time: datetime, end_time: datetime, account=None):

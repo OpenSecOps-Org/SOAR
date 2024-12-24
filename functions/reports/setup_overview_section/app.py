@@ -115,7 +115,7 @@ def lambda_handler(data, _context):
     TW_n_accounts_with_autoremediations = len(TW_accounts_with_autoremediations)
     TW_autoremediations_redux = get_security_control_data_redux(TW_autoremediations)
 
-    TW_incidents = retrieve_incidents_between(last_week, current_time)
+    TW_incidents = retrieve_incidents_between(last_week, current_time, org_account_name)
     TW_n_incidents = len(TW_incidents)
     TW_incidents_severity_level_breakdown = get_severity_level_breakdown(TW_incidents)
     TW_accounts_with_incidents = count_accounts(TW_incidents)
@@ -158,7 +158,7 @@ def lambda_handler(data, _context):
     LW_accounts_with_autoremediations = count_accounts(LW_autoremediations)
     LW_n_accounts_with_autoremediations = len(LW_accounts_with_autoremediations)
 
-    LW_incidents = retrieve_incidents_between(two_weeks, last_week)
+    LW_incidents = retrieve_incidents_between(two_weeks, last_week, org_account_name)
     LW_n_incidents = len(LW_incidents)
     LW_incidents_severity_level_breakdown = get_severity_level_breakdown(LW_incidents)
     LW_accounts_with_incidents = count_accounts(LW_incidents)
@@ -174,7 +174,7 @@ def lambda_handler(data, _context):
     L2W_ticket_severity_level_breakdown = get_severity_level_breakdown(L2W_open_tickets)
     L2W_autoremediations = retrieve_autoremediations_between(three_weeks, two_weeks)
     L2W_autoremediations_severity_level_breakdown = get_severity_level_breakdown(L2W_autoremediations)
-    L2W_incidents = retrieve_incidents_between(three_weeks, two_weeks)
+    L2W_incidents = retrieve_incidents_between(three_weeks, two_weeks, org_account_name)
     L2W_incidents_severity_level_breakdown = get_severity_level_breakdown(L2W_incidents)
 
 
@@ -183,7 +183,7 @@ def lambda_handler(data, _context):
     L3W_ticket_severity_level_breakdown = get_severity_level_breakdown(L3W_open_tickets)
     L3W_autoremediations = retrieve_autoremediations_between(four_weeks, three_weeks)
     L3W_autoremediations_severity_level_breakdown = get_severity_level_breakdown(L3W_autoremediations)
-    L3W_incidents = retrieve_incidents_between(four_weeks, three_weeks)
+    L3W_incidents = retrieve_incidents_between(four_weeks, three_weeks, org_account_name)
     L3W_incidents_severity_level_breakdown = get_severity_level_breakdown(L3W_incidents)
 
 
@@ -208,10 +208,10 @@ def lambda_handler(data, _context):
     )
 
 
-    # Convert to CSV for compactness, to save tokens. Max 10 items per list.
-    TW_open_tickets_redux = pd.DataFrame(TW_open_tickets_redux[0:10]).to_csv(index=False)
-    TW_autoremediations_redux = pd.DataFrame(TW_autoremediations_redux[0:10]).to_csv(index=False)
-    TW_incidents_redux = pd.DataFrame(TW_incidents_redux[0:10]).to_csv(index=False)
+    # Convert to CSV for compactness, to save tokens.
+    TW_open_tickets_redux = pd.DataFrame(TW_open_tickets_redux).to_csv(index=False)
+    TW_autoremediations_redux = pd.DataFrame(TW_autoremediations_redux).to_csv(index=False)
+    TW_incidents_redux = pd.DataFrame(TW_incidents_redux).to_csv(index=False)
 
     # Modify the input and return it
     data['bb']['n_accounts'] = n_accounts
@@ -536,6 +536,7 @@ def incidents_redux(incidents):
                 'IncidentType': incident['IncidentType'],
                 'Title': title,
                 'Description': incident['Description'],
+                'SOARFailure': incident.get('SOARFailure', False),
                 'Frequency': 1  # add frequency to each incident
             }
         else:
@@ -550,6 +551,26 @@ def incidents_redux(incidents):
         del incident['Frequency']
 
     return sorted_incidents
+
+
+# Massage the incidents
+def massage_incidents(incidents, org_account_name):
+    # Add SOAR failure field
+    # - SOAR failures can be identified by ALL of the following being true:
+    #   1. The account name is the same as the value of 'global_data.aws_organization_administrative_account_name'.
+    #   2. The severity_label is not INFORMATIONAL.
+    #   3. Its IncidentType must be exactly "Software and Configuration Checks/CloudWatch Alarms/soar-cloudwatch-alarms".
+    #   4. Its Title or Description must contain the substring "SOAR".
+    for incident in incidents:
+        if (incident['Account'] == org_account_name and 
+            incident['severity_label'] != 'INFORMATIONAL' and
+            incident['IncidentType'] == 'Software and Configuration Checks/CloudWatch Alarms/soar-cloudwatch-alarms' and
+            ('SOAR' in incident['Title'] or 'SOAR' in incident['Description'])
+           ):
+            incident['SOARFailure'] = True
+        else:
+            incident['SOARFailure'] = False
+    return incidents
 
 
 # Massage the tickets
@@ -830,7 +851,7 @@ def retrieve_autoremediations_between(start_time: datetime, end_time: datetime, 
     return results
 
 
-def retrieve_incidents_between(start_time: datetime, end_time: datetime, account=None):
+def retrieve_incidents_between(start_time: datetime, end_time: datetime, org_account_name, account=None):
     """Retrieve all incidents that occurred between the given start_time and end_time."""
     
     # Convert datetime objects to strings for querying
@@ -851,8 +872,8 @@ def retrieve_incidents_between(start_time: datetime, end_time: datetime, account
     # Filter results by account if provided
     if account:
         results = [incident for incident in results if incident.get('Account') == account]
-    
-    return results
+
+    return massage_incidents(results, org_account_name)
 
 
 def retrieve_opened_tickets_between(start_time: datetime, end_time: datetime, account=None):

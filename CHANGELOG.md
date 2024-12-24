@@ -1,5 +1,9 @@
 # Change Log
 
+## v1.22.0
+    * Precomputing SOAR failure boolean SOARFailure for incidents.
+    * Prompts updated to use the new boolean.
+
 ## v1.21.1
     * Prompt update for weekly report.
 

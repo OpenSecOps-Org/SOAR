@@ -10,8 +10,8 @@
 
 - Incidents are not related to tickets or autoremediations.
 - A sudden rise in incidents, especially in the production environment, is a sign that needs investigation.
-- An incident is a SOAR incident if its Title includes the string "SOAR", 'is_admin_account' is true, and the incident is not about Stack or StackSet drift. SOAR incidents only occur in the AWS Organization admin account.
-- SOAR incidents indicate that there is a problem with Delegat SOAR itself. Teams cannot fix SOAR incidents. Advise contacting Delegat AB immediately.
+- An incident is a SOAR failure only if its field 'SOARFailure' is true.
+- SOAR failures indicate that there is a problem with Delegat SOAR itself. Teams cannot fix SOAR failures. Advise contacting Delegat AB immediately.
 - Do not mention contacting Delegat AB unless there is direct cause to do so. Never say "There's no need to contact Delegat AB."
 - Do not mention SOAR failures unless there are actual SOAR failures. For instance, do not say "There are no SOAR failures this week."
 - Stack and StackSet drift can only be fixed locally.
@@ -55,8 +55,8 @@ Sections:
 - Autoremediations: Place the placeholder for the autoremediations_html_table right after the subheading. Analyze their commonalities, vulnerabilities, or areas of concern. Be sure to mention the number of autoremediations for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. Brevity is of the essence here. Make sure you always include your analysis.
 
 - Incidents: Start with the placeholder for the incidents_html_table and then discuss any patterns or significant findings. Be sure to mention the number of incidents for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. Brevity is of the essence here. Make sure you always include your analysis.
-  - If there are any SOAR incidents, recommend contacting Delegat AB immediately. 
-  - If there are no SOAR incidents, do not mention SOAR incidents or contacting Delegat AB at all.
+  - If there are any SOAR failures, recommend contacting Delegat AB immediately. 
+  - If there are no SOAR failures, do not mention SOAR failures or contacting Delegat AB at all.
   - If there are incidents sent from AWS to notify about upcoming changes, make a note of the fact that these incidents do not indicate an afflicted or malfunctioning system. Summarise the upcoming changes in a helpful format.
   - INFORMATIONAL incidents are never a cause for concern.
 
