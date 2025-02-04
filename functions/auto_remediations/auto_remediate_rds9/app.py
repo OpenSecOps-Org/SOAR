@@ -91,7 +91,7 @@ def lambda_handler(data, _context):
                 }
             )
         except ClientError as error:
-            if error.response['Error']['Code'] == 'DBInstanceNotFound':
+            if error.response['Error']['Code'] == 'DBInstanceNotFoundFault':
                 print("The DB instance wasn't found. Suppressing.")
                 data['messages']['actions_taken'] = "The DB instance wasn't found. This finding has been suppressed."
                 data['actions']['suppress_finding'] = True
@@ -138,7 +138,7 @@ def lambda_handler(data, _context):
                 }
             )
         except ClientError as error:
-            if error.response['Error']['Code'] == 'DBClusterNotFound':
+            if error.response['Error']['Code'] == 'DBClusterNotFoundFault':
                 print("The DB cluster wasn't found. Suppressing.")
                 data['messages']['actions_taken'] = "The DB cluster wasn't found. This finding has been suppressed."
                 data['actions']['suppress_finding'] = True

@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.23.0
+    * All RDS autoremediation `*NotFound` code comparisons changed to `*NotFoundFault`.
+
 ## v1.22.1
     * The wording of whom to contact for SOAR failures updated; it's now company neutral.
 

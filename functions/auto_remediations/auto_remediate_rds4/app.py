@@ -38,7 +38,7 @@ def process_cluster_snapshot(client, data, allocated_storage, snapshot_name, sna
         try:
             response = client.delete_db_cluster_snapshot(DBClusterSnapshotIdentifier=snapshot_name)
         except botocore.exceptions.ClientError as error:
-            if error.response['Error']['Code'] == 'DBClusterSnapshotNotFound':
+            if error.response['Error']['Code'] == 'DBClusterSnapshotNotFoundFault':
                 print("The snapshot can't be found. Suppressing.")
                 data['messages']['actions_taken'] = "The snapshot cannot be found. This finding has been suppressed."
                 data['actions']['suppress_finding'] = True
@@ -59,7 +59,7 @@ def process_cluster_snapshot(client, data, allocated_storage, snapshot_name, sna
             CopyTags=True
         )
     except botocore.exceptions.ClientError as error:
-        if error.response['Error']['Code'] == 'DBClusterSnapshotNotFound':
+        if error.response['Error']['Code'] == 'DBClusterSnapshotNotFoundFault':
             print("The snapshot can't be found. Suppressing.")
             data['messages']['actions_taken'] = "The snapshot cannot be found. This finding has been suppressed."
             data['actions']['suppress_finding'] = True
@@ -97,7 +97,7 @@ def process_instance_snapshot(client, data, allocated_storage, snapshot_name, sn
         try:
             response = client.delete_db_cluster_snapshot(DBSnapshotIdentifier=snapshot_name)
         except botocore.exceptions.ClientError as error:
-            if error.response['Error']['Code'] == 'DBSnapshotNotFound':
+            if error.response['Error']['Code'] == 'DBSnapshotNotFoundFault':
                 print("The snapshot can't be found. Suppressing.")
                 data['messages']['actions_taken'] = "The snapshot cannot be found. This finding has been suppressed."
                 data['actions']['suppress_finding'] = True
@@ -118,7 +118,7 @@ def process_instance_snapshot(client, data, allocated_storage, snapshot_name, sn
             CopyTags=True
         )
     except botocore.exceptions.ClientError as error:
-        if error.response['Error']['Code'] == 'DBSnapshotNotFound':
+        if error.response['Error']['Code'] == 'DBSnapshotNotFoundFault':
             print("The snapshot can't be found. Suppressing.")
             data['messages']['actions_taken'] = "The snapshot cannot be found. This finding has been suppressed."
             data['actions']['suppress_finding'] = True
