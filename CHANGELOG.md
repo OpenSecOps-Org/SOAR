@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.23.1
+    * Additional `Fault` added to return code comparisons.
+
 ## v1.23.0
     * All RDS autoremediation `*NotFound` code comparisons changed to `*NotFoundFault`.
 

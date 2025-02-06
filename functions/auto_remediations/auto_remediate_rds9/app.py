@@ -173,7 +173,7 @@ def ensure_new_db_parameter_group_exists(rds, new_name, family, parameters):
             Description=f'Same as default.{family} but with logging enabled'
         )
     except ClientError as error:
-        if error.response['Error']['Code'] == 'DBParameterGroupAlreadyExists':
+        if error.response['Error']['Code'] == 'DBParameterGroupAlreadyExistsFault':
             print("It already exists.")
             return
         raise error
@@ -195,7 +195,7 @@ def ensure_new_db_cluster_parameter_group_exists(rds, new_name, family, paramete
             Description=f'Same as default.{family} but with logging enabled'
         )
     except ClientError as error:
-        if error.response['Error']['Code'] == 'DBParameterGroupAlreadyExists':
+        if error.response['Error']['Code'] == 'DBParameterGroupAlreadyExistsFault':
             print("It already exists.")
             return
         raise error
