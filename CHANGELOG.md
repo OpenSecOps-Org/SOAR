@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.23.5
+    * Fix duplicate logo in Office365 emails by adding Content-Disposition: inline header
+
 ## v1.23.4
     * Add comprehensive ticketing system documentation in ticketing README
     * Document ticketing system parity recommendations between Jira and ServiceNow

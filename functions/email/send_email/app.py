@@ -26,6 +26,7 @@ def load_logo_image():
         logo_data = f.read()
     logo_image = MIMEImage(logo_data)
     logo_image.add_header('Content-ID', '<logo>')
+    logo_image.add_header('Content-Disposition', 'inline')
     
     # Create HTML code to reference the logo inline
     logo_html = '''
