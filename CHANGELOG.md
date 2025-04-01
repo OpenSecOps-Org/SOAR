@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.23.2
+    * Fix RDS4 auto-remediation function to use correct API call for DB instance snapshots
+    * Fix string formatting in RDS4 success messages to correctly display snapshot names
+    * Fix field name casing in RDS9 to use correct capitalization (DB vs Db) for parameter groups
+    * Enhance error handling in RDS6 auto-remediation for IAM role management
+
 ## v1.23.1
     * Additional `Fault` added to return code comparisons.
 

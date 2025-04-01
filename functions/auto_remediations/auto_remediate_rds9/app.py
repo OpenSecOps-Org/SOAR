@@ -66,7 +66,7 @@ def lambda_handler(data, _context):
     if instance_details and not instance_db_cluster_identifier:
 
         db_instance_identifier = details['DBInstanceIdentifier']
-        db_parameter_group_name = details['DbParameterGroups'][0]['DbParameterGroupName']
+        db_parameter_group_name = details['DBParameterGroups'][0]['DBParameterGroupName']
         suffix = '-with-logging'
         family = db_parameter_group_name.split('.')[-1].replace(suffix, '')
         new_db_parameter_group_name = f'{family}{suffix}'
@@ -110,7 +110,7 @@ def lambda_handler(data, _context):
         db_cluster_identifier = details['DBClusterIdentifier']
 
         if not instance_db_cluster_identifier:
-            db_cluster_parameter_group_name = details['DbClusterParameterGroups'][0]['DbClusterParameterGroupName']
+            db_cluster_parameter_group_name = details['DBClusterParameterGroups'][0]['DBClusterParameterGroupName']
         else:
             db_cluster_parameter_group_name = get_cluster_db_parameter_group_name(client, instance_db_cluster_identifier)
 
@@ -195,7 +195,7 @@ def ensure_new_db_cluster_parameter_group_exists(rds, new_name, family, paramete
             Description=f'Same as default.{family} but with logging enabled'
         )
     except ClientError as error:
-        if error.response['Error']['Code'] == 'DBParameterGroupAlreadyExistsFault':
+        if error.response['Error']['Code'] in ['DBParameterGroupAlreadyExistsFault', 'DBClusterParameterGroupAlreadyExistsFault']:
             print("It already exists.")
             return
         raise error

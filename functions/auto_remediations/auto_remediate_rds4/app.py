@@ -85,7 +85,7 @@ def process_cluster_snapshot(client, data, allocated_storage, snapshot_name, sna
     response = client.delete_db_cluster_snapshot(DBClusterSnapshotIdentifier=snapshot_name)
 
     # Success
-    data['messages']['actions_taken'] = "The snapshot has been copied to a new, encrypted snapshot '{snapshot_target_name}'. The original snapshot has been deleted."
+    data['messages']['actions_taken'] = f"The snapshot has been copied to a new, encrypted snapshot '{snapshot_target_name}'. The original snapshot has been deleted."
     data['messages']['actions_required'] = "None"
     return data
 
@@ -95,7 +95,7 @@ def process_instance_snapshot(client, data, allocated_storage, snapshot_name, sn
     if allocated_storage == 0:
         print("The instance snapshot was empty. Deleting it...")
         try:
-            response = client.delete_db_cluster_snapshot(DBSnapshotIdentifier=snapshot_name)
+            response = client.delete_db_snapshot(DBSnapshotIdentifier=snapshot_name)
         except botocore.exceptions.ClientError as error:
             if error.response['Error']['Code'] == 'DBSnapshotNotFoundFault':
                 print("The snapshot can't be found. Suppressing.")
@@ -144,7 +144,7 @@ def process_instance_snapshot(client, data, allocated_storage, snapshot_name, sn
     response = client.delete_db_snapshot(DBSnapshotIdentifier=snapshot_name)
 
     # Success
-    data['messages']['actions_taken'] = "The snapshot has been copied to a new, encrypted snapshot '{snapshot_target_name}'. The original snapshot has been deleted."
+    data['messages']['actions_taken'] = f"The snapshot has been copied to a new, encrypted snapshot '{snapshot_target_name}'. The original snapshot has been deleted."
     data['messages']['actions_required'] = "None"
     return data
 
