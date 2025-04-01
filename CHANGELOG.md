@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.23.4
+    * Add comprehensive ticketing system documentation in ticketing README
+    * Document ticketing system parity recommendations between Jira and ServiceNow
+    * Correct Multi-Account Management section in architecture documentation
+    * Improve architecture documentation with accurate account roles and responsibilities
+
 ## v1.23.3
     * Enhance error handling in ECR1, KMS4, ELB1, and S32 auto-remediation functions
     * Add specific AWS error code handling for better reliability

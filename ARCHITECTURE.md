@@ -62,8 +62,8 @@ The system uses specialized formatters for different issue types (GuardDuty find
 
 SOAR operates across an AWS Organization:
 
-- **Security Account**: Hosts the SOAR application and centralized monitoring
-- **Organization Admin Account**: Used for organization-wide operations
+- **Organization Admin Account**: Hosts the SOAR application and centralized security operations
+- **Security Account**: Used for managing the security posture and setting security controls
 - **Member Accounts**: Where findings are detected and remediated
 
 Cross-account access is managed via IAM roles with least privilege principles.
