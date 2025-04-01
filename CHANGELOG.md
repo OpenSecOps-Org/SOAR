@@ -1,5 +1,11 @@
 # Change Log
 
+## v1.23.3
+    * Enhance error handling in ECR1, KMS4, ELB1, and S32 auto-remediation functions
+    * Add specific AWS error code handling for better reliability
+    * Improve error diagnostics and feedback in remediation messages
+    * Fix string formatting in ELB1 auto-remediation
+
 ## v1.23.2
     * Fix RDS4 auto-remediation function to use correct API call for DB instance snapshots
     * Fix string formatting in RDS4 success messages to correctly display snapshot names

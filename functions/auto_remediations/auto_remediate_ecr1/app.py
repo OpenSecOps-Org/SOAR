@@ -25,22 +25,28 @@ def lambda_handler(data, _context):
     client = get_client('ecr', account_id, region)
 
     # Configure the registry scanning for the client
-    response = client.put_registry_scanning_configuration(
-        scanType='ENHANCED',
-        rules=[
-            {
-                'scanFrequency': 'SCAN_ON_PUSH',
-                'repositoryFilters': [
-                    {
-                        'filter': '*',
-                        'filterType': 'WILDCARD'
-                    },
-                ]
-            },
-        ]
-    )
-    # Print the response from the client
-    print(response)
+    try:
+        response = client.put_registry_scanning_configuration(
+            scanType='ENHANCED',
+            rules=[
+                {
+                    'scanFrequency': 'SCAN_ON_PUSH',
+                    'repositoryFilters': [
+                        {
+                            'filter': '*',
+                            'filterType': 'WILDCARD'
+                        },
+                    ]
+                },
+            ]
+        )
+        # Print the response from the client
+        print(response)
+    except ClientError as error:
+        print(f"Error configuring registry scanning: {error}")
+        data['messages']['actions_taken'] = "Could not configure registry scanning."
+        data['actions']['autoremediation_not_done'] = True
+        return data
 
     # Update the messages in the input data
     data['messages']['actions_taken'] = "Images are now scanned on push using enhanced scanning."

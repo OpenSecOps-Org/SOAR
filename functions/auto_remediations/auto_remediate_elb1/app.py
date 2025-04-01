@@ -26,7 +26,7 @@ def lambda_handler(data, _context):
         if result:
             print("The ALB was successfully configured to redirect HTTP to HTTPS.")
             data['messages']['actions_taken'] = "The ALB was successfully configured to redirect HTTP to HTTPS."
-            data['messages']['actions_required'] = f"None"
+            data['messages']['actions_required'] = "None"
             
         else:
             print("The ALB could not be configured to redirect HTTP to HTTPS. Create ticket to team to fix.")
@@ -52,7 +52,8 @@ def alb_exists(elbv2_client, alb_arn):
         response = elbv2_client.describe_load_balancers(LoadBalancerArns=[alb_arn])
         return response['LoadBalancers'][0]['Scheme']
     except botocore.exceptions.ClientError as e:
-        if e.response['Error']['Code'] == 'LoadBalancerNotFound':
+        if e.response['Error']['Code'] in ['LoadBalancerNotFound', 'ValidationError']:
+            print(f"Load balancer not found: {e}")
             return False
         else:
             raise e
