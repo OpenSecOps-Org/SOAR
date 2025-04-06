@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.24.1
+    * Updated LICENSE file to MPL 2.0.
+
 ## v1.24.0
     * Again: Updated publish.zsh to support dual-remote publishing to CloudSecOps-Org repositories.
 
