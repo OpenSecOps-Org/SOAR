@@ -14,15 +14,15 @@ fi
 
 REPO_NAME=$1
 
-# Add Delegat's company repository as a remote (if it doesn't already exist)
-if ! git remote | grep -q 'delegat'; then
-    git remote add delegat "https://github.com/Delegat-AB/$REPO_NAME.git"
+# Add CloudSecOps organization repository as a remote (if it doesn't already exist)
+if ! git remote | grep -q 'cloudsecops'; then
+    git remote add cloudsecops "https://github.com/CloudSecOps-Org/$REPO_NAME.git"
     if [ $? -ne 0 ]; then
-        echo "Error: Failed to add 'delegat' remote."
+        echo "Error: Failed to add 'cloudsecops' remote."
         exit 1
     fi
 else
-    echo "'delegat' remote already exists"
+    echo "'cloudsecops' remote already exists"
 fi
 
 # Switch back to the main branch before finishing

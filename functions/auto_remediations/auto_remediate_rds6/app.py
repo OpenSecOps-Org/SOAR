@@ -142,8 +142,8 @@ def attach_policy(iam, role_name, policy_arn):
         iam.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
         logger.info("Attached policy %s to role %s.", policy_arn, role_name)
     except ClientError as error:
-        if error.response['Error']['Code'] == 'EntityAlreadyExists':
-            print("The policy has already been attached.")
+        if error.response['Error']['Code'] in ['EntityAlreadyExists', 'NoSuchEntityException']:
+            print("The policy has already been attached or role doesn't exist.")
             return False
         logger.exception(
             "Couldn't attach policy %s to role %s.", policy_arn, role_name)

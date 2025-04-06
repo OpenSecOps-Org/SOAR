@@ -736,7 +736,7 @@ def monitor_stack_until_complete(stack_name, account_id, region, role, dry_run, 
     cf_client = get_client('cloudformation', account_id, region, role)
     
     # Define terminal states for CloudFormation stacks and stack sets
-    terminal_states = ["CREATE_COMPLETE", "ROLLBACK_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "DELETE_COMPLETE", "CURRENT", "ACTIVE"]
+    terminal_states = ["CREATE_COMPLETE", "ROLLBACK_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "DELETE_COMPLETE", "CURRENT", "ACTIVE", "SKIPPED_SUSPENDED_ACCOUNT"]
 
     # Get the current stack status
     stack = cf_client.describe_stacks(StackName=stack_name)
@@ -748,23 +748,38 @@ def monitor_stack_until_complete(stack_name, account_id, region, role, dry_run, 
 
     printc(LIGHT_BLUE, "Waiting for stack or stack set to complete...")
     
+    # Save initial line position
+    print()  # Start with a blank line
+    
+    # Variable to track the previous status
+    previous_status = None
+    
     while True:
         try:
             # Get the current stack status
             stack = cf_client.describe_stacks(StackName=stack_name)
             stack_status = stack['Stacks'][0]['StackStatus']
             
-            # Print the stack status with the appropriate color and reset the color afterward
-            if "ROLLBACK" in stack_status or "DELETE" in stack_status:
-                printc(RED, f"Stack Status: {stack_status}", end="")
-            elif "CREATE_COMPLETE" in stack_status or "UPDATE_COMPLETE" in stack_status:
-                printc(GREEN, f"Stack Status: {stack_status}", end="")
-            else:
-                printc(YELLOW, f"Stack Status: {stack_status}", end="")
+            # Only print if status has changed
+            if stack_status != previous_status:
+                # Move cursor up if we've printed before
+                if previous_status:
+                    sys.stdout.write("\033[1F\033[K")  # Move up 1 line and clear it
+                    sys.stdout.flush()
+                
+                # Print the stack status with the appropriate color and reset the color afterward
+                if "ROLLBACK" in stack_status or "DELETE" in stack_status:
+                    printc(RED, f"Stack Status: {stack_status}")
+                elif "CREATE_COMPLETE" in stack_status or "UPDATE_COMPLETE" in stack_status:
+                    printc(GREEN, f"Stack Status: {stack_status}")
+                else:
+                    printc(YELLOW, f"Stack Status: {stack_status}")
+                
+                # Update previous status
+                previous_status = stack_status
             
             # Exit loop if the stack is in a terminal state
             if stack_status in terminal_states:
-                printc(YELLOW, '')  # Move to the next line after final state is reached
                 time.sleep(5)
                 break
             
@@ -803,7 +818,7 @@ def monitor_stackset_until_complete(stackset_name, account_id, region, role, dry
     cf_client = get_client('cloudformation', account_id, region, role)
     
     # Define terminal states for CloudFormation StackSets
-    terminal_states = ["CREATE_COMPLETE", "ROLLBACK_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "DELETE_COMPLETE", "CURRENT", "ACTIVE"]
+    terminal_states = ["CREATE_COMPLETE", "ROLLBACK_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "DELETE_COMPLETE", "CURRENT", "ACTIVE", "SKIPPED_SUSPENDED_ACCOUNT"]
 
     # Get the current StackSet status
     stackset = cf_client.describe_stack_set(StackSetName=stackset_name)
@@ -815,23 +830,38 @@ def monitor_stackset_until_complete(stackset_name, account_id, region, role, dry
 
     printc(LIGHT_BLUE, "Waiting for StackSet deployment to complete...")
 
+    # Save initial line position
+    print()  # Start with a blank line
+    
+    # Variable to track the previous status
+    previous_status = None
+    
     while True:
         try:
             # Get the current StackSet status
             stackset = cf_client.describe_stack_set(StackSetName=stackset_name)
             stackset_status = stackset['StackSet']['Status']
             
-            # Print the StackSet status with the appropriate color and reset the color afterward
-            if "ROLLBACK" in stackset_status or "DELETE" in stackset_status:
-                printc(RED, f"StackSet Status: {stackset_status}", end="")
-            elif "CREATE_COMPLETE" in stackset_status or "UPDATE_COMPLETE" in stackset_status:
-                printc(GREEN, f"StackSet Status: {stackset_status}", end="")
-            else:
-                printc(YELLOW, f"StackSet Status: {stackset_status}", end="")
+            # Only print if status has changed
+            if stackset_status != previous_status:
+                # Move cursor up if we've printed before
+                if previous_status:
+                    sys.stdout.write("\033[1F\033[K")  # Move up 1 line and clear it
+                    sys.stdout.flush()
+                
+                # Print the StackSet status with the appropriate color and reset the color afterward
+                if "ROLLBACK" in stackset_status or "DELETE" in stackset_status:
+                    printc(RED, f"StackSet Status: {stackset_status}")
+                elif "CREATE_COMPLETE" in stackset_status or "UPDATE_COMPLETE" in stackset_status:
+                    printc(GREEN, f"StackSet Status: {stackset_status}")
+                else:
+                    printc(YELLOW, f"StackSet Status: {stackset_status}")
+                
+                # Update previous status
+                previous_status = stackset_status
             
             # Exit loop if the StackSet is in a terminal state
             if stackset_status in terminal_states:
-                printc(YELLOW, '')  # Move to the next line after final state is reached
                 time.sleep(5)
                 break
             
@@ -871,7 +901,7 @@ def monitor_stackset_stacks_until_complete(stackset_name, account_id, region, ro
     cf_client = get_client('cloudformation', account_id, region, role)
     
     # Define terminal states for CloudFormation stacks
-    terminal_states = ["CREATE_COMPLETE", "ROLLBACK_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "DELETE_COMPLETE", "CURRENT", "FAILED", "OUTDATED"]
+    terminal_states = ["CREATE_COMPLETE", "ROLLBACK_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE", "DELETE_COMPLETE", "CURRENT", "FAILED", "OUTDATED", "SKIPPED_SUSPENDED_ACCOUNT"]
 
     # Get the status of all stacks deployed by the StackSet
     stack_instances = cf_client.list_stack_instances(StackSetName=stackset_name)
@@ -882,24 +912,40 @@ def monitor_stackset_stacks_until_complete(stackset_name, account_id, region, ro
         return
 
     printc(LIGHT_BLUE, "Waiting for stack set's deployment of its stacks to complete...")
-
+    
+    # Track the number of instances in the previous update
+    previous_instances_count = 0
+    
     while True:
         try:
             # Get the status of all stacks deployed by the StackSet
             stack_instances = cf_client.list_stack_instances(StackSetName=stackset_name)
             stack_statuses = [instance['Status'] for instance in stack_instances['Summaries']]
             
+            # Calculate the number of lines to move up
+            # If this is not the first iteration, move cursor up by the number of 
+            # previously printed stack instances
+            if previous_instances_count > 0:
+                # Clear previous output
+                sys.stdout.write("\033[F" * previous_instances_count)
+                sys.stdout.flush()
+            
             # Print the status of each stack instance
             for instance in stack_instances['Summaries']:
                 stack_instance_identifier = f"{instance['Account']} {instance['Region']:<15}"
                 stack_status = instance['Status']
+                
+                # Clear current line before printing
+                sys.stdout.write("\033[K")
+                sys.stdout.flush()
+                
                 if stack_status in terminal_states:
                     printc(GREEN, f"{stack_instance_identifier} {stack_status}")
                 else:
                     printc(YELLOW, f"{stack_instance_identifier} {stack_status}")
             
-            # Move the cursor to the beginning of the line
-            sys.stdout.write("\033[F" * (len(stack_instances['Summaries'])))
+            # Update previous instances count
+            previous_instances_count = len(stack_instances['Summaries'])
             
             # Check if any stack is not in a terminal state
             if any(status not in terminal_states for status in stack_statuses):
@@ -908,7 +954,7 @@ def monitor_stackset_stacks_until_complete(stackset_name, account_id, region, ro
                 continue  # Continue monitoring if any stack is still in progress
             
             # All stacks are in a terminal state, exit the loop
-            printc(YELLOW, '')  # Move to the next line after all stacks are complete
+            printc(YELLOW, '')  # Add an extra line after completion
             time.sleep(5)
             break
         

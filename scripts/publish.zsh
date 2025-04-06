@@ -26,9 +26,13 @@ if git rev-parse $TAG_VERSION > /dev/null 2>&1; then
     exit 0
 fi
 
-# Get the repository name from the 'delegat' remote URL
-DELEGAT_REMOTE_URL=$(git remote get-url delegat)
-REPO_NAME=$(basename -s .git "$DELEGAT_REMOTE_URL")
+# Get the repository name - try delegat remote first, then origin if delegat doesn't exist
+if git remote | grep -q 'delegat'; then
+    REMOTE_URL=$(git remote get-url delegat)
+else
+    REMOTE_URL=$(git remote get-url origin)
+fi
+REPO_NAME=$(basename -s .git "$REMOTE_URL")
 
 cleanup() {
     git checkout main
@@ -81,9 +85,20 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Push the releases branch to the delegat repo's main branch
-git push delegat releases:main --tags
-if [ $? -ne 0 ]; then
-    echo "Error: Pushing to delegat failed."
-    exit 1
+# Push the releases branch to the delegat repo's main branch if it exists
+if git remote | grep -q 'delegat'; then
+    git push delegat releases:main --tags
+    if [ $? -ne 0 ]; then
+        echo "Error: Pushing to delegat failed."
+        exit 1
+    fi
+fi
+
+# Push the releases branch to the cloudsecops repo's main branch
+if git remote | grep -q 'cloudsecops'; then
+    git push cloudsecops releases:main --tags
+    if [ $? -ne 0 ]; then
+        echo "Error: Pushing to cloudsecops failed."
+        exit 1
+    fi
 fi

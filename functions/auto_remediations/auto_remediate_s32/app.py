@@ -1,5 +1,6 @@
 import os
 import boto3
+from botocore.exceptions import ClientError
 
 CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
 TAG = os.environ['TAG']
@@ -25,16 +26,30 @@ def lambda_handler(data, _context):
 
     client = get_client('s3', account_id, region)
 
-    response = client.put_public_access_block(
-        Bucket=bucket_name,
-        PublicAccessBlockConfiguration={
-            'BlockPublicAcls': True,
-            'IgnorePublicAcls': True,
-            'BlockPublicPolicy': True,
-            'RestrictPublicBuckets': True
-        }
-    )
-    print(response)
+    try:
+        response = client.put_public_access_block(
+            Bucket=bucket_name,
+            PublicAccessBlockConfiguration={
+                'BlockPublicAcls': True,
+                'IgnorePublicAcls': True,
+                'BlockPublicPolicy': True,
+                'RestrictPublicBuckets': True
+            }
+        )
+        print(response)
+    except ClientError as error:
+        error_code = error.response['Error']['Code']
+        error_message = error.response['Error']['Message']
+        print(f"Error blocking public access: {error_code} - {error_message}")
+        
+        if error_code in ['NoSuchBucket', 'AccessDenied']:
+            data['messages']['actions_taken'] = f"Unable to block public access: {error_code}. This finding has been suppressed."
+            data['actions']['suppress_finding'] = True
+            return data
+        else:
+            data['messages']['actions_taken'] = f"Failed to block public access: {error_code}"
+            data['actions']['autoremediation_not_done'] = True
+            return data
 
     data['messages'][
         'actions_taken'] = f"Public access has been disabled, as the tag '{TAG}' wasn't found on the bucket."

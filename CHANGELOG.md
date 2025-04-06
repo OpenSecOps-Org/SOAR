@@ -1,5 +1,29 @@
 # Change Log
 
+## v1.23.6
+    * Updated publish.zsh to support dual-remote publishing to CloudSecOps-Org repositories.
+
+## v1.23.5
+    * Fix duplicate logo in Office365 emails by adding Content-Disposition: inline header
+
+## v1.23.4
+    * Add comprehensive ticketing system documentation in ticketing README
+    * Document ticketing system parity recommendations between Jira and ServiceNow
+    * Correct Multi-Account Management section in architecture documentation
+    * Improve architecture documentation with accurate account roles and responsibilities
+
+## v1.23.3
+    * Enhance error handling in ECR1, KMS4, ELB1, and S32 auto-remediation functions
+    * Add specific AWS error code handling for better reliability
+    * Improve error diagnostics and feedback in remediation messages
+    * Fix string formatting in ELB1 auto-remediation
+
+## v1.23.2
+    * Fix RDS4 auto-remediation function to use correct API call for DB instance snapshots
+    * Fix string formatting in RDS4 success messages to correctly display snapshot names
+    * Fix field name casing in RDS9 to use correct capitalization (DB vs Db) for parameter groups
+    * Enhance error handling in RDS6 auto-remediation for IAM role management
+
 ## v1.23.1
     * Additional `Fault` added to return code comparisons.
 
