@@ -14,15 +14,15 @@ fi
 
 REPO_NAME=$1
 
-# Add CloudSecOps organization repository as a remote (if it doesn't already exist)
-if ! git remote | grep -q 'cloudsecops'; then
-    git remote add cloudsecops "https://github.com/CloudSecOps-Org/$REPO_NAME.git"
+# Add OpenSecOps organization repository as a remote (if it doesn't already exist)
+if ! git remote | grep -q 'OpenSecOps'; then
+    git remote add OpenSecOps "https://github.com/OpenSecOps-Org/$REPO_NAME.git"
     if [ $? -ne 0 ]; then
-        echo "Error: Failed to add 'cloudsecops' remote."
+        echo "Error: Failed to add 'OpenSecOps' remote."
         exit 1
     fi
 else
-    echo "'cloudsecops' remote already exists"
+    echo "'OpenSecOps' remote already exists"
 fi
 
 # Switch back to the main branch before finishing

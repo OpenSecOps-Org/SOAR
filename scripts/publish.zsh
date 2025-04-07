@@ -94,11 +94,11 @@ if git remote | grep -q 'delegat'; then
     fi
 fi
 
-# Push the releases branch to the cloudsecops repo's main branch
-if git remote | grep -q 'cloudsecops'; then
-    git push cloudsecops releases:main --tags
+# Push the releases branch to the OpenSecOps repo's main branch
+if git remote | grep -q 'OpenSecOps'; then
+    git push OpenSecOps releases:main --tags
     if [ $? -ne 0 ]; then
-        echo "Error: Pushing to cloudsecops failed."
+        echo "Error: Pushing to OpenSecOps failed."
         exit 1
     fi
 fi
