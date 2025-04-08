@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.24.4
+    * Parametrised the SOAR product name in the email sending function.
+
 ## v1.24.3
     * Updated GitHub organization name from CloudSecOps-Org to OpenSecOps-Org.
     * Updated references to CloudSecOps-Installer to Installer.

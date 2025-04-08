@@ -43,7 +43,7 @@ Parameters:
   ProductName:
     Type: String
     Description: The name of the product.
-    Default: 'Delegat SOAR'
+    Default: 'OpenSecOps SOAR'
 
   OrgAccountId:
     Type: String
@@ -1460,6 +1460,7 @@ Resources:
           EMAIL_CC: !Ref EmailCC
           EMAIL_BCC: !Ref EmailBCC
           EMAIL_RETURN_PATH: !Ref EmailReturnPath
+          PRODUCT_NAME: !Ref ProductName
         
 
   OpenTicketFunction:

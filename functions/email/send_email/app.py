@@ -18,6 +18,7 @@ EMAIL_SENDER = os.environ['EMAIL_SENDER']
 EMAIL_CC = os.environ['EMAIL_CC'].split(',')
 EMAIL_BCC = os.environ['EMAIL_BCC'].split(',')
 EMAIL_RETURN_PATH = os.environ['EMAIL_RETURN_PATH']
+PRODUCT_NAME = os.environ['PRODUCT_NAME']
 
 client = boto3.client('ses')
 
@@ -29,14 +30,14 @@ def load_logo_image():
     logo_image.add_header('Content-Disposition', 'inline')
     
     # Create HTML code to reference the logo inline
-    logo_html = '''
+    logo_html = f'''
 <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #030204; height: 128px;">
     <tr>
         <td style="padding-left: 18px;">
-            <img src="cid:logo" alt="Delegat SOAR logo" style="height: 128px;">
+            <img src="cid:logo" alt="OpenSecOps SOAR logo" style="height: 128px;">
         </td>
         <td style="font-family: Arial, sans-serif; font-weight: bold; font-size: 48px; text-align: right; color: #232144; vertical-align: bottom; padding-right: 18px; padding-bottom: 10px;">
-            DELEGAT SOAR
+            {PRODUCT_NAME}
         </td>
     </tr>
 </table>
