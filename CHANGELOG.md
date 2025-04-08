@@ -1,5 +1,8 @@
 # Change Log
 
+## v1.25.0
+    * Upped the version number.
+
 ## v1.24.4
     * Parametrised the SOAR product name in the email sending function.
 
