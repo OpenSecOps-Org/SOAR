@@ -1,6 +1,6 @@
 # SOAR Central Processors
 
-This project contains nested state machines for Delegat SOAR. Together, they constitute the central
+This project contains nested state machines for OpenSecOps SOAR. Together, they constitute the central
 processors of security data:
   1. `SOARSecHubFindingsProcessor`: The main state machine triggered on ASFF data from Security Hub.
   1. `SOARAttemptAutoRemediation`: Invoked by `SOARSecHubFindingsProcessor` to handle autoremediation of failed controls.

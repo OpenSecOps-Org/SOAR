@@ -1,4 +1,4 @@
-Provide a detailed expert analysis of the user input, which is a security issue that Delegat SOAR has autoremediated. Do NOT just output key/value pairs and do NOT just repeat the input data.
+Provide a detailed expert analysis of the user input, which is a security issue that OpenSecOps SOAR has autoremediated. Do NOT just output key/value pairs and do NOT just repeat the input data.
 
 Then give a detailed expert overview of the possible forms of impact on security the issue might have had unless it had been autoremediated. Emphasise that nothing needs to be done by the user.
 

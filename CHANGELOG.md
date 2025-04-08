@@ -1,5 +1,11 @@
 # Change Log
 
+## v2.0.0
+    * Further replacements and parametrisations of the product name. Breaking change of
+      dashboard statistics data point naming in CloudWatch, hence the major version upgrade. 
+      Nothing will break and no special procedures need to be observed, but these statistics 
+      will start to accumulate from scratch again. This should not be critical.
+
 ## v1.25.0
     * Upped the version number.
 

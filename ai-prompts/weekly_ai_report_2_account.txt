@@ -1,8 +1,8 @@
 [CONTEXT]
 - Severity levels are CRITICAL, HIGH, MEDIUM, LOW, and INFORMATIONAL.
 
-- Delegat SOAR constantly monitors and autoremediates issues whenever found. 
-- New tickets, incidents, or autoremediations are NEVER a sign of an improved security stance. Delegat SOAR sees everything anyway. Lower numbers of tickets, incidents, and autoremediations are always better.
+- OpenSecOps SOAR constantly monitors and autoremediates issues whenever found. 
+- New tickets, incidents, or autoremediations are NEVER a sign of an improved security stance. OpenSecOps SOAR sees everything anyway. Lower numbers of tickets, incidents, and autoremediations are always better.
 
 - Autoremediations are of two kinds:
   1. Security-related, meaning that they fix real security issues the teams have overlooked, such as publicly accessible ports or misconfigurations. These should be taken very seriously, and it is vital that the team be educated about the causes and effects so they can avoid making the same mistake again. A high number of autoremediations of this type is a cause for concern.
@@ -12,8 +12,8 @@
 - A sudden rise in incidents, especially in the production environment, is a sign that needs investigation.
 - An incident is a SOAR failure only if its field 'SOARFailure' is true.
 - SOAR failures only happen in the organisational account.
-- SOAR failures indicate that there is a problem with Delegat SOAR itself. Teams cannot fix SOAR failures. Advise contacting the maintainers of Delegat SOAR immediately.
-- Do not mention contacting the maintainers of Delegat SOAR unless there is direct cause to do so. Never say "There's no need to contact the maintainers of Delegat SOAR."
+- SOAR failures indicate that there is a problem with OpenSecOps SOAR itself. Teams cannot fix SOAR failures. Advise contacting the maintainers of OpenSecOps SOAR immediately.
+- Do not mention contacting the maintainers of OpenSecOps SOAR unless there is direct cause to do so. Never say "There's no need to contact the maintainers of OpenSecOps SOAR."
 - Do not mention SOAR failures unless there are actual SOAR failures. For instance, do not say "There are no SOAR failures this week."
 - Stack and StackSet drift can only be fixed locally.
 - INFORMATIONAL incidents are never a cause for concern.
@@ -56,8 +56,8 @@ Sections:
 - Autoremediations: Place the placeholder for the autoremediations_html_table right after the subheading. Analyze their commonalities, vulnerabilities, or areas of concern. Be sure to mention the number of autoremediations for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. Brevity is of the essence here. Make sure you always include your analysis.
 
 - Incidents: Start with the placeholder for the incidents_html_table and then discuss any patterns or significant findings. Be sure to mention the number of incidents for this week and for last week, respectively. Double-check that you retrieve the correct data for each week. Brevity is of the essence here. Make sure you always include your analysis.
-  - If there are any SOAR failures, recommend contacting the maintainers of Delegat SOAR immediately. 
-  - If there are no SOAR failures, do not mention SOAR failures or contacting the maintainers of Delegat SOAR at all.
+  - If there are any SOAR failures, recommend contacting the maintainers of OpenSecOps SOAR immediately. 
+  - If there are no SOAR failures, do not mention SOAR failures or contacting the maintainers of OpenSecOps SOAR at all.
   - If there are incidents sent from AWS to notify about upcoming changes, make a note of the fact that these incidents do not indicate an afflicted or malfunctioning system. Summarise the upcoming changes in a helpful format.
   - INFORMATIONAL incidents are never a cause for concern.
 

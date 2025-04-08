@@ -81,7 +81,7 @@ Parameters:
     Type: Number
     Description:
       The number of hours during which a newly created account is given time to stabilise 
-      and get registered with all relevant AWS services. During this period, Delegat SOAR 
+      and get registered with all relevant AWS services. During this period, OpenSecOps SOAR 
       ignores all issues for the account, deferring processing of them until later.
     Default: 24
 
@@ -491,7 +491,7 @@ Parameters:
   WeeklyReportTitle:
     Type: String
     Description: The base name of the weekly AI report.
-    Default: 'Delegat SOAR Weekly Security Report'
+    Default: 'OpenSecOps SOAR Weekly Security Report'
 
   WeeklyReportWeekNumbers:
     Type: String
@@ -546,17 +546,17 @@ Parameters:
   DashboardName:
     Type: String
     Description: The name of the SOAR security status dashboard. Set to 'CloudWatch-Default' to make it the default one.
-    Default: 'Delegat_SOAR_Security_Status'
+    Default: 'OpenSecOps_SOAR_Security_Status'
 
   DashboardExecName:
     Type: String
     Description: The name of the SOAR execution metrics dashboard. Set to 'CloudWatch-Default' to make it the default one.
-    Default: 'Delegat_SOAR_Execution_Dashboard'
+    Default: 'OpenSecOps_SOAR_Execution_Dashboard'
 
   MetricNamespace:
     Type: String
     Description: The CloudWatch metric namespace. There is no reason to change this value.
-    Default: 'DelegatSOAR'
+    Default: 'OpenSecOpsSOAR'
 
   # Environment Names ------------------------------------------------------------------
 
@@ -1605,8 +1605,8 @@ Resources:
   ExternalCallFailureSNSTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: DelegatSOARExternalCallFailures
-      DisplayName: Delegat SOAR External Call Failures
+      TopicName: OpenSecOpsSOARExternalCallFailures
+      DisplayName: OpenSecOps SOAR External Call Failures
 
 
   #-------------------------------------------------------------------------------
@@ -2916,6 +2916,7 @@ Resources:
         Variables:
           AI_REPORT_TABLE: !Ref AIReportTable
           BUCKET: !Ref SOARWeeklyAIReportBucket
+          PRODUCT_NAME: !Ref ProductName
 
 
   #-------------------------------------------------------------------------------
@@ -3330,7 +3331,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt AIPromptsSyncerFunction.Arn
       FunctionName: !Ref AIPromptsSyncerFunction
-      DummyProperty: 'hjgcgrdgfgukijh'  # Change this value whenever ai-prompts changes
+      DummyProperty: 'ekjrnfgefghsuss'  # Change this value whenever ai-prompts changes
       
 
   #-------------------------------------------------------------------------------
@@ -3397,7 +3398,7 @@ Resources:
               "properties": {
                 "sparkline": false,
                 "metrics": [
-                    [ "DelegatSOAR", "TotalTickets", "TicketStatus", "Open", { "region": "${AWS::Region}", "label": "(at end of range)" } ]
+                    [ "OpenSecOpsSOAR", "TotalTickets", "TicketStatus", "Open", { "region": "${AWS::Region}", "label": "(at end of range)" } ]
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
@@ -3418,7 +3419,7 @@ Resources:
               "properties": {
                 "sparkline": false,
                 "metrics": [
-                    [ "DelegatSOAR", "TotalTickets", "TicketStatus", "Overdue", { "region": "${AWS::Region}", "label": "(at end of range)" } ]
+                    [ "OpenSecOpsSOAR", "TotalTickets", "TicketStatus", "Overdue", { "region": "${AWS::Region}", "label": "(at end of range)" } ]
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
@@ -3439,7 +3440,7 @@ Resources:
               "properties": {
                 "sparkline": false,
                 "metrics": [
-                    [ "DelegatSOAR", "TotalAutoRemediations", "Action", "Performed", { "region": "${AWS::Region}", "label": "(past 4 weeks)" } ]
+                    [ "OpenSecOpsSOAR", "TotalAutoRemediations", "Action", "Performed", { "region": "${AWS::Region}", "label": "(past 4 weeks)" } ]
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
@@ -3460,7 +3461,7 @@ Resources:
               "properties": {
                 "sparkline": false,
                 "metrics": [
-                    [ "DelegatSOAR", "TotalIncidents", "Action", "Processed", { "region": "${AWS::Region}", "label": "(past 4 weeks)" } ]
+                    [ "OpenSecOpsSOAR", "TotalIncidents", "Action", "Processed", { "region": "${AWS::Region}", "label": "(past 4 weeks)" } ]
                 ],
                 "view": "singleValue",
                 "region": "${AWS::Region}",
@@ -3481,7 +3482,7 @@ Resources:
               "x": 4,
               "properties": {
                 "metrics": [
-                    [ { "expression": "SELECT MAX(TotalOpenTicketsBySeverity) FROM SCHEMA(DelegatSOAR, severity_label) GROUP BY severity_label",
+                    [ { "expression": "SELECT MAX(TotalOpenTicketsBySeverity) FROM SCHEMA(OpenSecOpsSOAR, severity_label) GROUP BY severity_label",
                         "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                 ],
                 "view": "pie",
@@ -3511,7 +3512,7 @@ Resources:
               "x": 9,
               "properties": {
                 "metrics": [
-                    [ { "expression": "SELECT MAX(TotalOpenTicketsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
+                    [ { "expression": "SELECT MAX(TotalOpenTicketsByEnvironment) FROM SCHEMA(OpenSecOpsSOAR, Environment) GROUP BY Environment", 
                         "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                 ],
                 "view": "pie",
@@ -3541,7 +3542,7 @@ Resources:
               "x": 14,
               "properties": {
                 "metrics": [
-                    [ { "expression": "SELECT MAX(TotalOpenTicketsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
+                    [ { "expression": "SELECT MAX(TotalOpenTicketsByAccount) FROM SCHEMA(OpenSecOpsSOAR, Account) GROUP BY Account", 
                         "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                 ],
                 "view": "pie",
@@ -3571,7 +3572,7 @@ Resources:
               "x": 19,
               "properties": {
                 "metrics": [
-                    [ { "expression": "SELECT MAX(TotalOpenTicketsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
+                    [ { "expression": "SELECT MAX(TotalOpenTicketsByTeam) FROM SCHEMA(OpenSecOpsSOAR, Team) GROUP BY Team", 
                         "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                 ],
                 "view": "pie",
@@ -3602,7 +3603,7 @@ Resources:
                 "type": "metric",
                 "properties": {
                     "metrics": [
-                        [ { "expression": "SELECT MAX(TotalAutoRemediationsBySeverity) FROM SCHEMA(DelegatSOAR, severity_label) GROUP BY severity_label", 
+                        [ { "expression": "SELECT MAX(TotalAutoRemediationsBySeverity) FROM SCHEMA(OpenSecOpsSOAR, severity_label) GROUP BY severity_label", 
                             "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
@@ -3632,7 +3633,7 @@ Resources:
                 "type": "metric",
                 "properties": {
                     "metrics": [
-                        [ { "expression": "SELECT MAX(TotalAutoRemediationsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
+                        [ { "expression": "SELECT MAX(TotalAutoRemediationsByEnvironment) FROM SCHEMA(OpenSecOpsSOAR, Environment) GROUP BY Environment", 
                             "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
@@ -3662,7 +3663,7 @@ Resources:
                 "type": "metric",
                 "properties": {
                     "metrics": [
-                        [ { "expression": "SELECT MAX(TotalAutoRemediationsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
+                        [ { "expression": "SELECT MAX(TotalAutoRemediationsByAccount) FROM SCHEMA(OpenSecOpsSOAR, Account) GROUP BY Account", 
                             "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
@@ -3692,7 +3693,7 @@ Resources:
                 "type": "metric",
                 "properties": {
                     "metrics": [
-                        [ { "expression": "SELECT MAX(TotalAutoRemediationsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
+                        [ { "expression": "SELECT MAX(TotalAutoRemediationsByTeam) FROM SCHEMA(OpenSecOpsSOAR, Team) GROUP BY Team", 
                             "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
@@ -3723,7 +3724,7 @@ Resources:
                 "type": "metric",
                 "properties": {
                     "metrics": [
-                        [ { "expression": "SELECT MAX(TotalIncidentsBySeverity) FROM SCHEMA(DelegatSOAR, severity_label) GROUP BY severity_label", 
+                        [ { "expression": "SELECT MAX(TotalIncidentsBySeverity) FROM SCHEMA(OpenSecOpsSOAR, severity_label) GROUP BY severity_label", 
                             "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
@@ -3753,7 +3754,7 @@ Resources:
                 "type": "metric",
                 "properties": {
                     "metrics": [
-                        [ { "expression": "SELECT MAX(TotalIncidentsByEnvironment) FROM SCHEMA(DelegatSOAR, Environment) GROUP BY Environment", 
+                        [ { "expression": "SELECT MAX(TotalIncidentsByEnvironment) FROM SCHEMA(OpenSecOpsSOAR, Environment) GROUP BY Environment", 
                             "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
@@ -3783,7 +3784,7 @@ Resources:
                 "type": "metric",
                 "properties": {
                     "metrics": [
-                        [ { "expression": "SELECT MAX(TotalIncidentsByAccount) FROM SCHEMA(DelegatSOAR, Account) GROUP BY Account", 
+                        [ { "expression": "SELECT MAX(TotalIncidentsByAccount) FROM SCHEMA(OpenSecOpsSOAR, Account) GROUP BY Account", 
                             "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
@@ -3813,7 +3814,7 @@ Resources:
                 "type": "metric",
                 "properties": {
                     "metrics": [
-                        [ { "expression": "SELECT MAX(TotalIncidentsByTeam) FROM SCHEMA(DelegatSOAR, Team) GROUP BY Team", 
+                        [ { "expression": "SELECT MAX(TotalIncidentsByTeam) FROM SCHEMA(OpenSecOpsSOAR, Team) GROUP BY Team", 
                             "label": "", "id": "q1", "region": "${AWS::Region}", "stat": "Maximum" } ]
                     ],
                     "view": "pie",
@@ -3882,7 +3883,7 @@ Resources:
               "y": 0,
               "x": 8,
               "properties": {
-                "title": "Delegat SOAR ASFF Processor Executions",
+                "title": "OpenSecOps SOAR ASFF Processor Executions",
                 "metrics": [
                   [ 
                     "AWS/States", "ExecutionsStarted", 
@@ -3914,7 +3915,7 @@ Resources:
               "y": 0,
               "x": 16,
               "properties": {
-                "title": "Delegat SOAR ASFF Processor Failures",
+                "title": "OpenSecOps SOAR ASFF Processor Failures",
                 "metrics": [
                     [ "AWS/States", "ExecutionsFailed", 
                       "StateMachineArn", "${SOARASFFProcessor.Arn}", 

@@ -6,6 +6,8 @@ from datetime import datetime, timezone, timedelta
 # Get environment variables
 AI_REPORT_TABLE = os.environ['AI_REPORT_TABLE']
 BUCKET = os.environ['BUCKET']
+PRODUCT_NAME = os.environ['PRODUCT_NAME']
+
 
 # Boto3 resources and clients
 dynamodb = boto3.resource('dynamodb')
@@ -23,7 +25,7 @@ def lambda_handler(data, _context):
     date = str(datetime.utcnow().date())
 
     result = '<div style="font-family: Verdana, sans-serif; font-size:16px;">'
-    result += f'<h1>Delegat SOAR Weekly Security Report {date}</h1>'
+    result += f'<h1>{PRODUCT_NAME} Weekly Security Report {date}</h1>'
 
     result += f'{h2}Overview</h2>'
     overview = retrieve_db_item(openai_report, 'overview')['html']

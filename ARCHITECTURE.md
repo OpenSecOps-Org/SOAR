@@ -1,10 +1,10 @@
 # SOAR Architecture
 
-This document provides a detailed overview of the Delegat Security Orchestration, Automation, and Response (SOAR) architecture.
+This document provides a detailed overview of the OpenSecOps Security Orchestration, Automation, and Response (SOAR) architecture.
 
 ## System Overview
 
-Delegat SOAR is a serverless AWS-native security automation platform that processes security findings, automates remediation, manages tickets for manual intervention, and generates AI-powered security reports. The system operates across an AWS Organization, providing centralized security management for all accounts.
+OpenSecOps SOAR is a serverless AWS-native security automation platform that processes security findings, automates remediation, manages tickets for manual intervention, and generates AI-powered security reports. The system operates across an AWS Organization, providing centralized security management for all accounts.
 
 ## Core Components
 
