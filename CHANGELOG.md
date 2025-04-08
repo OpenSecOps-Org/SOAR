@@ -1,5 +1,9 @@
 # Change Log
 
+## v2.0.1
+    * Updated GitHub remote references in publish.zsh script to use only OpenSecOps-Org, removed Delegat-AB
+    * Updated comment in get_overdue_tickets from 'DelegatSOAR' to 'OpenSecOpsSOAR'
+
 ## v2.0.0
     * Further replacements and parametrisations of the product name. Breaking change of
       dashboard statistics data point naming in CloudWatch, hence the major version upgrade. 

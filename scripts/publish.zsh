@@ -26,9 +26,9 @@ if git rev-parse $TAG_VERSION > /dev/null 2>&1; then
     exit 0
 fi
 
-# Get the repository name - try delegat remote first, then origin if delegat doesn't exist
-if git remote | grep -q 'delegat'; then
-    REMOTE_URL=$(git remote get-url delegat)
+# Get the repository name - try OpenSecOps remote first, then origin if OpenSecOps doesn't exist
+if git remote | grep -q 'OpenSecOps'; then
+    REMOTE_URL=$(git remote get-url OpenSecOps)
 else
     REMOTE_URL=$(git remote get-url origin)
 fi
@@ -83,15 +83,6 @@ git push origin releases --tags
 if [ $? -ne 0 ]; then
     echo "Error: Pushing to origin failed."
     exit 1
-fi
-
-# Push the releases branch to the delegat repo's main branch if it exists
-if git remote | grep -q 'delegat'; then
-    git push delegat releases:main --tags
-    if [ $? -ne 0 ]; then
-        echo "Error: Pushing to delegat failed."
-        exit 1
-    fi
 fi
 
 # Push the releases branch to the OpenSecOps repo's main branch

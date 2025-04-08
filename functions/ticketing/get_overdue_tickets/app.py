@@ -451,7 +451,7 @@ def emit_cloudwatch_metric(metric_name, metric_value, dimension_name, dimension_
 
     # Put the data
     cloudwatch_client.put_metric_data(
-        Namespace=METRIC_NAMESPACE,       # 'DelegatSOAR' as passed in via an ENV var
+        Namespace=METRIC_NAMESPACE,       # 'OpenSecOpsSOAR' as passed in via an ENV var
         MetricData=[
             {
                 'MetricName': metric_name,

@@ -77,8 +77,8 @@ def get_account_data_from_toml(account_key, id_or_profile):
     return data
 
 
-def get_all_parameters(delegat_app):
-    toml_file = f'../Installer/apps/{delegat_app}/parameters.toml'
+def get_all_parameters(opensecops_app):
+    toml_file = f'../Installer/apps/{opensecops_app}/parameters.toml'
     # Load and return the whole TOML file
     config = load_toml(toml_file)
     return config
@@ -1110,11 +1110,11 @@ def deploy(dry_run, verbose):
     
     # Get the deployment configuration
     dpcf = load_toml('config-deploy.toml')
-    delegat_app = dpcf['part-of']
+    opensecops_app = dpcf['part-of']
     repo_name = dpcf['repo-name']
 
     # Get the parameters (all of them, for all repos)
-    params = get_all_parameters(delegat_app)
+    params = get_all_parameters(opensecops_app)
     cross_account_role = params['cross-account-role']
     
     # Get the respective sections
