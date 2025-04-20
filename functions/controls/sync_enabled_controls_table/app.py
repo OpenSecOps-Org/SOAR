@@ -1,14 +1,13 @@
 import os
 import boto3
 from botocore.exceptions import ClientError
+from aws_utils.clients import get_client
 
-# Get the table name and cross-account role from environment variables
+# Get the table name from environment variables
 TABLE_NAME = os.environ['TABLE_NAME']
-CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
 
-# Create DynamoDB and STS clients
+# Create DynamoDB client
 dynamodb_client = boto3.client('dynamodb')
-sts_client = boto3.client('sts')
 
 
 def lambda_handler(data, _context):
@@ -164,22 +163,3 @@ def delete_control(control_identifier):
     )
 
 
-def get_client(client_type, account_id, role=CROSS_ACCOUNT_ROLE):
-    # Assume the cross-account role to get the client for the specified account
-    other_session = sts_client.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"update_enabled_sec_hub_controls_table_{account_id}"
-    )
-    
-    # Get the access key, secret key, and session token from the assumed role
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-    
-    # Create the client with the assumed role credentials
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token
-    )

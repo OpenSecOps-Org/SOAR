@@ -1,13 +1,10 @@
 import os
 import botocore
 import boto3
+from aws_utils.clients import get_client
 
-# Get the CROSS_ACCOUNT_ROLE and DYNAMODB_NO_PIT_RECOVERY_TAG environment variables
-CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
+# Get the DYNAMODB_NO_PIT_RECOVERY_TAG environment variable
 DYNAMODB_NO_PIT_RECOVERY_TAG = os.environ['DYNAMODB_NO_PIT_RECOVERY_TAG']
-
-# Create an STS client
-sts_client = boto3.client('sts')
 
 # Lambda handler function
 def lambda_handler(data, _context):
@@ -69,21 +66,3 @@ def lambda_handler(data, _context):
     data['messages']['actions_taken'] = "Point-in-time recovery has been enabled."
     return data
 
-# Function to get a client for the specified service, account, and region
-def get_client(client_type, account_id, region, role=CROSS_ACCOUNT_ROLE):
-    # Assume the specified role in the specified account
-    other_session = sts_client.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"auto_remediate_dynamodb2_{account_id}"
-    )
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-    # Create a client using the assumed role credentials and specified region
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token,
-        region_name=region
-    )

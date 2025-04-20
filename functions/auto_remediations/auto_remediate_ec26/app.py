@@ -5,12 +5,9 @@ import random
 
 import boto3
 from botocore.exceptions import ClientError
-
-CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
+from aws_utils.clients import get_client
 
 logger = logging.getLogger(__name__)
-
-sts = boto3.client('sts')
 
 
 def lambda_handler(data, _context):
@@ -81,24 +78,6 @@ def lambda_handler(data, _context):
     return data
 
 
-def get_client(client_type, account_id, region, role=CROSS_ACCOUNT_ROLE):
-    # Assume the specified role in the specified account and region
-    other_session = sts.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"auto_remediate_ec26_{account_id}"
-    )
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-
-    # Create a client with the assumed role credentials
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token,
-        region_name=region
-    )
 
 
 def create_role(iam, role_name, allowed_services):

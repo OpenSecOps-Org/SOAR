@@ -1,12 +1,7 @@
 import os
 import botocore
 import boto3
-
-# Get the CROSS_ACCOUNT_ROLE environment variable
-CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
-
-# Create an STS client
-sts_client = boto3.client('sts')
+from aws_utils.clients import get_client
 
 # Lambda handler function
 def lambda_handler(data, _context):
@@ -163,23 +158,6 @@ def revoke_egress(perm, client, sg_id):
         return False
     return True
 
-# Get the client for the specified account and region
-def get_client(client_type, account_id, region, role=CROSS_ACCOUNT_ROLE):
-    # Assume the specified role in the specified account
-    other_session = sts_client.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"auto_remediate_ec22_{account_id}"
-    )
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token,
-        region_name=region
-    )
 
 # Get the details of the security group
 def get_details(sg_id, client):

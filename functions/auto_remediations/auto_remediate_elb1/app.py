@@ -1,9 +1,7 @@
 import os
 import boto3
 import botocore
-
-CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
-STS_CLIENT = boto3.client('sts')
+from aws_utils.clients import get_client
 
 def lambda_handler(data, _context):
     print(data)
@@ -100,18 +98,3 @@ def redirect_http_to_https(elbv2_client, alb_arn):
         return False
 
 
-def get_client(client_type, account_id, region, role=CROSS_ACCOUNT_ROLE):
-    other_session = STS_CLIENT.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"auto_remediate_elb1_{account_id}"
-    )
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token,
-        region_name=region
-    )

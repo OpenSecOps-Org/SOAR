@@ -1,5 +1,18 @@
 # Change Log
 
+## v2.1.0
+    * Added Lambda Layers for shared code (aws_utils and rds_remediation) to centralize cross-account functionality
+    * Reorganized all RDS autoremediations to leverage common code from the rds_remediation layer
+    * Fixed RDS.2 autoremediation to properly handle DB instances within Aurora clusters
+    * Fixed capitalization in RDS.9 and RDS.2 autoremediations to handle Security Hub ASFF format correctly
+    * Fixed access to parameter group fields using 'DbParameterGroups' instead of 'DBParameterGroups'
+    * Fixed access to cluster parameter group fields using 'DbClusterParameterGroups' instead of 'DBClusterParameterGroups'
+    * Enhanced RDS.9 autoremediation to handle DB cluster findings more reliably with API-based fallbacks
+    * Improved error handling in RDS.9 parameter group creation to prevent duplicate name conflicts
+    * Added unique suffix generation for RDS parameter group names to avoid name collisions
+    * Removed unused CROSS_ACCOUNT_ROLE variable from RDS.9 autoremediation
+    * Thoroughly tested RDS.9 autoremediation with PostgreSQL and Aurora PostgreSQL instances (standalone and in clusters)
+
 ## v2.0.1
     * Updated GitHub remote references in publish.zsh script to use only OpenSecOps-Org, removed Delegat-AB
     * Updated comment in get_overdue_tickets from 'DelegatSOAR' to 'OpenSecOpsSOAR'

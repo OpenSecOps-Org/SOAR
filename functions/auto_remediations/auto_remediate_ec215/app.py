@@ -1,12 +1,7 @@
 import os
 import botocore
 import boto3
-
-# Get the value of the CROSS_ACCOUNT_ROLE environment variable
-CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
-
-# Create an STS client
-sts_client = boto3.client('sts')
+from aws_utils.clients import get_client
 
 # Define the lambda_handler function
 def lambda_handler(data, _context):
@@ -56,22 +51,3 @@ def lambda_handler(data, _context):
     # Return the updated input data
     return data
 
-# Define the get_client function
-def get_client(client_type, account_id, region, role=CROSS_ACCOUNT_ROLE):
-    # Assume the specified role in the specified account and region
-    other_session = sts_client.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"auto_remediate_ec215_{account_id}"
-    )
-    # Get the access key, secret key, and session token from the assumed role session
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-    # Create a client with the specified client type, access key, secret key, session token, and region
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token,
-        region_name=region
-    )

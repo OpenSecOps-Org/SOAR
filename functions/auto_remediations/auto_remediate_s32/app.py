@@ -1,11 +1,9 @@
 import os
 import boto3
 from botocore.exceptions import ClientError
+from aws_utils.clients import get_client
 
-CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
 TAG = os.environ['TAG']
-
-sts_client = boto3.client('sts')
 
 
 def lambda_handler(data, _context):
@@ -55,23 +53,6 @@ def lambda_handler(data, _context):
         'actions_taken'] = f"Public access has been disabled, as the tag '{TAG}' wasn't found on the bucket."
     data['messages']['actions_required'] = f"Adding the tag '{TAG}' to an existing bucket will not re-enable public access. You must redeploy with the correct tag, or add the tag and manually re-enable public access."
     return data
-
-
-def get_client(client_type, account_id, region, role=CROSS_ACCOUNT_ROLE):
-    other_session = sts_client.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"auto_remediate_s32_{account_id}"
-    )
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token,
-        region_name=region
-    )
 
 
 def has_tag(tag, tags):

@@ -2,12 +2,9 @@ import os
 import json
 import boto3
 import botocore
+from aws_utils.clients import get_client
 
-
-CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
 PRODUCT_NAME = os.environ['PRODUCT_NAME']
-
-sts_client = boto3.client('sts')
 
 
 def lambda_handler(data, _context):
@@ -53,17 +50,3 @@ def lambda_handler(data, _context):
     return data
 
 
-def get_client(client_type, account_id, role=CROSS_ACCOUNT_ROLE):
-    other_session = sts_client.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"update_remediated_finding_{account_id}"
-    )
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token
-    )

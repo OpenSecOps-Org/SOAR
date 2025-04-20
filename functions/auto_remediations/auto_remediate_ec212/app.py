@@ -4,12 +4,7 @@ import datetime as dt
 import botocore
 import boto3
 from dateutil import parser
-
-# Get the cross-account role from environment variables
-CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
-
-# Create an STS client
-sts_client = boto3.client('sts')
+from aws_utils.clients import get_client
 
 # Lambda handler function
 def lambda_handler(data, _context):
@@ -94,22 +89,3 @@ def lambda_handler(data, _context):
     data['messages']['actions_required'] = "Unused Elastic IPs will be released after 30 days. Make sure they are always in use and create them through code."
     return data
 
-# Function to get a client for the specified AWS service, account, and region
-def get_client(client_type, account_id, region, role=CROSS_ACCOUNT_ROLE):
-    # Assume the cross-account role using STS
-    other_session = sts_client.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"auto_remediate_ec212_{account_id}"
-    )
-    # Get the temporary credentials from the assumed role
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-    # Create a client with the temporary credentials
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token,
-        region_name=region
-    )

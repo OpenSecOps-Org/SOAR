@@ -1,10 +1,39 @@
+"""
+RDS.17 AUTOREMEDIATION - ENABLE TAG COPYING TO SNAPSHOTS
+
+This Lambda function automatically remediates AWS Security Hub findings for RDS.17 
+(RDS instances should have tags copied to snapshots).
+
+Target Resources:
+- RDS DB Instances
+- RDS DB Clusters (Aurora)
+
+Remediation Action:
+- Sets CopyTagsToSnapshot=True on DB instances and clusters
+- Changes take effect immediately (ApplyImmediately=True)
+
+Test Trigger:
+1. Create an RDS instance with tag copying to snapshots disabled
+2. Create an Aurora cluster with tag copying to snapshots disabled
+3. Verify the finding appears in Security Hub for RDS.17
+
+Security Hub Control:
+- https://docs.aws.amazon.com/securityhub/latest/userguide/rds-controls.html#rds-17
+"""
+
 import os
-import botocore
 import boto3
+from botocore.exceptions import ClientError
+from aws_utils.clients import get_client
+from rds_remediation.utils import (
+    get_engine_details,
+    get_parameter_group_family,
+    ensure_resource_available,
+    modify_db_resource,
+    handle_not_found_error
+)
 
 CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
-
-sts_client = boto3.client('sts')
 
 
 def lambda_handler(data, _context):
@@ -22,61 +51,28 @@ def lambda_handler(data, _context):
 
     client = get_client('rds', account_id, region)
 
+    # Enable tag copying to snapshots on instance or cluster as appropriate
     if not db_cluster_identifier:
-
-        waiter = client.get_waiter('db_instance_available')
-        waiter.wait(DBInstanceIdentifier=db_instance_identifier)
-        try:
-            response = client.modify_db_instance(
-                DBInstanceIdentifier=db_instance_identifier,
-                ApplyImmediately=True,
-                CopyTagsToSnapshot=True
-            )
-        except botocore.exceptions.ClientError as error:
-            if error.response['Error']['Code'] == 'DBInstanceNotFoundFault':
-                print("The DB instance wasn't found. Suppressing.")
-                data['messages']['actions_taken'] = "The DB instance wasn't found. This finding has been suppressed."
-                data['actions']['suppress_finding'] = True
-                return data
-            raise error
-        print(response)
-
+        success = modify_db_resource(
+            client, 
+            'instance', 
+            db_instance_identifier, 
+            {'CopyTagsToSnapshot': True}, 
+            data
+        )
     else:
-
-        waiter = client.get_waiter('db_cluster_available')
-        waiter.wait(DBClusterIdentifier=db_cluster_identifier)
-        try:
-            response = client.modify_db_cluster(
-                DBClusterIdentifier=db_cluster_identifier,
-                ApplyImmediately=True,
-                CopyTagsToSnapshot=True
-            )
-        except botocore.exceptions.ClientError as error:
-            if error.response['Error']['Code'] == 'DBClusterNotFoundFault':
-                print("The DB cluster wasn't found. Suppressing.")
-                data['messages']['actions_taken'] = "The DB cluster wasn't found. This finding has been suppressed."
-                data['actions']['suppress_finding'] = True
-                return data
-            raise error
-        print(response)
-
-    data['messages']['actions_taken'] = "Copying of DB tags to its snapshots has been enabled."
+        success = modify_db_resource(
+            client, 
+            'cluster', 
+            db_cluster_identifier, 
+            {'CopyTagsToSnapshot': True}, 
+            data
+        )
+        
+    # If resource not found, the response will already be in data
+    if 'suppress_finding' in data.get('actions', {}):
+        return data
+        
+    data['messages']['actions_taken'] = "Tag copying to snapshots has been enabled."
     data['messages']['actions_required'] = "None"
     return data
-
-
-def get_client(client_type, account_id, region, role=CROSS_ACCOUNT_ROLE):
-    other_session = sts_client.assume_role(
-        RoleArn=f"arn:aws:iam::{account_id}:role/{role}",
-        RoleSessionName=f"auto_remediate_rds17_{account_id}"
-    )
-    access_key = other_session['Credentials']['AccessKeyId']
-    secret_key = other_session['Credentials']['SecretAccessKey']
-    session_token = other_session['Credentials']['SessionToken']
-    return boto3.client(
-        client_type,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        aws_session_token=session_token,
-        region_name=region
-    )
