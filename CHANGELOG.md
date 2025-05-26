@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.1.1
+    * Added existence check to the auto-remediation for ELB.5.
+
 ## v2.1.0
     * Added Lambda Layers for shared code (aws_utils and rds_remediation) to centralize cross-account functionality
     * Reorganized all RDS autoremediations to leverage common code from the rds_remediation layer

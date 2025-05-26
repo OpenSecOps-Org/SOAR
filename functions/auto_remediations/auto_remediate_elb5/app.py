@@ -56,6 +56,22 @@ def lambda_handler(data, _context):
     s3_client = get_client('s3', account_id, region)
     elbv2_client = get_client('elbv2', account_id, region)
 
+    # First, verify the load balancer exists
+    try:
+        print(f"Checking if load balancer '{lb_arn}' exists...")
+        elbv2_client.describe_load_balancers(LoadBalancerArns=[lb_arn])
+        print("Load balancer exists, proceeding with remediation.")
+    except elbv2_client.exceptions.LoadBalancerNotFoundException:
+        print(f"Load balancer not found: {lb_arn}")
+        data['messages']['actions_taken'] = f"Load balancer not found: {lb_arn}. This finding has been suppressed."
+        data['actions']['suppress_finding'] = True
+        return data
+    except Exception as e:
+        print(f"Error checking load balancer existence: {str(e)}")
+        data['messages']['actions_taken'] = f"Error checking load balancer existence: {str(e)}. This finding has been suppressed."
+        data['actions']['suppress_finding'] = True
+        return data
+
     try:
         print(f"Creating bucket '{bucket_name}'...")
         response = s3_client.create_bucket(
@@ -138,24 +154,35 @@ def lambda_handler(data, _context):
     print(response)
 
     print(f"Enabling access logs for LB '{lb_arn}'...")
-    response = elbv2_client.modify_load_balancer_attributes(
-        Attributes=[
-            {
-                'Key': 'access_logs.s3.enabled',
-                'Value': 'true',
-            },
-            {
-                'Key': 'access_logs.s3.bucket',
-                'Value': bucket_name,
-            },
-            {
-                'Key': 'access_logs.s3.prefix',
-                'Value': '',
-            },
-        ],
-        LoadBalancerArn=lb_arn,
-    )
-    print(response)
+    try:
+        response = elbv2_client.modify_load_balancer_attributes(
+            Attributes=[
+                {
+                    'Key': 'access_logs.s3.enabled',
+                    'Value': 'true',
+                },
+                {
+                    'Key': 'access_logs.s3.bucket',
+                    'Value': bucket_name,
+                },
+                {
+                    'Key': 'access_logs.s3.prefix',
+                    'Value': '',
+                },
+            ],
+            LoadBalancerArn=lb_arn,
+        )
+        print(response)
+    except elbv2_client.exceptions.LoadBalancerNotFoundException:
+        print(f"Load balancer not found during modification: {lb_arn}")
+        data['messages']['actions_taken'] = f"Load balancer not found during modification: {lb_arn}. This finding has been suppressed."
+        data['actions']['suppress_finding'] = True
+        return data
+    except Exception as e:
+        print(f"Error modifying load balancer attributes: {str(e)}")
+        data['messages']['actions_taken'] = f"Error modifying load balancer attributes: {str(e)}. This finding has been suppressed."
+        data['actions']['suppress_finding'] = True
+        return data
 
     data['messages']['actions_taken'] = f"The bucket {bucket_name} was successfully created and configured for Load Balancer access logs."
     data['messages']['actions_required'] = f"None"
