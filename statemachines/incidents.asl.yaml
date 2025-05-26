@@ -390,7 +390,7 @@ States:
     AddAiDataForAppIncident:
         Type: Task
         Resource: '${QueryAIFunctionArn}'
-        TimeoutSeconds: 120
+        TimeoutSeconds: 600
         Retry:
             -
                 ErrorEquals:

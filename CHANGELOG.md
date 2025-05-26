@@ -1,5 +1,9 @@
 # Change Log
 
+## v2.1.2
+    * Set incident AI Query to 600 (was 120) as Claude Sonnet 4 keeps timing out - it's new.
+
+
 ## v2.1.1
     * Added existence check to the auto-remediation for ELB.5.
 
