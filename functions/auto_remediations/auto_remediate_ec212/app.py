@@ -1,14 +1,47 @@
-# Import necessary libraries
+"""
+AWS Security Hub Auto-Remediation: EC2.12 - Unused Elastic IP Address Cleanup
+
+This control identifies and removes Elastic IP addresses that have been unattached 
+for an extended period. Unattached Elastic IPs incur unnecessary costs and may
+indicate abandoned resources or misconfigurations in infrastructure management.
+
+Test triggers:
+- Unused EIP for over 30 days: aws ec2 describe-addresses --filters "Name=domain,Values=vpc"
+- Check EIP association status: aws ec2 describe-addresses --allocation-ids eipalloc-12345678
+- Monitor EIP first observed time: Check finding FirstObservedAt timestamp
+
+The auto-remediation releases Elastic IP addresses that have been unused for more than
+30 days, reducing costs and cleaning up orphaned network resources.
+
+Target Resources: AWS Elastic IP addresses with no associated instances/network interfaces
+Remediation: Release EIP after 30-day grace period to prevent accidental deletion
+"""
+
 import os
 import datetime as dt
 import botocore
 import boto3
 from dateutil import parser
 from aws_utils.clients import get_client
-
-# Lambda handler function
 def lambda_handler(data, _context):
-    # Print the input data
+    """
+    Main Lambda handler for EC2.12 auto-remediation.
+    
+    Args:
+        data: Security Hub finding data containing EIP details
+        _context: Lambda context (unused)
+        
+    Returns:
+        dict: Updated finding data with remediation results
+        
+    Remediation Logic:
+        1. Extract EIP allocation ID from Security Hub finding
+        2. Check finding age against 30-day minimum threshold
+        3. If too young, defer remediation for later processing
+        4. If old enough, release the Elastic IP address
+        5. Handle various error conditions with appropriate suppression
+        6. Return success message or reschedule directive
+    """
     print(data)
 
     # Get the finding from the input data

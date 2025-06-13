@@ -1,3 +1,30 @@
+"""
+SOAR Email Formatting: Generic Security Hub Finding Message
+
+This Lambda function formats Security Hub findings into email messages for incident
+notification. Creates human-readable email content with all relevant finding details,
+account information, and remediation guidance.
+
+Email Content Includes:
+- Incident severity and classification
+- Resource details (ARN, type, region)
+- Finding description and annotations
+- Account metadata (name, ID, organizational unit)
+- Team contact information
+- Remediation instructions and required actions
+- Technical details in YAML format for advanced users
+
+Message Formatting:
+- Subject line with severity and incident type
+- Structured body with clear sections
+- Actions required based on severity level
+- Product branding and contact information
+- Machine-readable technical appendix
+
+Target Use: Security incident email notifications to development teams
+Integration: Part of SOAR notification pipeline for Security Hub findings
+"""
+
 import yaml
 import os
 
@@ -5,6 +32,26 @@ PRODUCT_NAME = os.environ['PRODUCT_NAME']
 
 
 def lambda_handler(data, _context):
+    """
+    Main Lambda handler for formatting Security Hub findings as email messages.
+    
+    Args:
+        data: SOAR finding data containing Security Hub finding and account information
+        _context: Lambda context (unused)
+        
+    Returns:
+        dict: Input data enhanced with formatted email message in messages.email
+        
+    Email Structure:
+        - Subject: Severity-based incident notification
+        - Body: Human-readable finding details with remediation guidance
+        - Technical appendix: YAML dumps of resources, product fields, and account data
+        
+    Severity Handling:
+        - INFORMATIONAL: No action required
+        - LOW: Investigation optional
+        - MEDIUM/HIGH/CRITICAL: Investigation required with remediation guidance
+    """
     print(data)
 
     finding = data['finding']

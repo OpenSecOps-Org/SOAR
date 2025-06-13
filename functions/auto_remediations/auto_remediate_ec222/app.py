@@ -1,13 +1,47 @@
+"""
+AWS Security Hub Auto-Remediation: EC2.22 - Unused Security Group Cleanup
+
+This control identifies and removes security groups that have been unused for an
+extended period. Unused security groups can clutter the environment and may pose
+security risks if they contain overly permissive rules.
+
+Test triggers:
+- Unused security group for over 24 hours: aws ec2 describe-security-groups --group-ids sg-12345678
+- Check security group usage: aws ec2 describe-instances --filters "Name=instance.group-id,Values=sg-12345678"
+- Monitor security group first observed time: Check finding FirstObservedAt timestamp
+
+The auto-remediation deletes security groups that have been unused for more than
+24 hours, reducing security risks and cleaning up orphaned network configurations.
+
+Target Resources: AWS Security Groups with no associated instances or network interfaces
+Remediation: Delete security group after 24-hour grace period to prevent accidental deletion
+"""
+
 import os
 import datetime as dt
 import botocore
 import boto3
 from dateutil import parser
 from aws_utils.clients import get_client
-
-# Lambda handler function
 def lambda_handler(data, _context):
-    # Print the input data
+    """
+    Main Lambda handler for EC2.22 auto-remediation.
+    
+    Args:
+        data: Security Hub finding data containing security group details
+        _context: Lambda context (unused)
+        
+    Returns:
+        dict: Updated finding data with remediation results
+        
+    Remediation Logic:
+        1. Extract security group ID from Security Hub finding
+        2. Check finding age against 24-hour minimum threshold
+        3. If too young, defer remediation for later processing
+        4. If old enough, delete the unused security group
+        5. Handle dependency violations and not found errors with suppression
+        6. Return success message or reschedule directive
+    """
     print(data)
 
     # Get the finding from the input data

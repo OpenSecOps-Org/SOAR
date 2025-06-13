@@ -1,8 +1,19 @@
 # Change Log
 
+## v2.1.3
+    * Comprehensive testing infrastructure implementation with 53% auto-remediation coverage (16/30 functions, 236 tests)
+    * Complete EC2 auto-remediation testing (8/8 functions, 134 tests) with ASFF standardization patterns
+    * Complete RDS auto-remediation testing (7/7 controls, 88 tests) with comprehensive edge case coverage
+    * Established documentation-first testing methodology for efficient test development
+    * Added centralized test data management via fixtures/asff_data.py for consistent ASFF structures
+    * Implemented critical pytest module import isolation to prevent cross-contamination between test suites
+    * Enhanced testing documentation with LocalStack Docker integration and contributor guidelines
+    * Added bug handling protocol for test development to ensure proper production code review processes
+    * Comprehensive documentation added to core SOAR functions and auto-remediation components
+    * Testing strategy now serves as template for expanding coverage across all OpenSecOps repositories
+
 ## v2.1.2
     * Set incident AI Query to 600 (was 120) as Claude Sonnet 4 keeps timing out - it's new.
-
 
 ## v2.1.1
     * Added existence check to the auto-remediation for ELB.5.

@@ -1,3 +1,28 @@
+"""
+AWS Account Data Management: Get Account Data with Caching
+
+This Lambda function retrieves comprehensive account information including metadata,
+tags, organizational structure, and team assignments. Uses DynamoDB caching to 
+improve performance and reduce API calls to AWS Organizations.
+
+Account Data Includes:
+- Basic account information (ID, name, email, join date)
+- Organizational unit placement and hierarchy
+- Tag-based metadata (team, environment, client, project)
+- Contact information and team email assignments
+- Ticketing system integration details (Jira/ServiceNow)
+- Account age and classification (new vs established)
+
+Caching Strategy:
+- Check DynamoDB cache first for existing account data
+- Fetch fresh data from AWS Organizations if cache miss
+- Store fresh data in cache for future requests
+- Cache improves performance and reduces Organizations API throttling
+
+Target Resources: AWS Organizations accounts and DynamoDB cache
+Purpose: Centralized account metadata retrieval with performance optimization
+"""
+
 import os
 import datetime as dt
 import json
@@ -5,57 +30,92 @@ import boto3
 from botocore.config import Config
 from dateutil import parser
 
-# Get environment variables
+# SOAR Configuration
 PRODUCT_NAME = os.environ['PRODUCT_NAME']
+
+# Team Contact Configuration
 ACCOUNT_TEAM_EMAIL_TAG = os.environ['ACCOUNT_TEAM_EMAIL_TAG']         # soar:team:email
 ACCOUNT_TEAM_EMAIL_TAG_APP = os.environ['ACCOUNT_TEAM_EMAIL_TAG_APP'] # soar:team:email:app
 DEFAULT_TEAM_EMAIL = os.environ['DEFAULT_TEAM_EMAIL']
+
+# Account Classification Tags
 ENVIRONMENT_TAG = os.environ['ENVIRONMENT_TAG']                       # soar:environment
 CLIENT_TAG = os.environ['CLIENT_TAG']                                 # soar:client
 PROJECT_TAG = os.environ['PROJECT_TAG']                               # soar:project
 TEAM_TAG = os.environ['TEAM_TAG']                                     # soar:team
 
-TICKETING_SYSTEM = os.environ['TICKETING_SYSTEM'] # 
+# Ticketing System Integration
+TICKETING_SYSTEM = os.environ['TICKETING_SYSTEM']                    # JIRA or ServiceNow
 
+# Jira Integration Configuration
 JIRA_PROJECT_KEY_TAG = os.environ['JIRA_PROJECT_KEY_TAG']             # soar:jira:project-key
 JIRA_PROJECT_KEY_TAG_APP = os.environ['JIRA_PROJECT_KEY_TAG_APP']     # soar:jira:project-key:app
-JIRA_DEFAULT_PROJECT_KEY = os.environ['JIRA_DEFAULT_PROJECT_KEY']     # XXX
+JIRA_DEFAULT_PROJECT_KEY = os.environ['JIRA_DEFAULT_PROJECT_KEY']     # Default project key
 
+# ServiceNow Integration Configuration
 SERVICE_NOW_PROJECT_QUEUE_TAG = os.environ['SERVICE_NOW_PROJECT_QUEUE_TAG']         # soar:service-now:project-queue
 SERVICE_NOW_PROJECT_QUEUE_TAG_APP = os.environ['SERVICE_NOW_PROJECT_QUEUE_TAG_APP'] # soar:service-now:project-queue:app
-SERVICE_NOW_DEFAULT_PROJECT_QUEUE = os.environ['SERVICE_NOW_DEFAULT_PROJECT_QUEUE'] # XXX
+SERVICE_NOW_DEFAULT_PROJECT_QUEUE = os.environ['SERVICE_NOW_DEFAULT_PROJECT_QUEUE'] # Default queue
 
+# Cache Configuration
 CACHED_ACCOUNT_DATA_TABLE_NAME = os.environ['CACHED_ACCOUNT_DATA_TABLE_NAME']
-
 MIN_AGE_HOURS = int(os.environ['MIN_AGE_HOURS'])
 
-
-# Configure Boto3
+# Configure Boto3 with minimal retries - let Step Functions handle retry logic
 config = Config(
     retries={
         'total_max_attempts': 1  # Let Step Functions handle the retries
     }
 )
 
-# Create Boto3 clients
+# AWS Service Clients
 client = boto3.client('organizations', config=config)
 dynamodb = boto3.client('dynamodb')
 
-# Lambda handler function
+
 def lambda_handler(account_id, _context):
-    # Check if account data is cached
+    """
+    Main Lambda handler for retrieving account data with caching.
+    
+    Args:
+        account_id: AWS account ID to retrieve data for
+        _context: Lambda context (unused)
+        
+    Returns:
+        dict: Comprehensive account data including metadata, contacts, and classification
+        
+    Process:
+        1. Check DynamoDB cache for existing account data
+        2. If cache hit, return cached data immediately
+        3. If cache miss, fetch fresh data from AWS Organizations
+        4. Store fresh data in cache and return to caller
+    """
+    # STEP 1: Check cache first for performance optimization
     cached_account_data = get_cached_account_data(account_id)
     if cached_account_data:
         print(f"Account {account_id}: Using cache")
         return cached_account_data
 
-    # Fetch fresh account data
+    # STEP 2: Cache miss - fetch fresh data and update cache
     account_data = get_fresh_account_data(account_id)
     put_cached_account_data(account_id, account_data)
     return account_data
 
-# Get cached account data from DynamoDB
+
 def get_cached_account_data(account_id):
+    """
+    Retrieve account data from DynamoDB cache.
+    
+    Args:
+        account_id: AWS account ID to look up
+        
+    Returns:
+        dict: Cached account data if found and valid, False otherwise
+        
+    Error Handling:
+        Returns False for any cache misses, corruption, or JSON parsing errors.
+        This ensures graceful fallback to fresh data fetching.
+    """
     response = dynamodb.get_item(
         TableName=CACHED_ACCOUNT_DATA_TABLE_NAME,
         Key={
@@ -76,8 +136,18 @@ def get_cached_account_data(account_id):
 
     return data
 
-# Put account data into DynamoDB cache
 def put_cached_account_data(account_id, account_data):
+    """
+    Store account data in DynamoDB cache for future requests.
+    
+    Args:
+        account_id: AWS account ID as cache key
+        account_data: Complete account data dictionary to cache
+        
+    Cache Format:
+        Stores JSON-serialized account data with account ID as primary key.
+        This enables fast lookup and reduces Organizations API calls.
+    """
     response = dynamodb.put_item(
         TableName=CACHED_ACCOUNT_DATA_TABLE_NAME,
         Item={
@@ -87,8 +157,29 @@ def put_cached_account_data(account_id, account_data):
     )
     print(response)
 
-# Fetch fresh account data
+
 def get_fresh_account_data(account_id):
+    """
+    Fetch comprehensive account data from AWS Organizations and compile metadata.
+    
+    Args:
+        account_id: AWS account ID to retrieve information for
+        
+    Returns:
+        dict: Complete account data including:
+            - Basic account info (ID, name, email, join date)
+            - Organizational structure (OU placement)
+            - Tag-based metadata (team, environment, client, project)
+            - Contact information (team emails)
+            - Ticketing integration (Jira/ServiceNow project mappings)
+            - Account classification (new vs established)
+            - Tallies for reporting and aggregation
+            
+    Data Sources:
+        - AWS Organizations: Account details, tags, OU structure
+        - Environment variables: Default values and tag mappings
+        - Calculated fields: Account age, team assignments, project mappings
+    """
     print(f"Account {account_id}: Fetching fresh data")
 
     # Get account details

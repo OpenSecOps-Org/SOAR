@@ -1,11 +1,45 @@
+"""
+AWS Security Hub Auto-Remediation: EC2.4 - Stopped EC2 Instance Termination
+
+This control identifies and terminates EC2 instances that have been in a stopped
+state, which may indicate they are no longer needed. Stopped instances still
+incur EBS storage costs and may contain sensitive data or configurations.
+
+Test triggers:
+- Stopped EC2 instance: aws ec2 describe-instances --filters "Name=instance-state-name,Values=stopped"
+- Check instance state: aws ec2 describe-instances --instance-ids i-1234567890abcdef0
+- Monitor instance termination protection: aws ec2 describe-instance-attribute --instance-id i-1234567890abcdef0 --attribute disableApiTermination
+
+The auto-remediation first disables API termination protection if enabled, then
+terminates the stopped instance to reduce costs and eliminate potential security risks.
+
+Target Resources: AWS EC2 instances in stopped state
+Remediation: Disable termination protection and terminate the instance
+"""
+
 import os
 import botocore
 import boto3
 from aws_utils.clients import get_client
-
-# Define the lambda_handler function
 def lambda_handler(data, _context):
-    # Print the input data
+    """
+    Main Lambda handler for EC2.4 auto-remediation.
+    
+    Args:
+        data: Security Hub finding data containing stopped instance details
+        _context: Lambda context (unused)
+        
+    Returns:
+        dict: Updated finding data with remediation results
+        
+    Remediation Logic:
+        1. Extract instance ID from Security Hub finding
+        2. Get cross-account EC2 client for target account and region
+        3. Disable API termination protection to allow termination
+        4. Terminate the stopped EC2 instance
+        5. Handle instance not found errors with finding suppression
+        6. Return success message confirming instance termination
+    """
     print(data)
 
     # Extract relevant information from the input data

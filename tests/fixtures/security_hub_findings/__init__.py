@@ -1,0 +1,1 @@
+# Security Hub findings fixtures
