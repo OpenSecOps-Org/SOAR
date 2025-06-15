@@ -1,5 +1,9 @@
 # Change Log
 
+## v2.2.0
+    * AWS Health Reclassifier: Implemented automatic reclassification of AWS Health informational notifications from HIGH/MEDIUM/CRITICAL to INFORMATIONAL severity to prevent false positives in SOAR processing. The new parameter `ReclassifyAWSHealthIncidents` with a default value of `No` controls this behaviour.
+    * Default lambda runtime memory increased to 512 MB.
+
 ## v2.1.3
     * Comprehensive testing infrastructure implementation with 53% auto-remediation coverage (16/30 functions, 236 tests)
     * Complete EC2 auto-remediation testing (8/8 functions, 134 tests) with ASFF standardization patterns

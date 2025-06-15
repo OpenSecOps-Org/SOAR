@@ -1,3 +1,59 @@
+"""
+DYNAMODB.2 AUTOREMEDIATION - ENABLE POINT-IN-TIME RECOVERY
+
+This Lambda function automatically remediates AWS Security Hub findings for DynamoDB.2
+(DynamoDB tables should have point-in-time recovery enabled).
+
+Target Resources:
+- Amazon DynamoDB tables
+- All DynamoDB table types (provisioned and on-demand)
+
+Remediation Actions:
+1. Extracts table name from DynamoDB table ARN
+2. Checks for exemption tag using pagination
+3. Enables point-in-time recovery if not exempted
+4. Configures automatic backup capability
+
+Tag-Based Exemption:
+- Checks for DYNAMODB_NO_PIT_RECOVERY_TAG environment variable
+- If tag is present, suppresses auto-remediation
+- Uses pagination to handle tables with many tags
+
+Validation Commands:
+# Check point-in-time recovery status
+aws dynamodb describe-continuous-backups --table-name <table-name>
+
+# Verify point-in-time recovery is enabled
+aws dynamodb describe-continuous-backups --table-name <table-name> --query 'ContinuousBackupsDescription.PointInTimeRecoveryDescription.PointInTimeRecoveryStatus'
+
+# List table tags
+aws dynamodb list-tags-of-resource --resource-arn <table-arn>
+
+Security Impact:
+- Enables automatic point-in-time recovery for data protection
+- Provides 35-day backup retention for accidental data loss
+- Supports compliance requirements for data retention
+- Critical for disaster recovery and business continuity
+
+Data Protection Benefits:
+- Continuous backups with second-level granularity
+- No performance impact on table operations
+- Automatic backup management and retention
+- Supports table restoration to any point in time within 35 days
+
+Error Handling:
+- Missing table: Suppresses finding (table may have been deleted)
+- Tag exemption: Suppresses auto-remediation based on tag
+- API errors: Re-raises for investigation
+
+Table ARN Format:
+- Input: arn:aws:dynamodb:region:account:table/table-name
+- Extracted: table-name (everything after the last slash)
+
+Environment Variables:
+- DYNAMODB_NO_PIT_RECOVERY_TAG: Tag key for exempting tables from auto-remediation
+"""
+
 import os
 import botocore
 import boto3

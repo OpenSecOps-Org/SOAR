@@ -1,3 +1,39 @@
+"""
+ELB.1 AUTOREMEDIATION - CONFIGURE ALB HTTP TO HTTPS REDIRECTION
+
+This Lambda function automatically remediates AWS Security Hub findings for ELB.1
+(Application Load Balancer should be configured to redirect all HTTP requests to HTTPS).
+
+Target Resources:
+- Application Load Balancers (ALBs) with HTTP listeners
+- Only applies to internet-facing ALBs (internal ALBs are exempt)
+
+Remediation Actions:
+1. Verifies ALB exists and checks if it's internet-facing or internal
+2. For internet-facing ALBs:
+   - Checks for existing HTTPS listener (requires SSL certificate)
+   - Locates HTTP listener on port 80
+   - Configures HTTP listener to redirect to HTTPS with 301 status
+3. For internal ALBs: Suppresses finding (internal ALBs don't require HTTPS redirection)
+
+Validation Commands:
+# Check ALB listeners
+aws elbv2 describe-listeners --load-balancer-arn arn:aws:elasticloadbalancing:region:account:loadbalancer/app/name/id
+
+# Verify redirect configuration
+aws elbv2 describe-listeners --load-balancer-arn <alb-arn> --query 'Listeners[?Port==`80`].DefaultActions[0].RedirectConfig'
+
+Security Impact:
+- Ensures all HTTP traffic is automatically redirected to HTTPS
+- Prevents unencrypted data transmission over HTTP
+- Requires existing SSL certificate on HTTPS listener
+
+Error Handling:
+- Missing SSL certificate: Creates ticket for manual intervention
+- Missing ALB: Suppresses finding
+- Internal ALB: Suppresses finding (compliant by design)
+"""
+
 import os
 import boto3
 import botocore

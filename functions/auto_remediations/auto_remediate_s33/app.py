@@ -1,3 +1,34 @@
+"""
+S3.3 AUTOREMEDIATION - BLOCK S3 BUCKET PUBLIC ACCESS
+
+This Lambda function automatically remediates AWS Security Hub findings for S3.3 
+(S3 buckets should prohibit public access).
+
+Target Resources:
+- S3 buckets with public access allowed
+
+Remediation Actions:
+1. Check for exemption tag - if present, suppress finding
+2. Apply public access block configuration with all restrictions enabled:
+   - BlockPublicAcls: True
+   - IgnorePublicAcls: True
+   - BlockPublicPolicy: True
+   - RestrictPublicBuckets: True
+
+CRITICAL WARNING:
+This function lacks comprehensive error handling. Any AWS API failure will result 
+in unhandled exceptions. Unlike S3.2, this function does not handle NoSuchBucket 
+or AccessDenied errors gracefully.
+
+Test Triggers:
+1. Create S3 bucket with public access allowed
+2. Verify the finding appears in Security Hub for S3.3
+3. aws s3api get-public-access-block --bucket [bucket-name] (should show public access allowed)
+
+Security Hub Control:
+- https://docs.aws.amazon.com/securityhub/latest/userguide/s3-controls.html#s3-3
+"""
+
 import os
 import boto3
 from aws_utils.clients import get_client

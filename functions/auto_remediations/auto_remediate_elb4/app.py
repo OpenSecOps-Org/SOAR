@@ -1,3 +1,35 @@
+"""
+ELB.4 AUTOREMEDIATION - CONFIGURE ALB TO DROP INVALID HTTP HEADERS
+
+This Lambda function automatically remediates AWS Security Hub findings for ELB.4
+(Application Load Balancer should be configured to drop HTTP headers).
+
+Target Resources:
+- Application Load Balancers (ALBs)
+- Both internet-facing and internal ALBs
+
+Remediation Actions:
+1. Verifies ALB exists
+2. Enables the 'routing.http.drop_invalid_header_fields.enabled' attribute
+3. Configures ALB to automatically drop malformed HTTP headers
+
+Validation Commands:
+# Check ALB attribute configuration
+aws elbv2 describe-load-balancer-attributes --load-balancer-arn arn:aws:elasticloadbalancing:region:account:loadbalancer/app/name/id
+
+# Verify drop invalid headers is enabled
+aws elbv2 describe-load-balancer-attributes --load-balancer-arn <alb-arn> --query 'Attributes[?Key==`routing.http.drop_invalid_header_fields.enabled`].Value'
+
+Security Impact:
+- Prevents HTTP header injection attacks
+- Drops malformed headers that could be used for exploitation
+- Improves overall application security posture
+
+Error Handling:
+- Missing ALB: Suppresses finding
+- API errors: Creates ticket for manual intervention
+"""
+
 import os
 import json
 import boto3

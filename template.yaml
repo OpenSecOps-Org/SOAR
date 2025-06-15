@@ -4,7 +4,7 @@ Transform: AWS::Serverless-2016-10-31
 Globals:
   Function:
     Runtime: python3.12
-    MemorySize: 128
+    MemorySize: 512
     Handler: app.lambda_handler
     Timeout: 900
     Layers:
@@ -109,6 +109,13 @@ Parameters:
       and emailing remains the same in either case.
     AllowedValues: ['Yes', 'No']
     Default: 'No'
+
+  ReclassifyAWSHealthIncidents:
+    Type: String
+    Description: Yes to enable reclassification of AWS Health informational notifications from CRITICAL/HIGH/MEDIUM/LOW to INFORMATIONAL severity
+    AllowedValues: ['Yes', 'No']
+    Default: 'No'
+
 
   # Mail ----------------------------------------------------------------------------
 
@@ -1151,6 +1158,7 @@ Resources:
         RememberTicketClosedFunctionArn: !GetAtt RememberTicketClosedFunction.Arn
         RememberAutoRemediationDoneFunctionArn: !GetAtt RememberAutoRemediationDoneFunction.Arn
         GetTicketAndDecideFunctionArn: !GetAtt GetTicketAndDecideFunction.Arn
+        AWSHealthReclassifierFunctionArn: !GetAtt AWSHealthReclassifierFunction.Arn
 
         RemediatableSecHubControlsName: !Ref RemediatableSecHubControls
         LocalControlSuppressionsName: !Ref LocalControlSuppressions
@@ -1229,6 +1237,8 @@ Resources:
             FunctionName: !Ref RememberAutoRemediationDoneFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref GetTicketAndDecideFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AWSHealthReclassifierFunction
 
         - DynamoDBReadPolicy:
             TableName: !Ref RemediatableSecHubControls
@@ -1339,6 +1349,28 @@ Resources:
         Variables:
           CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
           PRODUCT_NAME: !Ref ProductName
+
+  AWSHealthReclassifierFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/aws_health_reclassifier/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:BatchUpdateFindings
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          PRODUCT_NAME: !Ref ProductName
+          RECLASSIFY_AWS_HEALTH_INCIDENTS: !Ref ReclassifyAWSHealthIncidents
 
   UpdateTicketedFindingFunction:
     Type: AWS::Serverless::Function
@@ -2448,7 +2480,8 @@ Resources:
                 - s3:CreateBucket
                 - s3:PutPublicAccessBlock
                 - s3:PutBucketEncryption
-                - s3:PutBucketEncryption
+                - s3:PutBucketVersioning
+                - s3:PutBucketPolicy
               Resource: '*'
             - Sid: ELBv2Permissions
               Effect: Allow

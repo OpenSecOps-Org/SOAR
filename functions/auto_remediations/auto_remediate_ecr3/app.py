@@ -1,3 +1,54 @@
+"""
+ECR.3 AUTOREMEDIATION - CONFIGURE ECR REPOSITORY LIFECYCLE POLICY
+
+This Lambda function automatically remediates AWS Security Hub findings for ECR.3
+(ECR repositories should have at least one lifecycle policy configured).
+
+Target Resources:
+- Amazon ECR repositories
+- Both private repositories
+
+Remediation Actions:
+1. Extracts repository name from repository ARN
+2. Applies predefined lifecycle policy to keep only the 2 most recent images
+3. Configures automatic cleanup of older images to manage storage costs
+
+Lifecycle Policy Configuration:
+- Rule Priority: 1
+- Selection: Any tag status
+- Count Type: Keep images when count is more than 2
+- Action: Expire (delete) older images
+
+Validation Commands:
+# Check repository lifecycle policy
+aws ecr get-lifecycle-policy --repository-name <repository-name>
+
+# Verify lifecycle policy configuration
+aws ecr get-lifecycle-policy --repository-name <repository-name> --query 'lifecyclePolicyText' --output text | jq
+
+# Preview lifecycle policy effects (dry run)
+aws ecr get-lifecycle-policy-preview --repository-name <repository-name>
+
+Security Impact:
+- Implements automated image retention policies
+- Reduces storage costs by removing old images
+- Prevents repository bloat and potential vulnerabilities in old images
+- Ensures only recent, presumably more secure images are retained
+
+Cost Optimization:
+- Automatically removes images beyond the 2 most recent
+- Reduces ECR storage costs
+- Maintains security by keeping only latest images
+
+Error Handling:
+- Missing repository: Suppresses finding (repository may have been deleted)
+- API errors: Re-raises for investigation
+
+Repository ARN Format:
+- Input: arn:aws:ecr:region:account:repository/repository-name
+- Extracted: repository-name (everything after the last slash)
+"""
+
 import os
 import boto3
 import json

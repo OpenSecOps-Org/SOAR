@@ -1,3 +1,40 @@
+"""
+ECR.2 AUTOREMEDIATION - CONFIGURE ECR REPOSITORY TAG IMMUTABILITY
+
+This Lambda function automatically remediates AWS Security Hub findings for ECR.2
+(ECR repositories should have tag mutability configured as immutable).
+
+Target Resources:
+- Amazon ECR repositories
+- Both private repositories
+
+Remediation Actions:
+1. Extracts repository name from repository ARN
+2. Configures image tag mutability to 'IMMUTABLE' for the specific repository
+3. Prevents image tags from being overwritten or deleted
+
+Validation Commands:
+# Check repository tag mutability configuration
+aws ecr describe-repositories --repository-names <repository-name>
+
+# Verify tag mutability is set to IMMUTABLE
+aws ecr describe-repositories --repository-names <repository-name> --query 'repositories[0].imageTagMutability'
+
+Security Impact:
+- Prevents accidental or malicious overwriting of container image tags
+- Ensures image version integrity and traceability
+- Supports immutable infrastructure practices
+- Critical for container supply chain security
+
+Error Handling:
+- Missing repository: Suppresses finding (repository may have been deleted)
+- API errors: Re-raises for investigation
+
+Repository ARN Format:
+- Input: arn:aws:ecr:region:account:repository/repository-name
+- Extracted: repository-name (everything after the last slash)
+"""
+
 import os
 import boto3
 from botocore.exceptions import ClientError

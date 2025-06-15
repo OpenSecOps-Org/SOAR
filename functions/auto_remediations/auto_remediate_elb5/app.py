@@ -1,3 +1,52 @@
+"""
+ELB.5 AUTOREMEDIATION - ENABLE ALB AND CLB ACCESS LOGGING
+
+This Lambda function automatically remediates AWS Security Hub findings for ELB.5
+(Application and Classic Load Balancers logging should be enabled).
+
+Target Resources:
+- Application Load Balancers (ALBs)
+- Classic Load Balancers (CLBs)
+- Both internet-facing and internal load balancers
+
+Remediation Actions:
+1. Verifies load balancer exists
+2. Creates dedicated S3 bucket for access logs with secure configuration:
+   - Enables versioning for audit trails
+   - Blocks all public access
+   - Enables AES256 encryption
+   - Configures bucket policy for ELB service account access
+3. Enables access logging on the load balancer pointing to the S3 bucket
+
+Validation Commands:
+# Check load balancer access logging configuration
+aws elbv2 describe-load-balancer-attributes --load-balancer-arn arn:aws:elasticloadbalancing:region:account:loadbalancer/app/name/id
+
+# Verify access logs are enabled
+aws elbv2 describe-load-balancer-attributes --load-balancer-arn <lb-arn> --query 'Attributes[?Key==`access_logs.s3.enabled`].Value'
+
+# Check S3 bucket configuration
+aws s3api get-bucket-policy --bucket lb-logs-for-<lb-name>
+aws s3api get-bucket-versioning --bucket lb-logs-for-<lb-name>
+
+Security Impact:
+- Enables comprehensive access logging for security monitoring
+- Creates audit trail for all load balancer requests
+- Supports forensic analysis and compliance requirements
+- Secure S3 bucket configuration prevents data exposure
+
+S3 Bucket Security Features:
+- Versioning enabled for data integrity
+- Public access completely blocked
+- Server-side encryption with AES256
+- Bucket policy restricts access to ELB service accounts only
+
+Error Handling:
+- Missing load balancer: Suppresses finding
+- S3 operation failures: Suppresses finding with error details
+- Existing bucket conflicts: Continues with configuration
+"""
+
 import os
 import json
 import boto3

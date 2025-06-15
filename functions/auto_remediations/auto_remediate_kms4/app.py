@@ -1,3 +1,57 @@
+"""
+KMS.4 AUTOREMEDIATION - ENABLE KMS KEY ROTATION
+
+This Lambda function automatically remediates AWS Security Hub findings for KMS.4
+(KMS keys should have automatic rotation enabled).
+
+Target Resources:
+- AWS KMS customer-managed keys
+- Applies only to customer-managed keys (AWS managed keys automatically rotate)
+
+Remediation Actions:
+1. Extracts key ID from KMS key ARN
+2. Enables automatic yearly key rotation for the specific key
+3. Configures yearly rotation schedule
+
+Validation Commands:
+# Check key rotation status
+aws kms get-key-rotation-status --key-id <key-id>
+
+# Verify key rotation is enabled
+aws kms describe-key --key-id <key-id> --query 'KeyMetadata.KeyRotationStatus'
+
+# List key rotation history
+aws kms list-key-rotations --key-id <key-id>
+
+Security Impact:
+- Enables automatic yearly rotation of encryption keys
+- Reduces risk of key compromise through regular rotation
+- Maintains compliance with security best practices
+- Critical for long-term data protection and regulatory compliance
+
+Compliance Benefits:
+- Meets NIST, SOC, and other regulatory requirements
+- Supports PCI DSS key rotation standards
+- Ensures cryptographic key lifecycle management
+- Reduces manual key management overhead
+
+Error Handling Categories:
+1. **Suppressible Errors** (suppress finding):
+   - AccessDeniedException: Insufficient permissions
+   - KMSInvalidStateException: Key not in valid state (e.g., disabled, deleted)
+   - NotFoundException: Key doesn't exist
+   - Unexpected exceptions: Unknown errors
+
+2. **Actionable Errors** (create ticket):
+   - Other API errors: Require manual investigation
+
+Key ARN Format:
+- Input: arn:aws:kms:region:account:key/key-id
+- Extracted: key-id (everything after the last slash)
+
+Note: Only customer-managed keys support rotation. AWS managed keys automatically rotate yearly.
+"""
+
 import os
 import boto3
 from botocore.exceptions import ClientError

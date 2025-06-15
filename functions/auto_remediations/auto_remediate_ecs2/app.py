@@ -1,3 +1,63 @@
+"""
+ECS.2 AUTOREMEDIATION - DISABLE PUBLIC IP ASSIGNMENT FOR ECS SERVICES
+
+This Lambda function automatically remediates AWS Security Hub findings for ECS.2
+(ECS services should not have public IP addresses assigned automatically).
+
+Target Resources:
+- Amazon ECS services running in Fargate launch type
+- Services with awsvpcConfiguration network mode
+- Services currently configured with public IP assignment
+
+Remediation Actions:
+1. Extracts service and cluster names from service ARN
+2. Parses detailed network configuration from finding details
+3. Updates service network configuration to disable public IP assignment
+4. Preserves existing subnets and security groups configuration
+
+Network Security Impact:
+- Prevents services from receiving public IP addresses automatically
+- Forces traffic routing through NAT gateways or VPC endpoints
+- Enhances network security by removing direct internet connectivity
+- Critical for services handling sensitive data in private subnets
+
+Validation Commands:
+# Check service network configuration
+aws ecs describe-services --cluster <cluster-name> --services <service-name>
+
+# Verify public IP assignment is disabled
+aws ecs describe-services --cluster <cluster-name> --services <service-name> --query 'services[0].networkConfiguration.awsvpcConfiguration.assignPublicIp'
+
+# Check service running tasks
+aws ecs list-tasks --cluster <cluster-name> --service-name <service-name>
+
+Complex Data Structure Requirements:
+- Requires detailed ECS service information in ASFF Details section
+- Parses nested AwsEcsService configuration
+- Extracts VPC configuration including subnets and security groups
+- Preserves existing network settings while modifying public IP assignment
+
+Error Handling Categories:
+1. **Missing Details**: Suppresses finding if ASFF Details section is missing
+2. **ClusterNotFoundException**: Suppresses finding (cluster may be deleted)
+3. **ServiceNotFoundException**: Suppresses finding (service may be deleted)
+4. **ServiceNotActiveException**: Suppresses finding (service not in deployable state)
+5. **Other API errors**: Re-raises for investigation
+
+Service ARN Format:
+- Input: arn:aws:ecs:region:account:service/cluster-name/service-name
+- Extracted service: service-name (last part after final slash)
+- Extracted cluster: cluster-name (from Details.AwsEcsService.Cluster)
+
+Network Configuration Structure:
+- Details.AwsEcsService.NetworkConfiguration.AwsVpcConfiguration.Subnets[]
+- Details.AwsEcsService.NetworkConfiguration.AwsVpcConfiguration.SecurityGroups[]
+- AssignPublicIp: Changed from ENABLED → DISABLED
+
+Note: This function requires comprehensive ASFF details including network configuration.
+Only works with services using awsvpcConfiguration (Fargate and EC2 with awsvpc network mode).
+"""
+
 import os
 import boto3
 import json

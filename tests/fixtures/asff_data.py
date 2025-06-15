@@ -85,3 +85,117 @@ def prepare_ec2_test_data(finding_function):
     finding_fixture = finding_function()
     finding_data = finding_fixture['finding']
     return create_asff_test_data(finding_data)
+
+
+def prepare_s3_test_data(finding_function, tags=None):
+    """
+    Helper specifically for S3 auto-remediation tests.
+    
+    Args:
+        finding_function: Function that returns S3 finding fixture
+        tags: Optional list of S3 bucket tags to populate tags['resource']
+        
+    Returns:
+        ASFF data structure with S3 finding embedded and optional tags
+    """
+    finding_fixture = finding_function()
+    finding_data = finding_fixture['finding']
+    asff_data = create_asff_test_data(finding_data)
+    
+    # Populate tags['resource'] as done by fetch_bucket_tags function
+    if tags is not None:
+        asff_data['tags']['resource'] = tags
+    else:
+        asff_data['tags']['resource'] = []
+    
+    return asff_data
+
+
+def prepare_iam_test_data(finding_function):
+    """
+    Helper specifically for IAM auto-remediation tests.
+    
+    Args:
+        finding_function: Function that returns IAM finding fixture
+        
+    Returns:
+        ASFF data structure with IAM finding embedded
+    """
+    finding_fixture = finding_function()
+    finding_data = finding_fixture['finding']
+    return create_asff_test_data(finding_data)
+
+
+def prepare_elb_test_data(finding_function):
+    """
+    Helper specifically for ELB auto-remediation tests.
+    
+    Args:
+        finding_function: Function that returns ELB finding fixture
+        
+    Returns:
+        ASFF data structure with ELB finding embedded
+    """
+    finding_fixture = finding_function()
+    finding_data = finding_fixture['finding']
+    return create_asff_test_data(finding_data)
+
+
+def prepare_ecr_test_data(finding_function):
+    """
+    Helper specifically for ECR auto-remediation tests.
+    
+    Args:
+        finding_function: Function that returns ECR finding fixture
+        
+    Returns:
+        ASFF data structure with ECR finding embedded
+    """
+    finding_fixture = finding_function()
+    finding_data = finding_fixture['finding']
+    return create_asff_test_data(finding_data)
+
+
+def prepare_ecs_test_data(finding_function):
+    """
+    Helper specifically for ECS auto-remediation tests.
+    
+    Args:
+        finding_function: Function that returns ECS finding fixture
+        
+    Returns:
+        ASFF data structure with ECS finding embedded
+    """
+    finding_fixture = finding_function()
+    finding_data = finding_fixture['finding']
+    return create_asff_test_data(finding_data)
+
+
+def prepare_kms_test_data(finding_function):
+    """
+    Helper specifically for KMS auto-remediation tests.
+    
+    Args:
+        finding_function: Function that returns KMS finding fixture
+        
+    Returns:
+        ASFF data structure with KMS finding embedded
+    """
+    finding_fixture = finding_function()
+    finding_data = finding_fixture['finding']
+    return create_asff_test_data(finding_data)
+
+
+def prepare_dynamodb_test_data(finding_function):
+    """
+    Helper specifically for DynamoDB auto-remediation tests.
+    
+    Args:
+        finding_function: Function that returns DynamoDB finding fixture
+        
+    Returns:
+        ASFF data structure with DynamoDB finding embedded
+    """
+    finding_fixture = finding_function()
+    finding_data = finding_fixture['finding']
+    return create_asff_test_data(finding_data)
