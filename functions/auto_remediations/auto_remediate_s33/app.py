@@ -15,10 +15,11 @@ Remediation Actions:
    - BlockPublicPolicy: True
    - RestrictPublicBuckets: True
 
-CRITICAL WARNING:
-This function lacks comprehensive error handling. Any AWS API failure will result 
-in unhandled exceptions. Unlike S3.2, this function does not handle NoSuchBucket 
-or AccessDenied errors gracefully.
+Error Handling Strategy (v2.2.1+):
+This function intentionally has no error handling at the function level. All AWS API 
+failures are caught by the state machine safety net and automatically routed to the 
+ticketing system for manual intervention. This provides uniform error handling across 
+all autoremediation functions.
 
 Test Triggers:
 1. Create S3 bucket with public access allowed

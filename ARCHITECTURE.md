@@ -87,6 +87,14 @@ The system implements consistent error handling across all state machines:
 - **Lambda.AWSLambdaException**: Extended retry for AWS service issues
 - **DynamoDB.ProvisionedThroughputExceededException**: Specialized retry for database throttling
 - **States.TaskFailed**: Catch-all for general task failures
+- **States.ALL**: Comprehensive catch-all for any unhandled exceptions
+
+#### Fallback-to-Ticketing Error Handling (v2.2.1+)
+- **Comprehensive Coverage**: All 30+ autoremediation functions protected by state machine catch-all error handling
+- **Centralized Error Handler**: `SetAutoremediationNotDone` state sets `actions.autoremediation_not_done = true` for any unhandled failures
+- **Data Preservation**: Pure ASL implementation preserves all original scratchpad data while adding error flag
+- **Workflow Integration**: Failed autoremediations automatically route to ticketing system for manual intervention
+- **Zero Silent Failures**: Eliminates workflow failures from unhandled Lambda exceptions or API errors
 
 #### AI Function Special Handling
 - **Timeout**: 600 seconds (10 minutes)
@@ -99,6 +107,7 @@ The system implements consistent error handling across all state machines:
 - **Status**: Complete test coverage (428 tests)
 - **Services**: RDS, EC2, S3, IAM, ELB, ECR, ECS, KMS, DynamoDB
 - **Pattern**: Standardized ASFF processing with comprehensive error handling
+- **Error Resilience**: State machine catch-all error handling ensures 100% fallback-to-ticketing coverage (v2.2.1+)
 
 ### Core Workflow Functions (46 functions - Next Testing Priority)
 

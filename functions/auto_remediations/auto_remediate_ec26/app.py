@@ -22,7 +22,6 @@ import logging
 import random
 
 import boto3
-from botocore.exceptions import ClientError
 from aws_utils.clients import get_client
 
 logger = logging.getLogger(__name__)
@@ -141,16 +140,12 @@ def create_role(iam, role_name, allowed_services):
         ]
     }
 
-    try:
-        role = iam.create_role(
-            RoleName=role_name,
-            AssumeRolePolicyDocument=json.dumps(trust_policy))
-        logger.info("Created role %s.", role_name)
-    except ClientError:
-        logger.exception("Couldn't create role %s.", role_name)
-        raise
-    else:
-        return role
+    # Create role - let state machine handle any errors
+    role = iam.create_role(
+        RoleName=role_name,
+        AssumeRolePolicyDocument=json.dumps(trust_policy))
+    logger.info("Created role %s.", role_name)
+    return role
 
 
 def attach_policy(iam, role_name, policy_arn):
@@ -163,15 +158,11 @@ def attach_policy(iam, role_name, policy_arn):
         policy_arn: ARN of the policy to attach
         
     Error Handling:
-        Logs and re-raises any ClientError exceptions for caller handling.
+        All errors bubble up to state machine for uniform ticketing fallback (v2.2.1+).
     """
-    try:
-        iam.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
-        logger.info("Attached policy %s to role %s.", policy_arn, role_name)
-    except ClientError:
-        logger.exception(
-            "Couldn't attach policy %s to role %s.", policy_arn, role_name)
-        raise
+    # Attach policy - let state machine handle any errors
+    iam.attach_role_policy(RoleName=role_name, PolicyArn=policy_arn)
+    logger.info("Attached policy %s to role %s.", policy_arn, role_name)
 
 
 def create_policy(iam, name, description, actions, resource_arn):
@@ -203,13 +194,9 @@ def create_policy(iam, name, description, actions, resource_arn):
             }
         ]
     }
-    try:
-        policy = iam.create_policy(
-            PolicyName=name, Description=description,
-            PolicyDocument=json.dumps(policy_doc))
-        logger.info("Created policy %s.", name)
-    except ClientError:
-        logger.exception("Couldn't create policy %s.", name)
-        raise
-    else:
-        return policy
+    # Create policy - let state machine handle any errors
+    policy = iam.create_policy(
+        PolicyName=name, Description=description,
+        PolicyDocument=json.dumps(policy_doc))
+    logger.info("Created policy %s.", name)
+    return policy

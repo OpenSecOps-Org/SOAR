@@ -18,8 +18,8 @@ Security Impact:
 - Immediate loss of access for affected users
 
 Error Handling:
-- NoSuchEntityException: Gracefully handles missing login profiles
-- WARNING: No error handling for access key operations or other failures
+- All AWS API failures are caught by state machine and routed to ticketing (v2.2.1+)
+- No function-level error handling - uniform behavior via state machine safety net
 
 Test Triggers:
 1. Create IAM user with login password: aws iam create-login-profile --user-name test-user
@@ -47,13 +47,10 @@ def lambda_handler(data, _context):
 
     client = get_client('iam', account_id, region)
 
-    # Delete password
-    try:
-        client.delete_login_profile(UserName=user_name)
-    except client.exceptions.NoSuchEntityException:
-        pass
+    # Delete password - let state machine handle any errors
+    client.delete_login_profile(UserName=user_name)
 
-    # Delete access keys
+    # Delete access keys - let state machine handle any errors
     response = client.list_access_keys(UserName=user_name)
     for access_key in response['AccessKeyMetadata']:
         if access_key['Status'] == 'Active':

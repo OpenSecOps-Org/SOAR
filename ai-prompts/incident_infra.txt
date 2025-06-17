@@ -3,3 +3,42 @@ Provide a detailed expert analysis of the security incident. Do NOT just output 
 Then give a detailed expert overview of the possible forms of impact on security while the underlying cause is left unattended. Emphasise that the recipient is responsible for addressing the consequences of the incident in a timely manner according to its severity level.
 
 Finally, give exhaustive and expert instructions in a friendly tutorial format on how to avoid the issue from happening again, or - if the incident is the result of an AWS operational notification - on how to update your infrastructure to conform to any new requirements. In both cases, include [[IAC_SNIPPETS]] snippets, if relevant. Double-check, then triple-check that the code you generate is up-to-date and correct, and that all parameters exist and have legal values. When presenting code snippets, make sure you format them well using <pre>.
+
+[SUPPLEMENTARY: OPENSECOPS INFRASTRUCTURE ALARM REFERENCE]
+If this incident is from an OpenSecOps infrastructure monitoring alarm (alarm names starting with "INFRA-"), use this reference to provide specific context about the failed component and appropriate debugging guidance:
+
+**SOAR Platform Core Failures (HIGH Severity):**
+- **INFRA-SOAR-ASFF-Processor-SM-Failure-HIGH**: A single execution of the SOARASFFProcessor state machine failed. This represents ONE isolated incident where a specific security finding could not be processed. The overall SOAR platform remains operational and continues processing other findings. Only investigate systemic issues if multiple such incidents occur frequently.
+- **INFRA-SOAR-AutoRemediations-SM-Failure-HIGH**: A single execution of the SOARAutoRemediations state machine failed. This represents ONE isolated incident where a specific security control could not be automatically remediated. The overall auto-remediation system remains operational and continues fixing other security issues. Only investigate systemic issues if multiple such incidents occur frequently.
+- **INFRA-SOAR-Incidents-SM-Failure-HIGH**: A single execution of the SOARIncidents state machine failed. This represents ONE isolated incident where a specific security incident could not be processed. The overall incident response system remains operational and continues handling other security incidents. Only investigate systemic issues if multiple such incidents occur frequently.
+- **INFRA-DiskForensicStepFunction-SM-Failure-HIGH**: A single execution of the forensic disk collection state machine failed. This represents ONE isolated incident where forensic analysis could not be completed for a specific compromised instance. The overall forensic system remains operational and continues processing other cases. Only investigate systemic issues if multiple such incidents occur frequently.
+
+**SOAR Platform Operational Failures (MEDIUM/LOW Severity):**
+- **INFRA-SOAR-Weekly-AI-Report-SM-Failure-MEDIUM**: A single execution of the SOARWeeklyAIReport state machine failed. This represents ONE isolated incident where a specific weekly report could not be generated. The overall reporting system remains operational. If multiple such incidents occur frequently, check GenAI integration and token limits.
+- **INFRA-SOAR-Hourly-Tasks-SM-Failure-MEDIUM**: A single execution of the SOARHourlyTasks state machine failed. This represents ONE isolated incident affecting a specific hourly task run. The overall system remains operational and will continue with subsequent hourly tasks.
+- **INFRA-SOAR-Sync-Enabled-Controls-Table-SM-Failure-LOW**: A single execution of the SOARSyncEnabledControlsTable state machine failed. This represents ONE isolated incident where a specific synchronization run could not complete. The overall control synchronization system remains operational.
+
+**SOAR Component Failures (MEDIUM/LOW Severity):**
+- **INFRA-MonitorBucketForLogs-Failure-MEDIUM**: A single execution of the MonitorBucketForLogs state machine failed. This represents ONE isolated incident where a specific S3 bucket could not be configured for centralized logging. The overall bucket monitoring system remains operational.
+- **INFRA-LifecycleEventFunction-MEDIUM**: A single execution of the log bucket lifecycle Lambda function failed. This represents ONE isolated incident where log retention policies could not be applied to a specific log group. The overall lifecycle management system remains operational.
+- **INFRA-DetectStackDrift-Failure-LOW**: A single execution of the DetectStackDrift state machine failed. This represents ONE isolated incident where drift detection could not be performed on a specific CloudFormation stack. The overall drift detection system remains operational.
+
+**Foundation Infrastructure Failures:**
+- **INFRA-CombineLogFilesSM-Failure-HIGH**: A single execution of the log file combination state machine failed. This represents ONE isolated incident where specific log files could not be combined. The overall centralized log processing system remains operational.
+- **INFRA-ProcessHistoricalMainLogsSM-Failure-HIGH**: A single execution of the historical log processing state machine failed. This represents ONE isolated incident where specific historical logs could not be processed. The overall log archival system remains operational.
+- **INFRA-RemoveDefaultVpcsFromAccount-Failure-MEDIUM**: A single execution of the default VPC removal state machine failed. This represents ONE isolated incident where default VPCs could not be removed from a specific account. The overall VPC removal system remains operational.
+- **INFRA-DefaultVpcRemoverTriggerFunction-MEDIUM**: A single execution of the default VPC remover trigger function failed. This represents ONE isolated incident affecting a specific account setup process. The overall automation system remains operational.
+- **INFRA-InfraImmutableTagger-Failure-MEDIUM**: A single execution of the infrastructure tagging state machine failed. This represents ONE isolated incident where specific resources could not be tagged. The overall tagging system remains operational.
+- **INFRA-InfraImmutableTaggerTriggerFunction-MEDIUM**: A single execution of the infrastructure tagger trigger function failed. This represents ONE isolated incident affecting specific resource tagging. The overall automation system remains operational.
+- **INFRA-InstancePortReport-SM-Failure-LOW**: A single execution of the instance port reporting state machine failed. This represents ONE isolated incident where a specific port scan report could not be generated. The overall reporting system remains operational.
+- **INFRA-LimitLogGroupRetention-SM-Failure-LOW**: A single execution of the log group retention limiting state machine failed. This represents ONE isolated incident where retention policies could not be applied to specific log groups. The overall retention system remains operational.
+
+**Common Debugging Steps:**
+1. **For AI-related failures**: Check GenAI service integration, API token limits, and model availability if multiple AI report failures occur.
+2. **For state machine failures**: Review CloudWatch Logs for the specific state machine execution to identify the failing step and error details.
+3. **For cross-account failures**: Verify that cross-account IAM roles (AWSControlTowerExecution or OrganizationAccountAccessRole) are accessible and have proper permissions.
+4. **For Lambda function failures**: Check function logs in CloudWatch for specific error messages, timeout issues, or permission problems.
+5. **For persistent failures**: Consider if AWS service limits, throttling, or regional outages might be affecting the infrastructure.
+
+**Impact Assessment:**
+Each individual incident represents an isolated failure of a single execution or task. The serverless, stateless architecture ensures that one failure does not affect subsequent operations or the overall system functionality. HIGH severity incidents indicate that a specific security finding, remediation, or incident could not be processed, but the systems remain operational for other tasks. MEDIUM and LOW severity incidents represent isolated operational failures that do not compromise the overall security posture. Only investigate systemic issues if multiple similar incidents occur frequently, which may indicate broader problems like GenAI integration misconfiguration, AWS service limits, or permission issues.

@@ -3407,7 +3407,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt AIPromptsSyncerFunction.Arn
       FunctionName: !Ref AIPromptsSyncerFunction
-      DummyProperty: 'ekjrnfgefghsuss'  # Change this value whenever ai-prompts changes
+      DummyProperty: 'hgfdsduiuytrdsfghj'  # Change this value whenever ai-prompts changes
       
 
   #-------------------------------------------------------------------------------

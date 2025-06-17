@@ -1,20 +1,27 @@
 # Change Log
 
+## v2.2.1
+    * Added comprehensive state machine error handling across all 30+ autoremediation functions
+    * Simplified error handling in IAM.8, S3.3, and EC2.6 autoremediations
+    * Added centralized SetAutoremediationNotDone state for 100% fallback-to-ticketing coverage
+    * Improved AI prompt clarity for SOAR self-monitoring infrastructure incidents
+    * Updated incident_infra.txt and weekly_ai_report_0_common.txt to distinguish individual failures from systemic issues
+
 ## v2.2.0
-    * AWS Health Reclassifier: Implemented automatic reclassification of AWS Health informational notifications from HIGH/MEDIUM/CRITICAL to INFORMATIONAL severity to prevent false positives in SOAR processing. The new parameter `ReclassifyAWSHealthIncidents` with a default value of `No` controls this behaviour.
-    * Default lambda runtime memory increased to 512 MB.
+    * Added AWS Health incident reclassifier with `ReclassifyAWSHealthIncidents` parameter
+    * Default lambda runtime memory increased to 512 MB
+    * Achieved 100% auto-remediation test coverage (30/30 functions, 428 tests)
 
 ## v2.1.3
-    * Comprehensive testing infrastructure implementation with 53% auto-remediation coverage (16/30 functions, 236 tests)
-    * Complete EC2 auto-remediation testing (8/8 functions, 134 tests) with ASFF standardization patterns
-    * Complete RDS auto-remediation testing (7/7 controls, 88 tests) with comprehensive edge case coverage
-    * Established documentation-first testing methodology for efficient test development
-    * Added centralized test data management via fixtures/asff_data.py for consistent ASFF structures
-    * Implemented critical pytest module import isolation to prevent cross-contamination between test suites
-    * Enhanced testing documentation with LocalStack Docker integration and contributor guidelines
-    * Added bug handling protocol for test development to ensure proper production code review processes
-    * Comprehensive documentation added to core SOAR functions and auto-remediation components
-    * Testing strategy now serves as template for expanding coverage across all OpenSecOps repositories
+    * Testing infrastructure implementation with 53% auto-remediation coverage (16/30 functions, 236 tests)
+    * Complete EC2 auto-remediation testing (8/8 functions, 134 tests)
+    * Complete RDS auto-remediation testing (7/7 controls, 88 tests)
+    * Added documentation-first testing methodology
+    * Added centralized test data management via fixtures/asff_data.py
+    * Added pytest module import isolation to prevent cross-contamination
+    * Enhanced testing documentation with LocalStack Docker integration
+    * Added bug handling protocol for test development
+    * Added comprehensive documentation to core SOAR functions
 
 ## v2.1.2
     * Set incident AI Query to 600 (was 120) as Claude Sonnet 4 keeps timing out - it's new.
@@ -23,17 +30,14 @@
     * Added existence check to the auto-remediation for ELB.5.
 
 ## v2.1.0
-    * Added Lambda Layers for shared code (aws_utils and rds_remediation) to centralize cross-account functionality
-    * Reorganized all RDS autoremediations to leverage common code from the rds_remediation layer
-    * Fixed RDS.2 autoremediation to properly handle DB instances within Aurora clusters
-    * Fixed capitalization in RDS.9 and RDS.2 autoremediations to handle Security Hub ASFF format correctly
-    * Fixed access to parameter group fields using 'DbParameterGroups' instead of 'DBParameterGroups'
-    * Fixed access to cluster parameter group fields using 'DbClusterParameterGroups' instead of 'DBClusterParameterGroups'
-    * Enhanced RDS.9 autoremediation to handle DB cluster findings more reliably with API-based fallbacks
-    * Improved error handling in RDS.9 parameter group creation to prevent duplicate name conflicts
-    * Added unique suffix generation for RDS parameter group names to avoid name collisions
-    * Removed unused CROSS_ACCOUNT_ROLE variable from RDS.9 autoremediation
-    * Thoroughly tested RDS.9 autoremediation with PostgreSQL and Aurora PostgreSQL instances (standalone and in clusters)
+    * Added Lambda Layers for shared code (aws_utils and rds_remediation)
+    * Reorganized all RDS autoremediations to use common code from rds_remediation layer
+    * Fixed RDS.2 autoremediation to handle DB instances within Aurora clusters
+    * Fixed capitalization in RDS.9 and RDS.2 autoremediations for ASFF format
+    * Fixed parameter group field access using correct casing
+    * Enhanced RDS.9 autoremediation with API-based fallbacks
+    * Improved error handling in RDS.9 parameter group creation
+    * Added unique suffix generation for RDS parameter group names
 
 ## v2.0.1
     * Updated GitHub remote references in publish.zsh script to use only OpenSecOps-Org, removed Delegat-AB

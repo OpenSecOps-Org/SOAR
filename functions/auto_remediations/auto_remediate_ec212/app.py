@@ -112,7 +112,9 @@ def lambda_handler(data, _context):
             data['messages']['actions_taken'] = "EIP not found. This finding has been suppressed."
             data['actions']['suppress_finding'] = True
             return data
-        raise error
+        # Unexpected errors bubble up to state machine for ticketing fallback (v2.2.1+)
+        print(f"Unexpected error: {error}. State machine will handle fallback to ticketing.")
+        raise
 
     # Print the response for debugging
     print(response)

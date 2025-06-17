@@ -113,7 +113,9 @@ def lambda_handler(data, _context):
             print(data['messages']['actions_taken'])
             return data
         else:
-            raise error
+            # Unexpected errors bubble up to state machine for ticketing fallback (v2.2.1+)
+            print(f"Unexpected error: {error}. State machine will handle fallback to ticketing.")
+            raise
 
     # Print the response from the update_continuous_backups API
     print(response)

@@ -140,6 +140,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: 'S3.2: S3 bucket publicly readable'
 
     'S3.2: S3 bucket publicly readable':
@@ -154,6 +159,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'S3.3: Fetch Bucket Tags':
@@ -168,6 +178,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: 'S3.3: S3 bucket publicly writable'
 
     'S3.3: S3 bucket publicly writable':
@@ -182,6 +197,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'S3.10: Versioned buckets should have a lifecycle policy':
@@ -196,6 +216,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'EC2.7: Default EBS Encryption not enabled':
@@ -210,6 +235,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'EC2.15: EC2 subnets should not automatically assign public IP addresses':
@@ -224,6 +254,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'ECR.1: ECR private repositories should have image scanning configured':
@@ -238,6 +273,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'ECR.2: ECR private repositories should have tag immutability configured':
@@ -252,6 +292,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'ECR.3: ECR repositories should have at least one lifecycle policy configured':
@@ -266,6 +311,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'ECS.2: ECS services should not have public IP addresses auto-assigned':
@@ -280,6 +330,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'ECS.12: ECS clusters should use Container Insights':
@@ -294,6 +349,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
     
     'IAM.8: Unused IAM user credentials should be removed':
@@ -308,6 +368,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'RDS.2: Prohibit public RDS access':
@@ -322,6 +387,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'RDS.4: RDS cluster snapshots and database snapshots should be encrypted at rest':
@@ -336,6 +406,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'RDS.6: Enhanced monitoring should be configured for RDS DB instances':
@@ -350,6 +425,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'RDS.9: Database logging should be enabled':
@@ -364,6 +444,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'RDS.11: RDS instances should have automatic backups enabled':
@@ -378,6 +463,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'RDS.13: RDS automatic minor version upgrades should be enabled':
@@ -392,6 +482,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'RDS.17: RDS DB instances should be configured to copy tags to snapshots':
@@ -406,6 +501,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'KMS.4: Enable customer CMK key rotation':
@@ -420,6 +520,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'EC2.6: Enable VPC Flow Logs':
@@ -434,6 +539,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'EC2.13: World ingress to 22':
@@ -448,6 +558,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'EC2.14: World ingress to 3389':
@@ -462,6 +577,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'EC2.2: VPC default SG should not allow traffic':
@@ -476,6 +596,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'EC2.4: Terminate stopped instances':
@@ -490,6 +615,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'EC2.22: Delete unused SG':
@@ -504,6 +634,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'EC2.12: Release unused EIP':
@@ -518,6 +653,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'DynamoDB.2: DynamoDB tables should have point-in-time recovery enabled':
@@ -532,6 +672,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'ELB.1: ALB should be configured to redirect all HTTP requests to HTTPS':
@@ -546,6 +691,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'ELB.4: Application Load Balancer should be configured to drop http headers':
@@ -560,6 +710,11 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
         Next: Done
 
     'ELB.5: Application and Classic Load Balancers logging should be enabled':
@@ -574,6 +729,17 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                Next: SetAutoremediationNotDone
+        Next: Done
+
+    SetAutoremediationNotDone:
+        Type: Pass
+        Result: true
+        ResultPath: "$.actions.autoremediation_not_done"
         Next: Done
 
     Done:
