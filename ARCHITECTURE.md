@@ -336,10 +336,334 @@ SOAR follows an established **"API Update → Event Trigger → Reprocessing"** 
 
 This pattern enables the SOAR to maintain clean separation between decision logic and state management while ensuring all systems have consistent, up-to-date finding information.
 
+## CloudWatch Alarm Integration and Monitoring
+
+### System Self-Monitoring Architecture
+
+The OpenSecOps platform implements comprehensive self-monitoring through CloudWatch alarms that automatically create SOAR incidents for operational failures. This ensures that infrastructure issues are handled through the same security incident response workflow as other security findings.
+
+#### Alarm Processing Workflow
+
+1. **Alarm Creation**: CloudWatch alarms monitor AWS services (Step Functions, Lambda, etc.)
+2. **Event Generation**: Alarm state changes to "ALARM" trigger EventBridge events
+3. **Event Processing**: SOAR-all-alarms-to-sec-hub component converts alarm events to Security Hub findings
+4. **SOAR Processing**: Main SOAR system processes alarm findings as incidents
+5. **Incident Response**: Alarms are routed through standard incident workflows with AI analysis
+
+#### SOAR-all-alarms-to-sec-hub Component
+
+**Purpose**: Converts CloudWatch alarm state change events into AWS Security Finding Format (ASFF) findings in Security Hub
+
+**Trigger Pattern**: EventBridge rule matching CloudWatch alarms transitioning to "ALARM" state:
+```yaml
+Pattern:
+  source: [aws.cloudwatch]
+  detail-type: [CloudWatch Alarm State Change]
+  detail:
+    state:
+      value: [ALARM]
+```
+
+**Processing Logic**:
+- Extracts alarm metadata (name, description, account, region, timestamp)
+- Suppresses CIS-related alarms to avoid operational noise
+- Requires severity level in alarm name (INFORMATIONAL|LOW|MEDIUM|HIGH|CRITICAL)  
+- Determines incident domain: "INFRA" (infrastructure) vs "APP" (application) based on alarm name
+- Creates ASFF-compliant Security Hub finding
+
+**ASFF Structure Created**:
+```json
+{
+  "SchemaVersion": "2018-10-08",
+  "Types": ["Software and Configuration Checks/CloudWatch Alarms/soar-cloudwatch-alarms"],
+  "Title": "ALARM_NAME",
+  "Description": "ALARM_DESCRIPTION or N/A",
+  "Severity": {"Label": "HIGH|MEDIUM|LOW|etc"},
+  "Resources": [{"Type": "AwsAccountId", "Id": "account_id", "Region": "region"}],
+  "ProductFields": {
+    "IncidentDomain": "INFRA|APP",
+    "TicketDestination": "TEAM"
+  }
+}
+```
+
+#### Alarm Naming Convention
+
+All monitoring alarms follow the pattern: `[DOMAIN]-[Component]-[Type]-[Severity]`
+
+**Domain Types**:
+- **INFRA**: Infrastructure alarms routed to infrastructure/operations teams
+- **APP**: Application alarms that can be routed to application development teams
+
+**Examples**:
+- `INFRA-SOAR-ASFF-Processor-SM-Failure-HIGH`
+- `INFRA-CombineLogFilesSM-Failure-HIGH`
+- `INFRA-SOAR-Weekly-AI-Report-SM-Failure-MEDIUM`
+- `APP-UserService-Lambda-Error-MEDIUM` (hypothetical application alarm)
+
+This naming convention enables:
+- Automatic severity extraction and incident routing
+- Incident domain classification (INFRA vs APP) for appropriate team assignment
+- Complete incident management coverage across infrastructure and application layers
+- Consistent AI prompt context and analysis
+
+#### SOAR Platform Self-Monitoring
+
+**Core State Machine Monitoring** (HIGH severity):
+- SOAR ASFF Processor failures
+- Auto-Remediation state machine failures  
+- Incident processing failures
+
+**Operational Monitoring** (MEDIUM/LOW severity):
+- Weekly AI Report generation failures
+- Hourly maintenance task failures
+- Control synchronization failures
+
+**Alarm Configuration**:
+- **Metric**: `ExecutionsFailed` from `AWS/States` namespace
+- **Threshold**: >= 1 failed execution
+- **Period**: 60 seconds with 1 evaluation period
+- **Treatment**: Missing data treated as not breaching
+
+#### Foundation Platform Self-Monitoring
+
+**Log Processing Infrastructure** (HIGH severity):
+- Control Tower log aggregation failures
+- Historical log processing failures
+
+**Alarm Configuration**: Same pattern as SOAR alarms, monitoring Step Functions execution failures
+
+#### AI-Enhanced Incident Analysis
+
+Recent enhancements (v2.2.1) provide comprehensive AI-powered incident analysis capabilities:
+
+**Intelligence Features**:
+- **Component-Specific Analysis**: Deep understanding of each state machine and Lambda function's purpose
+- **Context-Aware Prompts**: AI prompts distinguish between individual failures vs. systemic issues
+- **Impact Assessment**: Explains operational impact and urgency levels based on component criticality
+- **Targeted Recommendations**: Provides specific troubleshooting steps tailored to each alarm type
+- **Operational Continuity**: Emphasizes that single failures don't indicate complete system breakdown
+
+**Enhanced Diagnostic Capabilities**:
+- **Failure Context**: AI understands the role and dependencies of each failing component
+- **Troubleshooting Guidance**: Component-specific debugging procedures and common resolution steps
+- **Automated Infrastructure Knowledge**: Self-updating understanding of system architecture
+- **Multi-Account Awareness**: Context-aware analysis across different AWS accounts and environments
+
+**Analysis Inputs**:
+The AI analysis receives the alarm-based ASFF finding and provides contextualized guidance based on:
+- Component type (SOAR core vs. operational vs. Foundation vs. application)
+- Severity level and expected operational impact
+- Component criticality and dependencies
+- Historical patterns and troubleshooting procedures
+- Account context and organizational structure
+
+#### Limitations and Context Gaps
+
+**Current Context Available**:
+- Alarm name, description, and basic metadata
+- Account and region information
+- Severity level and incident domain classification
+- Timestamp of alarm trigger
+
+**Missing Context for Enhanced Debugging**:
+- Specific Step Functions execution ARN and failure details
+- CloudWatch Logs from failed Lambda functions
+- Actual metric values that triggered the alarm
+- Execution timeline and specific failure points
+- Resource-specific details beyond account-level information
+
+This comprehensive alarm integration ensures that both SOAR and Foundation infrastructure failures are automatically detected, classified, and routed through the standard security incident response workflow with appropriate AI-powered analysis and operational guidance.
+
+## CloudWatch Alarm Context Enrichment Enhancement
+
+### Proposed Architecture Enhancement
+
+To address the context limitations identified above, a **CloudWatch Context Enrichment Function** is proposed to provide AI-powered incident analysis with comprehensive debugging information and historical pattern analysis.
+
+#### Enhanced Context Enrichment Function
+
+**Purpose**: Enrich CloudWatch alarm-based incidents with detailed execution context, logs, and historical pattern analysis before AI processing.
+
+**Integration Point**: Added to SOARIncidents state machine between instruction retrieval and AI analysis for both APP and INFRA domains.
+
+**State Machine Placement**:
+```yaml
+# After "Format Generic message" and before "Email to Whom?"
+EnrichCloudWatchContext:
+  Type: Task
+  Resource: '${EnrichCloudWatchContextFunctionArn}'
+  TimeoutSeconds: 300
+  Condition: Finding type contains "CloudWatch Alarms"
+  Next: Email to Whom?
+```
+
+#### Intelligent Enrichment Logic
+
+**Service-Aware Processing**:
+- **Step Functions Failures**: Extract execution ARNs, failure details, execution history
+- **Lambda Function Errors**: Retrieve CloudWatch Logs, error messages, invocation details  
+- **Generic AWS Services**: Basic metric and configuration data
+
+**Temporal Correlation**:
+- Calculate exact alarm evaluation window using Period × EvaluationPeriods
+- Query failed executions/invocations within specific time window that triggered alarm
+- Eliminates false correlation with unrelated failures
+
+**Memory and Pattern Analysis**:
+- Query DynamoDB incidents table using configurable retention period (`IncidentExpirationInDays`)
+- Analyze incident frequency across multiple time windows (7d, 30d, 90d, full retention)
+- Detect pattern trends: INCREASING, DECREASING, STABLE
+- Classify incidents: RARE_OCCURRENCE, FREQUENT_RECENT, RECURRING_PATTERN, ISOLATED_INCIDENT, BASELINE_DEGRADATION
+- Determine success baselines from recent execution history
+
+#### Enhanced Context Data Structure
+
+**Technical Enrichment**:
+```json
+{
+  "service_type": "stepfunctions|lambda|generic",
+  "alarm_correlation": {
+    "evaluation_window": {...},
+    "total_executions_in_window": N
+  },
+  "failed_executions": [
+    {
+      "execution_arn": "...",
+      "failure_details": {...},
+      "logs_summary": "..."
+    }
+  ]
+}
+```
+
+**Pattern Analysis**:
+```json
+{
+  "pattern_analysis": {
+    "retention_period_days": 365,
+    "incident_trends": {
+      "recent_rate": 0.5,
+      "trend_direction": "INCREASING|STABLE|DECREASING"
+    },
+    "pattern_classification": "FREQUENT_RECENT|ISOLATED_INCIDENT|...",
+    "baseline_context": {
+      "success_rate": 0.95,
+      "last_successful_execution": "2024-01-01T12:00:00Z"
+    }
+  }
+}
+```
+
+#### AI Enhancement Benefits
+
+The enriched context enables AI analysis to provide:
+
+1. **Precise Debugging**: "Step XYZ failed with error ABC in execution DEF, check log stream GHI for root cause JKL"
+2. **Pattern Awareness**: "This is the 3rd occurrence in 7 days, suggesting systematic issue vs. isolated failure"
+3. **Baseline Comparison**: "Success rate dropped from 95% to 60% vs. isolated failure in otherwise healthy system"
+4. **Historical Context**: "Last successful execution 2 hours ago vs. no successful executions in 48 hours"
+5. **Trend Analysis**: "Increasing failure frequency suggests underlying degradation vs. random operational issue"
+
+#### Error Resilience and Performance
+
+- **Graceful Degradation**: Enrichment failures don't block incident processing
+- **Intelligent Filtering**: Only processes CloudWatch alarm findings with enrichable patterns
+- **Configurable Timeouts**: 300-second limit prevents workflow delays
+- **Cost Optimization**: Respects configured retention periods and query limits
+- **Cross-Account Integration**: Leverages existing SOAR IAM roles for API access
+
+This enhancement transforms AI incident analysis from reactive debugging to **pattern-aware, context-rich incident intelligence**, significantly improving operational response quality and debugging efficiency.
+
+### Implementation Plan
+
+#### Phase 1: Core Enrichment Function (Week 1-2)
+1. **Create Lambda Function**
+   - `functions/enrich_cloudwatch_context/app.py`
+   - Core function structure with intelligent pattern detection
+   - Environment variables: `INCIDENTS_TABLE_NAME`, `EXPIRATION_DAYS`
+
+2. **Add Function to Template**
+   - CloudFormation resource definition
+   - IAM permissions for DynamoDB, Step Functions, CloudWatch APIs
+   - Environment variable mapping
+
+3. **Basic Service Detection**
+   - Step Functions alarm pattern matching
+   - Lambda function alarm pattern matching
+   - Alarm evaluation window calculation
+
+#### Phase 2: Step Functions Integration (Week 2-3)
+1. **Step Functions Enrichment**
+   - Execution ARN extraction from alarm configuration
+   - Failed execution queries within evaluation window
+   - Execution history and failure point identification
+   - CloudWatch Logs integration for state machine logs
+
+2. **Lambda Functions Enrichment**
+   - Function name extraction from alarm configuration
+   - CloudWatch Logs queries for error patterns
+   - Invocation failure correlation with alarm timing
+
+#### Phase 3: Memory and Pattern Analysis (Week 3-4)
+1. **DynamoDB Integration**
+   - Query incidents table using configurable retention period
+   - Multi-timeframe analysis (7d, 30d, 90d, full retention)
+   - Incident frequency and trend calculation
+
+2. **Pattern Classification**
+   - Success baseline analysis from execution history
+   - Incident pattern categorization logic
+   - Trend direction detection (increasing/stable/decreasing)
+
+#### Phase 4: State Machine Integration (Week 4-5)
+1. **SOARIncidents State Machine Updates**
+   - Add `EnrichCloudWatchContext` state after "Format Generic message"
+   - Conditional execution for CloudWatch alarm findings only
+   - Error handling with graceful degradation
+
+2. **Testing and Validation**
+   - Unit tests for enrichment logic
+   - Integration tests with sample alarm events
+   - Performance testing with large DynamoDB datasets
+
+#### Phase 5: AI Prompt Enhancement (Week 5-6)
+1. **AI Prompt Updates**
+   - Update incident_infra.txt to utilize enriched context
+   - Update incident_app.txt for application incidents
+   - Test AI analysis quality with enriched data
+
+2. **Documentation and Deployment**
+   - Update architecture documentation
+   - Deployment procedures and rollback plans
+   - Performance monitoring and alerting
+
+#### Implementation Files
+
+**New Files to Create**:
+- `functions/enrich_cloudwatch_context/app.py` - Main enrichment function
+- `functions/enrich_cloudwatch_context/requirements.txt` - Dependencies
+- `tests/test_enrich_cloudwatch_context.py` - Unit tests
+
+**Files to Modify**:
+- `template.yaml` - Add function definition and state machine updates
+- `statemachines/incidents.asl.yaml` - Add enrichment state
+- `ai-prompts/incident_infra.txt` - Enhanced prompts for enriched context
+- `ai-prompts/incident_app.txt` - Enhanced prompts for enriched context
+
+#### Success Metrics
+
+- **Enrichment Coverage**: % of CloudWatch alarms receiving enrichment
+- **AI Quality Improvement**: Subjective assessment of AI recommendations with enriched context
+- **Performance Impact**: Enrichment function execution time and state machine latency
+- **Pattern Detection Accuracy**: Validation of pattern classifications against known incident trends
+
 ## Integration Points
 
 - **Security Hub**: Primary source of findings
 - **GuardDuty**: Threat detection integration
+- **CloudWatch**: Infrastructure monitoring and alarm generation
+- **EventBridge**: Alarm event routing and processing
 - **External Ticketing**: Can connect to external systems
 - **Microsoft Sentinel**: Optional integration for enterprise SOC environments
 

@@ -1,5 +1,11 @@
 # Change Log
 
+## v2.3.0
+    * Added CloudWatch alarm context enrichment for Step Functions and Lambda incidents
+    * Enhanced AI incident analysis with enriched CloudWatch alarm data and execution context
+    * Improved timestamp parsing accuracy for CloudWatch alarm processing
+    * Enhanced AI operation error handling: changed States.Timeout to States.ALL for improved Bedrock timeout resilience
+
 ## v2.2.1
     * Added comprehensive state machine error handling across all 30+ autoremediation functions
     * Simplified error handling in IAM.8, S3.3, and EC2.6 autoremediations

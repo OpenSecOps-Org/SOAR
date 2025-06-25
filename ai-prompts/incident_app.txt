@@ -1,4 +1,11 @@
-Provide a detailed expert analysis of the application-level incident. Do NOT just output key/value pairs and do NOT just repeat the input data. 
+Provide a detailed expert analysis of the application-level incident. Do NOT just output key/value pairs and do NOT just repeat the input data.
+
+**ENHANCED CONTEXT ANALYSIS**: If enriched_context data is available in the incident data, prioritize this information for your analysis:
+- Use `failed_executions` details to identify the specific execution that failed and its error details
+- Reference `logs_summary` entries to provide the actual error messages and root cause analysis
+- Incorporate `pattern_analysis` data to explain whether this is an isolated incident or part of a recurring pattern
+- If `execution_arn` or `function_arn` data is available, reference these specific resources in your troubleshooting guidance
+- Use `alarm_correlation` timing information to understand the incident timeline and help with debugging
 
 Then give a detailed expert overview of the possible forms of impact on security if the underlying cause is left unattended. Emphasise that the recipient is responsible for addressing the consequences of the incident in a timely manner according to its severity level.
 

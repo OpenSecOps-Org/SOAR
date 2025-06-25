@@ -99,6 +99,11 @@ Parameters:
     Description: The name of the custom event bus. There is no need to change this value.
     Default: SOAR-events
 
+  CloudWatchAlarmType:
+    Type: String
+    Description: The CloudWatch alarm type identifier used by SOAR-all-alarms-to-sec-hub. Must match AlarmTypeForASFF parameter in that deployment.
+    Default: soar-cloudwatch-alarms
+
   DiskForensicsInvoke:
     Type: String
     Description:
@@ -1127,6 +1132,45 @@ Resources:
         Variables:
           TICKETS_TABLE_NAME: !Ref Tickets
           EXPIRATION_DAYS: !Ref ClosedTicketExpirationInDays
+
+  EnrichCloudWatchContextFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/enrich_cloudwatch_context/
+      Policies:
+        - Statement:
+            - 
+              Sid: CrossAccountAssumeRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - 
+              Sid: StepFunctionsPermissions
+              Effect: Allow
+              Action:
+                - states:DescribeExecution
+                - states:GetExecutionHistory
+                - states:ListExecutions
+              Resource: '*'
+            - 
+              Sid: CloudWatchLogsPermissions
+              Effect: Allow
+              Action:
+                - logs:FilterLogEvents
+              Resource: '*'
+            - 
+              Sid: DynamoDBPermissions
+              Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource: !GetAtt Incidents.Arn
+      Environment:
+        Variables:
+          INCIDENTS_TABLE_NAME: !Ref Incidents
+          INCIDENT_EXPIRATION_DAYS: !Ref IncidentExpirationInDays
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          CLOUDWATCH_ALARM_TYPE: !Ref CloudWatchAlarmType  # Must match SOAR-all-alarms-to-sec-hub AlarmTypeForASFF
 
 
   #-------------------------------------------------------------------------------
@@ -2513,6 +2557,7 @@ Resources:
         FormatGuardDutyS3MessageFunctionArn: !GetAtt FormatGuardDutyS3MessageFunction.Arn
         FormatGuardDutyEksMessageFunctionArn: !GetAtt FormatGuardDutyEksMessageFunction.Arn
         FormatGenericMessageFunctionArn: !GetAtt FormatGenericMessageFunction.Arn
+        EnrichCloudWatchContextFunctionArn: !GetAtt EnrichCloudWatchContextFunction.Arn
         SendEmailFunctionArn: !GetAtt SendEmailFunction.Arn
         OpenTicketFunctionArn: !GetAtt OpenTicketFunction.Arn
         SuppressLocallyFunctionArn: !GetAtt SuppressLocallyFunction.Arn
@@ -2558,6 +2603,8 @@ Resources:
             FunctionName: !Ref ComputePenaltyScoreFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref SaveToSentinelFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref EnrichCloudWatchContextFunction
 
         - DynamoDBReadPolicy:
             TableName: !Ref LocalIncidentSuppressions
@@ -3407,7 +3454,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt AIPromptsSyncerFunction.Arn
       FunctionName: !Ref AIPromptsSyncerFunction
-      DummyProperty: 'hgfdsduiuytrdsfghj'  # Change this value whenever ai-prompts changes
+      DummyProperty: 'hchgcdxfdxhtkhl'  # Change this value whenever ai-prompts changes
       
 
   #-------------------------------------------------------------------------------

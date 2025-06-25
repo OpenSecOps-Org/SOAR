@@ -270,6 +270,27 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+        Next: Enrich CloudWatch Context
+
+    Enrich CloudWatch Context:
+        Type: Task
+        Resource: '${EnrichCloudWatchContextFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
+                ResultPath: null
+                Next: Open Ticket?
         Next: Open Ticket?
 
     Open Ticket?:
@@ -403,7 +424,7 @@ States:
         Catch:
             -   
                 ErrorEquals:
-                    - States.Timeout
+                    - States.ALL
                 ResultPath: null
                 Next: Send APP email
         Next: Send APP email
@@ -471,7 +492,7 @@ States:
         Catch:
             -   
                 ErrorEquals:
-                    - States.Timeout
+                    - States.ALL
                 ResultPath: null
                 Next: Send INFRA email
         Next: Send INFRA email
