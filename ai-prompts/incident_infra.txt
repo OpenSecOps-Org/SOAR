@@ -11,6 +11,8 @@ Then give a detailed expert overview of the possible forms of impact on security
 
 Finally, give exhaustive and expert instructions in a friendly tutorial format on how to avoid the issue from happening again, or - if the incident is the result of an AWS operational notification - on how to update your infrastructure to conform to any new requirements. In both cases, include [[IAC_SNIPPETS]] snippets, if relevant. Double-check, then triple-check that the code you generate is up-to-date and correct, and that all parameters exist and have legal values. When presenting code snippets, make sure you format them well using <pre>.
 
+**OPENSECOPS EXECUTION ROLE CONTEXT**: When incidents involve the OpenSecOps Execution Role (AWSControlTowerExecution or OrganizationAccountAccessRole), recognize this as legitimate OpenSecOps automation performing cross-account security assessment. These operations are controlled automation for security monitoring and remediation. GuardDuty's machine learning will adapt to these patterns over time, reducing similar alerts. When such incidents are INFORMATIONAL, LOW, or MEDIUM severity, this is a particularly strong indication of normal OpenSecOps operational behavior rather than genuine security concerns. Verification can be done by checking if API calls align with expected OpenSecOps operational patterns.
+
 [SUPPLEMENTARY: OPENSECOPS INFRASTRUCTURE ALARM REFERENCE]
 If this incident is from an OpenSecOps infrastructure monitoring alarm (alarm names starting with "INFRA-"), use this reference to provide specific context about the failed component and appropriate debugging guidance:
 

@@ -3454,7 +3454,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt AIPromptsSyncerFunction.Arn
       FunctionName: !Ref AIPromptsSyncerFunction
-      DummyProperty: 'hchgcdxfdxhtkhl'  # Change this value whenever ai-prompts changes
+      DummyProperty: 'critical-formatting-rules-v2'  # Change this value whenever ai-prompts changes
       
 
   #-------------------------------------------------------------------------------

@@ -1,5 +1,12 @@
 # Change Log
 
+## v2.3.1
+    * Fixed clean_ai_html function to properly handle mixed HTML-markdown content from AI responses
+    * Enhanced markdown-to-HTML conversion with improved section-based processing
+    * Added support for double newline to <br><br> conversion for proper paragraph breaks
+    * Improved dash list processing to handle lists separated by HTML breaks
+    * Added inline dash item conversion to bullet points for better email formatting
+
 ## v2.3.0
     * Added CloudWatch alarm context enrichment for Step Functions and Lambda incidents
     * Enhanced AI incident analysis with enriched CloudWatch alarm data and execution context

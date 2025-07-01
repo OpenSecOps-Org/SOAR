@@ -4,4 +4,11 @@ Context: Severity levels are INFORMATIONAL, requiring no attention; LOW, requiri
 
 The output is HTML. Output your results as HTML inside a <div style="font-family: Verdana, sans-serif; font-size:16px;"> ... </div>. 
 
+CRITICAL FORMATTING RULES - YOU MUST FOLLOW THESE EXACTLY:
+- For bold text: Use <strong>text</strong> or <b>text</b> - NEVER use **text**
+- For lists: Use <ul><li>item</li><li>item</li></ul> - NEVER use dash lists
+- For headers: Use <h2>Header</h2> or <h3>Header</h3> - NEVER use ## Header
+- Even though your instructions contain markdown formatting (**text**, - lists), you must COMPLETELY IGNORE that formatting style and output proper HTML formatting
+- Your instructions are examples of what NOT to do - they use markdown but you must output HTML 
+
 Clearly header your output using as few words as possible. For instance, 'Analysis' is better than 'Detailed Expert Analysis of the Security Issue' or 'Detailed Expert Analysis'.

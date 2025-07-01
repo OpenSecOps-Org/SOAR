@@ -158,6 +158,69 @@ html_post = '''
 '''
 
 
+def clean_ai_html(ai_html):
+    """Convert markdown formatting to HTML in AI-generated content that may be mixed HTML/markdown."""
+    if not ai_html:
+        return ai_html
+    
+    # Convert **text** to <strong>text</strong> (non-greedy matching)
+    ai_html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', ai_html)
+    
+    # Convert double newlines to <br><br> for paragraph breaks
+    ai_html = re.sub(r'\n\n+', '<br><br>', ai_html)
+    
+    # Pre-process to handle dash lists that may be separated by <br><br>
+    # Split on <br><br> to handle sections separately
+    sections = ai_html.split('<br><br>')
+    processed_sections = []
+    
+    for section in sections:
+        lines = section.split('\n')
+        processed_lines = []
+        in_list = False
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            # Check if this line starts a dash list item
+            if stripped.startswith('- ') and len(stripped) > 2:
+                # Start or continue a list
+                if not in_list:
+                    processed_lines.append('<ul>')
+                    in_list = True
+                
+                item_text = stripped[2:].strip()
+                processed_lines.append(f'<li>{item_text}</li>')
+                
+            else:
+                # Check if we need to close an existing list
+                if in_list:
+                    processed_lines.append('</ul>')
+                    in_list = False
+                
+                # Handle inline dash items (convert to bullet points)
+                # But only if they're clearly inline items, not at start of line
+                if ' - ' in line and not stripped.startswith('- '):
+                    line = re.sub(r'(\s)- ([^\n-]+?)(?=\s|$)', r'\1• \2', line)
+                
+                processed_lines.append(line)
+        
+        # Close any remaining open list
+        if in_list:
+            processed_lines.append('</ul>')
+        
+        processed_sections.append('\n'.join(processed_lines))
+    
+    # Rejoin sections with <br><br>
+    result = '<br><br>'.join(processed_sections)
+    
+    # Clean up excessive <br> tags and empty sections
+    result = re.sub(r'(<br><br>)+', '<br><br>', result)
+    result = re.sub(r'^<br><br>|<br><br>$', '', result)
+    
+    return result
+
+
 def body_to_html(body, _ai_plaintext, ai_html):
     body = body.replace("\n\n\n", "\n")
     body = body.replace("\n\n", "\n")
@@ -218,6 +281,7 @@ def body_to_html(body, _ai_plaintext, ai_html):
     html += f"          <tr><td colspan='2'><h2>{freeform[1]}</h2></td></tr>\n"
 
     if ai_html:
+        ai_html = clean_ai_html(ai_html)  # Convert markdown to HTML
         html += f" <tr><td colspan='2' style='font-size:16px; padding-bottom:8px'>{ai_html}</td></tr>\n"
     else:
         for line in freeform[2:]:

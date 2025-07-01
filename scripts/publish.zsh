@@ -1,5 +1,30 @@
 #!/usr/bin/env zsh
 
+# OpenSecOps Foundation Component Publishing Workflow
+#
+# This script implements the sophisticated dual-repository publishing system used across
+# OpenSecOps Foundation components to maintain clean public repositories while preserving
+# full development history.
+#
+# What it does:
+# - Collapses all messy development commits into a single clean release commit
+# - Creates/updates a 'releases' branch with just the final state of files  
+# - Tags the release with the version number from CHANGELOG.md or command line
+# - Pushes to both development and published repositories with appropriate history
+#
+# Repository Pattern:
+# - Development repo (origin): Full messy commit history for active development
+# - Published repo (OpenSecOps): Clean release-only history for professional presentation
+#
+# This ensures the public OpenSecOps repositories have clean, meaningful commit histories
+# while developers retain full working history in their development repositories.
+#
+# Usage:
+#   ./publish [version]    # Version from CHANGELOG.md if not specified
+#
+# The dual-repository workflow ensures professional public repositories while preserving 
+# complete development history for maintainers.
+
 # Check for uncommitted changes
 if ! git diff-index --quiet HEAD --; then
     echo "There are uncommitted changes. Please commit or stash them before running this script."

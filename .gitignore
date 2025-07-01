@@ -144,10 +144,6 @@ wheels/
 .installed.cfg
 *.egg
 
-!functions/layers/*/python/lib/
-!functions/layers/*/python/lib/python3.*/
-!functions/layers/*/python/lib/python3.*/site-packages/
-
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -198,7 +194,6 @@ celerybeat-schedule.*
 
 # Environments
 .env
-.env.test
 .venv
 env/
 venv/
