@@ -1,5 +1,12 @@
 # Change Log
 
+## v2.3.2
+    * Enhanced OpenSecOps Execution Role context in AI prompts to recognize reconnaissance activities as unlikely
+    * Removed code snippet recommendations for incidents involving AWSControlTowerExecution role
+    * Fixed excessive newlines around HTML block elements in AI-generated email content
+    * Improved email formatting by preventing <br><br> insertion around headers, divs, lists, and other HTML elements
+    * Preserved natural HTML spacing while maintaining proper paragraph breaks in plain text content
+
 ## v2.3.1
     * Fixed clean_ai_html function to properly handle mixed HTML-markdown content from AI responses
     * Enhanced markdown-to-HTML conversion with improved section-based processing

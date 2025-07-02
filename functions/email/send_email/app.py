@@ -166,8 +166,20 @@ def clean_ai_html(ai_html):
     # Convert **text** to <strong>text</strong> (non-greedy matching)
     ai_html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', ai_html)
     
-    # Convert double newlines to <br><br> for paragraph breaks
+    # Convert double newlines to <br><br> for paragraph breaks, but avoid around HTML block elements
+    # First, protect block elements by temporarily replacing newlines around them
+    block_elements = r'(</?(?:h[1-6]|div|p|ul|ol|li|pre|blockquote|table|tr|td|th)[^>]*>)'
+    
+    # Replace newlines around block elements with placeholders
+    ai_html = re.sub(rf'\n+{block_elements}', r'BLOCK_START\1', ai_html)
+    ai_html = re.sub(rf'{block_elements}\n+', r'\1BLOCK_END', ai_html)
+    
+    # Now convert remaining double newlines to <br><br>
     ai_html = re.sub(r'\n\n+', '<br><br>', ai_html)
+    
+    # Restore the protected newlines around block elements (but as single newlines)
+    ai_html = re.sub(r'BLOCK_START', '\n', ai_html)
+    ai_html = re.sub(r'BLOCK_END', '\n', ai_html)
     
     # Pre-process to handle dash lists that may be separated by <br><br>
     # Split on <br><br> to handle sections separately
