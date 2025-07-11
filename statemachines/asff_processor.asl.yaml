@@ -677,15 +677,40 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
-        Next: Should Terminate After Health?
+        Next: Should Reconsider Later After Health?
 
-    Should Terminate After Health?:
+    Should Reconsider Later After Health?:
         Type: Choice
         Choices:
             -
-                Variable: $.terminate_for_reprocessing
+                Variable: $.actions.reconsider_later
                 BooleanEquals: true
                 Next: Do Nothing
+        Default: Account Reassignment Preprocessor
+
+    Account Reassignment Preprocessor:
+        Type: Task
+        Resource: '${AccountReassignmentPreprocessorFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - States.TaskFailed
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Should Suppress Finding After Account Reassignment?
+
+    Should Suppress Finding After Account Reassignment?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.actions.suppress_finding
+                BooleanEquals: true
+                Next: Suppress Finding
         Default: Handle Incident
 
     Handle Incident:

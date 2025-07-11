@@ -1203,6 +1203,7 @@ Resources:
         RememberAutoRemediationDoneFunctionArn: !GetAtt RememberAutoRemediationDoneFunction.Arn
         GetTicketAndDecideFunctionArn: !GetAtt GetTicketAndDecideFunction.Arn
         AWSHealthReclassifierFunctionArn: !GetAtt AWSHealthReclassifierFunction.Arn
+        AccountReassignmentPreprocessorFunctionArn: !GetAtt AccountReassignmentPreprocessorFunction.Arn
 
         RemediatableSecHubControlsName: !Ref RemediatableSecHubControls
         LocalControlSuppressionsName: !Ref LocalControlSuppressions
@@ -1415,6 +1416,34 @@ Resources:
           CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
           PRODUCT_NAME: !Ref ProductName
           RECLASSIFY_AWS_HEALTH_INCIDENTS: !Ref ReclassifyAWSHealthIncidents
+
+  AccountReassignmentPreprocessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/findings/account_reassignment_preprocessor/
+      Policies:
+        - Statement:
+            - Sid: AssumeTheRole
+              Effect: Allow
+              Action:
+                - sts:AssumeRole
+              Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountRole}'
+            - Sid: SecHubPermissions
+              Effect: Allow
+              Action:
+                - securityhub:BatchImportFindings
+                - securityhub:BatchUpdateFindings
+              Resource: '*'
+            - Sid: OrganizationsPermissions
+              Effect: Allow
+              Action:
+                - organizations:DescribeAccount
+              Resource: '*'
+      Environment:
+        Variables:
+          CROSS_ACCOUNT_ROLE: !Ref CrossAccountRole
+          PRODUCT_NAME: !Ref ProductName
+          SECURITY_ADM_ACCOUNT: !Ref SecurityAccountId
 
   UpdateTicketedFindingFunction:
     Type: AWS::Serverless::Function

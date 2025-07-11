@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.0
+    * Automatic reassignment of delegated findings to the originating accounts.
+
 ## v2.3.5
     * Removed internal development files from release package
 

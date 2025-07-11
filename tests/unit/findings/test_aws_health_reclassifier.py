@@ -157,8 +157,7 @@ class TestAWSHealthReclassifier:
         result = lambda_handler(asff_data, None)
         
         # Verify no reclassification occurred when disabled
-        # No API update means no termination needed
-        assert result['terminate_for_reprocessing'] is False
+        # No API update means no flag set, continue normal processing
         assert result['finding']['Severity']['Label'] == 'HIGH'
 
     def test_operational_notification_reclassified(self, aws_health_operational_finding):
@@ -195,9 +194,9 @@ class TestAWSHealthReclassifier:
                 # Call function
                 result = lambda_handler(asff_data, None)
                 
-                # Verify reclassification triggers termination for reprocessing
+                # Verify reclassification triggers actions.reconsider_later for routing to "Do Nothing"
                 # This follows the architecture: API Update → Event Trigger → Reprocessing
-                assert result['terminate_for_reprocessing'] is True
+                assert result['actions']['reconsider_later'] is True
                 
                 # Verify Security Hub API was called correctly
                 mock_client.batch_update_findings.assert_called_once()
@@ -242,9 +241,9 @@ class TestAWSHealthReclassifier:
                 # Call function
                 result = lambda_handler(asff_data, None)
                 
-                # Verify reclassification triggers termination for reprocessing
+                # Verify reclassification triggers actions.reconsider_later for routing to "Do Nothing"
                 # This follows the architecture: API Update → Event Trigger → Reprocessing
-                assert result['terminate_for_reprocessing'] is True
+                assert result['actions']['reconsider_later'] is True
                 
                 # Verify Security Hub API was called correctly
                 mock_client.batch_update_findings.assert_called_once()
@@ -260,8 +259,7 @@ class TestAWSHealthReclassifier:
         result = lambda_handler(asff_data, None)
         
         # Verify no reclassification occurred - continue processing normally
-        # No API update means no termination needed
-        assert result['terminate_for_reprocessing'] is False
+        # No API update means no flag set, continue normal processing
 
     def test_informational_finding_ignored(self, mock_env_enabled, aws_health_informational_finding):
         """Test that already INFORMATIONAL findings are not reclassified"""
@@ -275,7 +273,6 @@ class TestAWSHealthReclassifier:
         
         # Verify no reclassification occurred - continue processing normally
         # Finding already INFORMATIONAL, no API update needed
-        assert result['terminate_for_reprocessing'] is False
 
     def test_api_error_continues_processing(self, mock_env_enabled, aws_health_operational_finding):
         """Test that API errors result in continued processing with original severity"""
@@ -294,9 +291,8 @@ class TestAWSHealthReclassifier:
             # Call function
             result = lambda_handler(asff_data, None)
             
-            # Verify processing continues with original severity (no termination)
+            # Verify processing continues with original severity (no flag set)
             # This follows the architecture: if Security Hub update fails, continue processing
-            assert result['terminate_for_reprocessing'] is False
             
             # Verify Security Hub API was attempted
             mock_get_client.assert_called_once_with('securityhub', aws_health_operational_finding['AwsAccountId'])
@@ -639,7 +635,7 @@ class TestRealWorldScenarios:
             result = lambda_handler(asff_data, None)
             
             # Verify reclassification triggered
-            assert result['terminate_for_reprocessing'] is True
+            assert result['actions']['reconsider_later'] is True
             
             # Verify Security Hub API was called correctly
             mock_get_client.assert_called_once_with('securityhub', '515966493378')
@@ -679,7 +675,7 @@ class TestRealWorldScenarios:
             result = lambda_handler(asff_data, None)
             
             # Verify reclassification triggered
-            assert result['terminate_for_reprocessing'] is True
+            assert result['actions']['reconsider_later'] is True
             
             # Verify Security Hub API was called correctly
             mock_get_client.assert_called_once_with('securityhub', '515966493378')
@@ -719,7 +715,7 @@ class TestRealWorldScenarios:
             result = lambda_handler(asff_data, None)
             
             # Verify reclassification triggered
-            assert result['terminate_for_reprocessing'] is True
+            assert result['actions']['reconsider_later'] is True
             
             # Verify Security Hub API was called correctly
             mock_get_client.assert_called_once_with('securityhub', '650251698273')

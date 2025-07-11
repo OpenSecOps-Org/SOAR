@@ -101,7 +101,7 @@ The system implements consistent error handling across all state machines:
 - **Throttling Protection**: Extended retry intervals
 - **Memory Allocation**: Higher memory limits for AI processing
 
-## Function Architecture (76 Total Lambda Functions)
+## Function Architecture (77 Total Lambda Functions)
 
 ### Auto-Remediation Functions (30 functions - 100% tested)
 - **Status**: Complete test coverage (428 tests)
@@ -109,14 +109,15 @@ The system implements consistent error handling across all state machines:
 - **Pattern**: Standardized ASFF processing with comprehensive error handling
 - **Error Resilience**: State machine catch-all error handling ensures 100% fallback-to-ticketing coverage (v2.2.1+)
 
-### Core Workflow Functions (46 functions - Next Testing Priority)
+### Core Workflow Functions (47 functions - Next Testing Priority)
 
-#### Category 1: Core Workflow (5 functions) - CRITICAL
+#### Category 1: Core Workflow (6 functions) - CRITICAL
 1. **get_ticket_and_decide** - Central decision maker for all workflow routing
 2. **get_account_data** - Loads account metadata used throughout system
 3. **suppress_finding** - Updates Security Hub finding status to SUPPRESSED
 4. **suppress_locally** - Applies local suppression rules
 5. **update_remediated_finding** - Marks findings as RESOLVED
+6. **account_reassignment_preprocessor** - Corrects account routing for delegated services (IAM Access Analyzer, GuardDuty, Inspector, Detective) - ✅ COMPLETE (25 tests passing)
 
 #### Category 2: Finding Processing (8 functions) - HIGH PRIORITY
 1. **compute_penalty_score** - Risk scoring algorithm
@@ -229,9 +230,9 @@ The system maintains historical data for:
 
 ### Serverless Infrastructure
 
-- **Lambda Functions**: 76 total functions, Python 3.12 runtime
+- **Lambda Functions**: 77 total functions, Python 3.12 runtime
   - 30 auto-remediation functions (100% tested)
-  - 46 workflow/support functions (next testing target)
+  - 47 workflow/support functions (next testing target)
 - **Lambda Layers**: Shared code libraries for common functionality
 - **DynamoDB**: Stores findings, ticketing data, and configuration
 - **EventBridge**: Custom event bus coordinates asynchronous processing
@@ -315,26 +316,62 @@ The system maintains historical data for:
 
 ## Event-Driven Architecture Pattern
 
-SOAR follows an established **"API Update → Event Trigger → Reprocessing"** pattern for state transitions:
+SOAR follows established event-driven patterns for state transitions, with two primary approaches based on AWS API constraints:
 
-### Update-and-Reprocess Workflow
+### Update-and-Reprocess Workflow (Mutable Fields)
 1. **State Change**: Lambda function calls Security Hub `batch_update_findings` API
 2. **Event Generation**: Security Hub automatically generates new finding event with updated status
 3. **Fresh Processing**: SOAR processes the new event with corrected data from the beginning
 4. **Clean Logic**: All workflow decisions use the updated finding state
 
-### Established Use Cases
+**Use Cases**:
 - **Auto-Remediation Completion**: Sets `Workflow.Status: 'RESOLVED'` → Triggers ticket closure workflow
 - **Finding Suppression**: Sets `Workflow.Status: 'SUPPRESSED'` → Triggers cleanup actions
 - **Severity Reclassification**: Updates `Severity.Label` → Triggers reprocessing with correct severity
+
+### Create-and-Suppress Workflow (Immutable Fields)
+1. **Create New Finding**: Lambda function calls Security Hub `batch_import_findings` API with corrected data
+2. **Suppress Original**: Lambda function calls Security Hub `batch_update_findings` API to suppress original finding
+3. **Terminate Current**: Sets `terminate_for_reprocessing` flag to end current workflow
+4. **Fresh Processing**: New finding triggers fresh SOAR processing with corrected data
+
+**Use Cases**:
+- **Account Routing Correction**: Creates finding in correct account when `AwsAccountId` is immutable
+- **Cross-Account Finding Creation**: Routes findings to appropriate account teams
+
+### Account Reassignment Preprocessor
+
+AWS Security Hub delegated administration architecture creates account routing mismatches for certain security services (IAM Access Analyzer, GuardDuty, Inspector, Detective). These services generate findings that appear to originate from the Security-Adm account but actually concern resources in member accounts.
+
+**Problem**: Finding shows `AwsAccountId: 111111111111` (Security-Adm) but resource is in account `222222222222`
+
+**Solution**: Account Reassignment Preprocessor detects mismatches and creates corrected findings in the appropriate accounts:
+
+1. **Detection**: Two-tier approach comparing `AwsAccountId` with:
+   - **Priority 1**: `ProductFields.ResourceOwnerAccount` field
+   - **Priority 2**: Account extracted from resource ARN (arn:aws:service:region:account:resource)
+2. **Recreation**: Uses `batch_import_findings` to create properly structured ASFF finding in target account
+3. **Suppression**: Sets `actions.suppress_finding = True` to trigger state machine suppression of original finding
+4. **Graceful Degradation**: Any failure preserves original workflow (fail-safe design)
+5. **Fresh Processing**: New finding triggers complete SOAR processing in correct account
+
+**Technical Implementation**:
+- **Production-Ready**: All 25 tests passing with comprehensive TDD coverage
+- **ASFF Compliance**: Follows AWS Security Hub BatchImportFindings API requirements exactly
+- **Zero AWS Costs**: Comprehensive mocking prevents real API calls during testing
+- **Cross-Account Support**: Uses established SOAR `get_client` patterns for secure access
+- **Unique ID Generation**: Creates unique finding IDs using `{original-id}-reassigned-{account-id}` pattern
+
+**Integration**: Account Reassignment Preprocessor integrates into the ASFF processor state machine after AWS Health Reclassifier, with Choice node routing to existing suppression functionality when `actions.suppress_finding = true`.
 
 ### Benefits
 - **Consistent Processing**: All workflows use the same updated finding data
 - **Audit Trail**: Security Hub maintains complete state change history
 - **Downstream Integration**: Other Security Hub consumers see corrected data
 - **Loop Prevention**: Updates are unidirectional (e.g., HIGH → INFORMATIONAL only)
+- **Correct Team Notification**: Findings reach the teams responsible for the actual resources
 
-This pattern enables the SOAR to maintain clean separation between decision logic and state management while ensuring all systems have consistent, up-to-date finding information.
+This pattern enables the SOAR to maintain clean separation between decision logic and state management while ensuring all systems have consistent, up-to-date finding information and appropriate team routing.
 
 ## CloudWatch Alarm Integration and Monitoring
 

@@ -1,5 +1,5 @@
 """
-Test fixtures for preprocessing pipeline implementation.
+Test fixtures for preprocessing interceptors implementation.
 Contains ASFF findings for testing account routing correction logic.
 """
 
@@ -320,4 +320,76 @@ def get_access_analyzer_finding_needs_correction_3():
         },
         'ASFF_decision': 'failed_control',
         'ASFF_decision_reason': 'FAILED control'
+    }
+
+
+def get_finding_not_in_security_adm_account():
+    """
+    Finding that is NOT in the security-adm account.
+    This finding should be skipped by the optimization logic.
+    """
+    return {
+        'SOAREnabled': 'Yes',
+        'DeferIncidents': 'No',
+        'DeferAutoRemediations': 'No',
+        'DeferTeamFixes': 'No',
+        'DiskForensicsInvoke': 'No',
+        'account': {},
+        'finding': {
+            'Id': 'arn:aws:ec2:us-east-1:555555555555:security-group/sg-12345678',
+            'AwsAccountId': '555555555555',  # NOT the security-adm account
+            'AwsAccountName': 'Production-Account',
+            'Title': 'EC2 Security Group allows unrestricted access',
+            'Description': 'Security group sg-12345678 allows unrestricted inbound access',
+            'ProductArn': 'arn:aws:securityhub:us-east-1::product/aws/securityhub',
+            'ProductName': 'Security Hub',
+            'CompanyName': 'AWS',
+            'GeneratorId': 'aws-foundational-security-standard/v/1.0.0/EC2.19',
+            'Types': [
+                'Software and Configuration Checks/AWS Security Best Practices/Network Reachability'
+            ],
+            'Severity': {
+                'Label': 'HIGH',
+                'Normalized': 70
+            },
+            'Resources': [
+                {
+                    'Type': 'AwsEc2SecurityGroup',
+                    'Id': 'arn:aws:ec2:us-east-1:555555555555:security-group/sg-12345678'
+                }
+            ],
+            'ProductFields': {
+                'aws/securityhub/FindingId': 'arn:aws:securityhub:us-east-1::product/aws/securityhub/arn:aws:ec2:us-east-1:555555555555:security-group/sg-12345678',
+                'aws/securityhub/ProductName': 'Security Hub',
+                'aws/securityhub/CompanyName': 'AWS'
+            },
+            'CreatedAt': '2025-01-01T12:00:00.000Z',
+            'UpdatedAt': '2025-01-01T12:00:00.000Z',
+            'ProcessedAt': '2025-01-01T12:00:00.000Z',
+            'RecordState': 'ACTIVE',
+            'WorkflowState': 'NEW',
+            'Workflow': {
+                'Status': 'NEW'
+            },
+            'SchemaVersion': '2018-10-08'
+        },
+        'tags': {},
+        'actions': {
+            'suppress_finding': False,
+            'autoremediation_not_done': False,
+            'reconsider_later': False
+        },
+        'messages': {
+            'actions_taken': 'None.',
+            'actions_required': 'Please update your infrastructural code to prevent this security issue from arising again at the next deployment.',
+            'ai': {
+                'plaintext': '',
+                'html': ''
+            }
+        },
+        'db': {
+            'tickets': {}
+        },
+        'ASFF_decision': 'incident',
+        'ASFF_decision_reason': 'Finding is an incident'
     }

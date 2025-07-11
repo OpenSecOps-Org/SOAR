@@ -6,7 +6,7 @@ to INFORMATIONAL severity to prevent false positives in SOAR processing.
 
 This function implements the established SOAR pattern:
 1. Update Security Hub finding severity via API
-2. Terminate current execution 
+2. Set actions.reconsider_later flag to route to "Do Nothing" 
 3. Let the new event trigger fresh processing with correct severity
 
 Uses pattern-based detection of AWS Health notification types rather than 
@@ -31,7 +31,7 @@ def lambda_handler(data, context):
         context: Lambda context
         
     Returns:
-        dict: Modified scratchpad with terminate_for_reprocessing flag if reclassified
+        dict: Modified scratchpad with actions.reconsider_later flag if reclassified
     """
     finding = data.get('finding', {})
     current_severity = finding.get('Severity', {}).get('Label', 'unknown')
@@ -41,7 +41,6 @@ def lambda_handler(data, context):
     # Check if reclassification is enabled
     if RECLASSIFY_ENABLED != 'Yes':
         print(f"DECISION: AWS Health reclassification is disabled - no action taken")
-        data['terminate_for_reprocessing'] = False
         return data
     
     # Check if this is an AWS Health informational notification
@@ -54,18 +53,17 @@ def lambda_handler(data, context):
             # Update Security Hub with corrected severity
             update_security_hub_severity(finding)
             
-            # Signal state machine to terminate for reprocessing
-            data['terminate_for_reprocessing'] = True
-            print(f"SUCCESS: Security Hub updated, terminating for reprocessing")
+            # Signal state machine to reconsider later (uses existing SOAR pattern)
+            data['actions']['reconsider_later'] = True
+            print(f"SUCCESS: Security Hub updated, setting actions.reconsider_later = True")
             
         except Exception as e:
             print(f"ERROR: Failed to update Security Hub: {e}")
             print(f"DECISION: Continuing with original severity due to error")
-            # Continue processing with original severity on error
-            data['terminate_for_reprocessing'] = False
+            # Continue processing with original severity on error (no flag set)
     else:
         print(f"DECISION: No reclassification needed - {reclassify_decision['reason']}")
-        data['terminate_for_reprocessing'] = False
+        # No flag set - continue normal processing
     
     return data
 
