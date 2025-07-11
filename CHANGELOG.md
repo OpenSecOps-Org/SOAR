@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.3.5
+    * Removed internal development files from release package
+
 ## v2.3.4
     * Fixed Health Reclassifier positioning in ASFF state machine to incident workflow only, as Health issues only pertain to incidents
 
