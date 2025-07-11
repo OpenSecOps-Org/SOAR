@@ -38,32 +38,7 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 100
                 BackoffRate: 3
-        Next: AWS Health Reclassifier
-
-    AWS Health Reclassifier:
-        Type: Task
-        Resource: '${AWSHealthReclassifierFunctionArn}'
-        Retry:
-            -
-                ErrorEquals:
-                    - States.Timeout
-                    - States.TaskFailed
-                    - Lambda.ServiceException
-                    - Lambda.AWSLambdaException
-                    - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
-        Next: Should Terminate for Reprocessing?
-
-    Should Terminate for Reprocessing?:
-        Type: Choice
-        Choices:
-            -
-                Variable: $.terminate_for_reprocessing
-                BooleanEquals: true
-                Next: Do Nothing
-        Default: Branch on Decision
+        Next: Branch on Decision
 
     Branch on Decision:
         Type: Choice
@@ -686,7 +661,32 @@ States:
                 IntervalSeconds: 3
                 MaxAttempts: 100
                 BackoffRate: 3
-        Next:  Handle Incident
+        Next: AWS Health Reclassifier
+
+    AWS Health Reclassifier:
+        Type: Task
+        Resource: '${AWSHealthReclassifierFunctionArn}'
+        Retry:
+            -
+                ErrorEquals:
+                    - States.Timeout
+                    - States.TaskFailed
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                IntervalSeconds: 3
+                MaxAttempts: 10
+                BackoffRate: 3
+        Next: Should Terminate After Health?
+
+    Should Terminate After Health?:
+        Type: Choice
+        Choices:
+            -
+                Variable: $.terminate_for_reprocessing
+                BooleanEquals: true
+                Next: Do Nothing
+        Default: Handle Incident
 
     Handle Incident:
         Type: Task
