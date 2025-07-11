@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.3.4
+    * Fixed Health Reclassifier positioning in ASFF state machine to incident workflow only, as Health issues only pertain to incidents
+
 ## v2.3.3
     * Improved Health Reclassifier positioning in ASFF state machine to incident workflow only, as Health issues only pertain to incidents
 
