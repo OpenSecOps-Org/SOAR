@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.4
+    * Verifying structure
+
 ## v2.4.3
     * Synced git histories.
 
