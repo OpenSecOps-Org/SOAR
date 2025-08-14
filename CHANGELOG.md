@@ -1,5 +1,9 @@
 # Change Log
 
+## v2.4.1
+    * Added execution rights to AccountReassignmentPreprocessorFunction
+    * added DynamoDB.2 to the list of enabled auto-remedations.
+
 ## v2.4.0
     * Automatic reassignment of delegated findings to the originating accounts.
 

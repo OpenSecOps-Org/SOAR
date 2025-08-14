@@ -99,7 +99,8 @@ def setup_remediatable_sec_hub_controls(table_resource):
         {'id': 'RDS.17'},
         {'id': 'S3.2'},
         {'id': 'S3.3'},
-        {'id': 'S3.10'}
+        {'id': 'S3.10'}.
+        {'id': 'DynamoDB.2'}
     ]
 
     logger.info('Proposed changes: %s', proposed_changes)

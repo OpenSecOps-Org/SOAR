@@ -1284,6 +1284,8 @@ Resources:
             FunctionName: !Ref GetTicketAndDecideFunction
         - LambdaInvokePolicy:
             FunctionName: !Ref AWSHealthReclassifierFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref AccountReassignmentPreprocessorFunction
 
         - DynamoDBReadPolicy:
             TableName: !Ref RemediatableSecHubControls
