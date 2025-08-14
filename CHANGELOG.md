@@ -1,5 +1,9 @@
 # Change Log
 
+## v2.4.7
+    * ELB.5 now handles both Classic and ALB logging, and also retrieves the LB name
+      using heuristics: AWS is not consistent in their use of field names.
+
 ## v2.4.6
     * KMS keys in RDS.4 autoremediation now are alias/aws/rds.
     * RDS remediation utils layer augmented with duplicate Exception names.

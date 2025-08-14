@@ -14,8 +14,8 @@ Remediation Actions:
 2. Creates dedicated S3 bucket for access logs with secure configuration:
    - Enables versioning for audit trails
    - Blocks all public access
-   - Enables AES256 encryption
    - Configures bucket policy for ELB service account access
+   - Uses default S3 encryption (automatically enabled)
 3. Enables access logging on the load balancer pointing to the S3 bucket
 
 Validation Commands:
@@ -38,12 +38,13 @@ Security Impact:
 S3 Bucket Security Features:
 - Versioning enabled for data integrity
 - Public access completely blocked
-- Server-side encryption with AES256
+- Default encryption automatically enabled
 - Bucket policy restricts access to ELB service accounts only
 
 Error Handling:
 - Missing load balancer: Suppresses finding
-- S3 operation failures: Suppresses finding with error details
+- Load balancer configuration errors: Flags for manual remediation
+- S3 operation failures: Flags for manual remediation
 - Existing bucket conflicts: Continues with configuration
 """
 
@@ -81,6 +82,41 @@ ELB_ACCOUNTS = {
 }
 
 
+def extract_load_balancer_name(resource_details, lb_arn, max_length=50):
+    """
+    Extract load balancer name with multiple fallback options.
+    
+    Returns:
+        tuple: (success: bool, name: str, source: str, error_message: str)
+    """
+    # Try LoadBalancerName first (use as-is)
+    if 'LoadBalancerName' in resource_details and resource_details['LoadBalancerName']:
+        value = resource_details['LoadBalancerName']
+        return True, str(value)[:max_length], 'LoadBalancerName field', None
+    
+    # Try DNS fields (split on '.' and take first part)
+    for dns_field in ['DnsName', 'DNSName']:
+        if dns_field in resource_details and resource_details[dns_field]:
+            value = resource_details[dns_field]
+            name = value.split('.')[0][:max_length]
+            return True, name, f'{dns_field} field', None
+    
+    # Fallback: extract from ARN
+    try:
+        # ARN format: arn:aws:elasticloadbalancing:region:account:loadbalancer/name
+        arn_parts = lb_arn.split('/')
+        if len(arn_parts) >= 2:
+            name = arn_parts[-1][:max_length]  # Last part after final '/'
+            return True, name, 'ARN extraction', None
+    except Exception as e:
+        pass  # Continue to error case
+    
+    # If nothing worked
+    available_fields = list(resource_details.keys())
+    error_msg = f"Unable to extract load balancer name from fields {available_fields} or ARN {lb_arn}"
+    return False, None, None, error_msg
+
+
 def lambda_handler(data, _context):
     print(data)
 
@@ -92,25 +128,45 @@ def lambda_handler(data, _context):
     elb_account_id = ELB_ACCOUNTS[region]
 
     lb_arn = resource['Id']
-    lb_dns_name = resource['Details'][elb_type]['DNSName']
-    lb_name = lb_dns_name.split('.')[0][0:50]
+    elb_details = resource['Details'][elb_type]
+
+    success, lb_name, source, error_message = extract_load_balancer_name(elb_details, lb_arn)
+
+    if not success:
+        print(f"Unable to extract load balancer name: {error_message}")
+        data['messages']['actions_taken'] = f"Cannot identify load balancer for remediation: {error_message}"
+        data['messages']['actions_required'] = "Investigate why load balancer name could not be extracted from Security Hub finding data."
+        data['actions']['autoremediation_not_done'] = True
+        return data
 
     bucket_name = f"lb-logs-for-{lb_name.lower()}"
 
-    print(f"lb_dns_name: {lb_dns_name}")
-    print(f"lb_name: {lb_name}")
+    print(f"lb_name: {lb_name} (extracted from {source})")
     print(f"bucket_name: {bucket_name}")
 
-
     s3_client = get_client('s3', account_id, region)
-    elbv2_client = get_client('elbv2', account_id, region)
+
+    # Determine LB type and appropriate client
+    if elb_type == 'AwsElbLoadBalancer':  # Classic Load Balancer
+        elb_client = get_client('elb', account_id, region)
+        is_classic = True
+        print("Detected Classic Load Balancer")
+    else:  # Application/Network Load Balancer
+        elb_client = get_client('elbv2', account_id, region)
+        is_classic = False
+        print("Detected Application/Network Load Balancer")
 
     # First, verify the load balancer exists
     try:
         print(f"Checking if load balancer '{lb_arn}' exists...")
-        elbv2_client.describe_load_balancers(LoadBalancerArns=[lb_arn])
+        if is_classic:
+            # Classic ELB uses LoadBalancerNames parameter
+            elb_client.describe_load_balancers(LoadBalancerNames=[lb_name])
+        else:
+            # ALB/NLB uses LoadBalancerArns parameter
+            elb_client.describe_load_balancers(LoadBalancerArns=[lb_arn])
         print("Load balancer exists, proceeding with remediation.")
-    except elbv2_client.exceptions.LoadBalancerNotFoundException:
+    except elb_client.exceptions.LoadBalancerNotFound:
         print(f"Load balancer not found: {lb_arn}")
         data['messages']['actions_taken'] = f"Load balancer not found: {lb_arn}. This finding has been suppressed."
         data['actions']['suppress_finding'] = True
@@ -121,120 +177,138 @@ def lambda_handler(data, _context):
         data['actions']['suppress_finding'] = True
         return data
 
+    # Create S3 bucket with region-specific handling
     try:
-        print(f"Creating bucket '{bucket_name}'...")
-        response = s3_client.create_bucket(
-            Bucket=bucket_name,
-            CreateBucketConfiguration={
-                'LocationConstraint': region,
-            },
-        )
+        print(f"Creating bucket '{bucket_name}' in region '{region}'...")
+        if region == 'us-east-1':
+            # us-east-1 doesn't accept LocationConstraint
+            response = s3_client.create_bucket(Bucket=bucket_name)
+        else:
+            # All other regions require LocationConstraint
+            response = s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={'LocationConstraint': region}
+            )
         print(response)
     except s3_client.exceptions.BucketAlreadyExists:
         print(f"Warning: The bucket '{bucket_name}' already exists.")
     except s3_client.exceptions.BucketAlreadyOwnedByYou:
         print(f"Warning: Bucket '{bucket_name}' is already owned by you.")
+    except Exception as e:
+        print(f"Error creating S3 bucket: {str(e)}")
+        data['messages']['actions_taken'] = f"Error creating S3 bucket: {str(e)}"
+        data['messages']['actions_required'] = "Investigate S3 bucket creation issue and create logging bucket manually."
+        data['actions']['autoremediation_not_done'] = True
+        return data
 
-
-    print(f"Enabling versioning for bucket '{bucket_name}'...")
-    response = s3_client.put_bucket_versioning(
-        Bucket=bucket_name,
-        VersioningConfiguration={
-            'MFADelete': 'Disabled',
-            'Status': 'Enabled'
-        }
-    )
-    print(response)
-
-    print(f"Putting access block on bucket '{bucket_name}'...")
-    response = s3_client.put_public_access_block(
-        Bucket=bucket_name,
-        PublicAccessBlockConfiguration={
-            'BlockPublicAcls': True,
-            'IgnorePublicAcls': True,
-            'BlockPublicPolicy': True,
-            'RestrictPublicBuckets': True
-        }
-    )
-    print(response)
-
-    print(f"Encrypting bucket '{bucket_name}'...")
-    response = s3_client.put_bucket_encryption(
-        Bucket=bucket_name,
-        ServerSideEncryptionConfiguration={
-            'Rules': [
-                {
-                    'ApplyServerSideEncryptionByDefault': {
-                        'SSEAlgorithm': 'AES256'
-                    }
-                },
-            ]
-        }
-    )
-    print(response)
-
-    print(f"Attaching bucket policy to bucket '{bucket_name}'...")
-    response = s3_client.put_bucket_policy(
-        Bucket=bucket_name,
-        Policy=json.dumps(
-            {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Principal": {
-                            "AWS": f"arn:aws:iam::{elb_account_id}:root"
-                        },
-                        "Action": "s3:PutObject",
-                        "Resource": f"arn:aws:s3:::{bucket_name}/AWSLogs/{account_id}/*"
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Principal": {
-                            "Service": "logdelivery.elb.amazonaws.com"
-                        },
-                        "Action": "s3:GetBucketAcl",
-                        "Resource": f"arn:aws:s3:::{bucket_name}"
-                    }
-                ]
+    # Configure S3 bucket with error handling
+    try:
+        print(f"Enabling versioning for bucket '{bucket_name}'...")
+        response = s3_client.put_bucket_versioning(
+            Bucket=bucket_name,
+            VersioningConfiguration={
+                'MFADelete': 'Disabled',
+                'Status': 'Enabled'
             }
         )
-    )
-    print(response)
+        print(response)
 
-    print(f"Enabling access logs for LB '{lb_arn}'...")
-    try:
-        response = elbv2_client.modify_load_balancer_attributes(
-            Attributes=[
-                {
-                    'Key': 'access_logs.s3.enabled',
-                    'Value': 'true',
-                },
-                {
-                    'Key': 'access_logs.s3.bucket',
-                    'Value': bucket_name,
-                },
-                {
-                    'Key': 'access_logs.s3.prefix',
-                    'Value': '',
-                },
-            ],
-            LoadBalancerArn=lb_arn,
+        print(f"Putting access block on bucket '{bucket_name}'...")
+        response = s3_client.put_public_access_block(
+            Bucket=bucket_name,
+            PublicAccessBlockConfiguration={
+                'BlockPublicAcls': True,
+                'IgnorePublicAcls': True,
+                'BlockPublicPolicy': True,
+                'RestrictPublicBuckets': True
+            }
         )
         print(response)
-    except elbv2_client.exceptions.LoadBalancerNotFoundException:
+
+        # Note: S3 encryption is enabled by default, no explicit configuration needed
+
+        print(f"Attaching bucket policy to bucket '{bucket_name}'...")
+        response = s3_client.put_bucket_policy(
+            Bucket=bucket_name,
+            Policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": f"arn:aws:iam::{elb_account_id}:root"
+                            },
+                            "Action": "s3:PutObject",
+                            "Resource": f"arn:aws:s3:::{bucket_name}/AWSLogs/{account_id}/*"
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "logdelivery.elb.amazonaws.com"
+                            },
+                            "Action": "s3:GetBucketAcl",
+                            "Resource": f"arn:aws:s3:::{bucket_name}"
+                        }
+                    ]
+                }
+            )
+        )
+        print(response)
+
+    except Exception as e:
+        print(f"Error configuring S3 bucket: {str(e)}")
+        data['messages']['actions_taken'] = f"Bucket created but configuration failed: {str(e)}"
+        data['actions']['autoremediation_not_done'] = True
+        return data
+
+    # Enable access logging with type-specific handling
+    print(f"Enabling access logs for LB '{lb_arn}'...")
+    try:
+        if is_classic:
+            # Classic Load Balancer uses different API
+            response = elb_client.modify_load_balancer_attributes(
+                LoadBalancerName=lb_name,
+                LoadBalancerAttributes={
+                    'AccessLog': {
+                        'Enabled': True,
+                        'S3BucketName': bucket_name,
+                        'S3BucketPrefix': ''
+                    }
+                }
+            )
+        else:
+            # Application/Network Load Balancer
+            response = elb_client.modify_load_balancer_attributes(
+                Attributes=[
+                    {
+                        'Key': 'access_logs.s3.enabled',
+                        'Value': 'true',
+                    },
+                    {
+                        'Key': 'access_logs.s3.bucket',
+                        'Value': bucket_name,
+                    },
+                    {
+                        'Key': 'access_logs.s3.prefix',
+                        'Value': '',
+                    },
+                ],
+                LoadBalancerArn=lb_arn,
+            )
+        print(response)
+    except elb_client.exceptions.LoadBalancerNotFound:
         print(f"Load balancer not found during modification: {lb_arn}")
         data['messages']['actions_taken'] = f"Load balancer not found during modification: {lb_arn}. This finding has been suppressed."
         data['actions']['suppress_finding'] = True
         return data
     except Exception as e:
         print(f"Error modifying load balancer attributes: {str(e)}")
-        data['messages']['actions_taken'] = f"Error modifying load balancer attributes: {str(e)}. This finding has been suppressed."
-        data['actions']['suppress_finding'] = True
+        data['messages']['actions_taken'] = f"Error modifying load balancer attributes: {str(e)}"
+        data['messages']['actions_required'] = "Investigate load balancer configuration issue and enable logging manually."
+        data['actions']['autoremediation_not_done'] = True
         return data
 
     data['messages']['actions_taken'] = f"The bucket {bucket_name} was successfully created and configured for Load Balancer access logs."
-    data['messages']['actions_required'] = f"None"
+    data['messages']['actions_required'] = "None"
     return data
-
-
