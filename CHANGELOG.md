@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.8
+    * Added iam:PassRole to the RDS.6 autoremediation.
+
 ## v2.4.7
     * ELB.5 now handles both Classic and ALB logging, and also retrieves the LB name
       using heuristics: AWS is not consistent in their use of field names.

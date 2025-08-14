@@ -2227,6 +2227,7 @@ Resources:
               Action:
                 - iam:CreateRole
                 - iam:AttachRolePolicy
+                - iam:PassRole
               Resource: '*'
             - Sid: RDSPermissions
               Effect: Allow
