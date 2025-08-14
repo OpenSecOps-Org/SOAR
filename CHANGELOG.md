@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.5
+    * Added ResultPath to all auto-remediation Catch block in their state machine.
+
 ## v2.4.4
     * Verifying structure
 
