@@ -1,5 +1,11 @@
 # Change Log
 
+## v2.4.3
+    * Synced git histories.
+
+## v2.4.2
+    * Unstaged AI file.
+
 ## v2.4.1
     * Added execution rights to AccountReassignmentPreprocessorFunction
     * added DynamoDB.2 to the list of enabled auto-remedations.
