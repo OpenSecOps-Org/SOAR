@@ -1,5 +1,9 @@
 # Change Log
 
+## v2.4.6
+    * KMS keys in RDS.4 autoremediation now are alias/aws/rds.
+    * RDS remediation utils layer augmented with duplicate Exception names.
+
 ## v2.4.5
     * Added ResultPath to all auto-remediation Catch block in their state machine.
 

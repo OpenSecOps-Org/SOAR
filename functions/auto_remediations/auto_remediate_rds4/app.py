@@ -99,7 +99,7 @@ def process_cluster_snapshot(client, data, allocated_storage, snapshot_name, sna
         response = client.copy_db_cluster_snapshot(
             SourceDBClusterSnapshotIdentifier=snapshot_name,
             TargetDBClusterSnapshotIdentifier=snapshot_target_name,
-            KmsKeyId='aws/rds',
+            KmsKeyId='alias/aws/rds',
             CopyTags=True
         )
     except ClientError as error:
@@ -172,7 +172,7 @@ def process_instance_snapshot(client, data, allocated_storage, snapshot_name, sn
         response = client.copy_db_snapshot(
             SourceDBSnapshotIdentifier=snapshot_name,
             TargetDBSnapshotIdentifier=snapshot_target_name,
-            KmsKeyId='aws/rds',
+            KmsKeyId='alias/aws/rds',
             CopyTags=True
         )
     except ClientError as error:
