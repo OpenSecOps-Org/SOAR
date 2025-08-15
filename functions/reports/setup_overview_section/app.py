@@ -394,8 +394,9 @@ def accounts_breakdown_html_table(accounts_with_open_tickets, accounts_with_over
                                 accounts_with_autoremediations.get(account, 0) + \
                                 accounts_with_incidents.get(account, 0)
     
-    # Sort accounts by the sum in descending order
-    sorted_accounts = sorted(all_accounts, key=lambda x: account_sums[x], reverse=True)
+    # Filter to only include accounts that exist in account_data, then sort by sum
+    existing_accounts = {account for account in all_accounts if account in account_data}
+    sorted_accounts = sorted(existing_accounts, key=lambda x: account_sums[x], reverse=True)
 
     # Start of the table
     table_html = "<table><thead><tr><th>Account</th><th>Env</th><th>OU</th><th>Team</th>" + \

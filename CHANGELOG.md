@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.10
+    * The weekly AI report now filters away old data for renamed accounts.
+
 ## v2.4.9
     * Pinned versions of pandas and numpy to avoid SAM build issues.
 
