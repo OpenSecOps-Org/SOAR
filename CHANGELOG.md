@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.9
+    * Pinned versions of pandas and numpy to avoid SAM build issues.
+
 ## v2.4.8
     * Added iam:PassRole to the RDS.6 autoremediation.
 
