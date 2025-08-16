@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.12
+    * Fixed Lambda enrichment to use actual ARN from alarm generator instead of reconstructing it
+
 ## v2.4.11
     * Fixed DynamoDB permissions for EnrichCloudWatchContextFunction to access GSI indexes
     * Removed unreliable heuristics fallback logic from CloudWatch enricher

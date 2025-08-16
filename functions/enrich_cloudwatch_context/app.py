@@ -335,8 +335,12 @@ def enrich_lambda_context(finding: Dict[str, Any], service_context: Dict[str, An
         # Get CloudWatch Logs client for Lambda function logs
         logs_client = get_client('logs', account_id, region)
         
-        # For Lambda functions, we primarily get information from CloudWatch Logs
-        lambda_arn = f"arn:aws:lambda:{region}:{account_id}:function:{function_name}"
+        # Use the actual Lambda ARN from service context (provided by alarm generator)
+        lambda_arn = service_context.get('function_arn')
+        if not lambda_arn:
+            # Fallback: construct ARN if not available (should not happen with fixed alarm generator)
+            lambda_arn = f"arn:aws:lambda:{region}:{account_id}:function:{function_name}"
+        
         logs_summary = extract_lambda_logs_summary(logs_client, lambda_arn, get_incident_timestamp(finding))
         
         if logs_summary and 'No ERROR logs found' not in logs_summary:
