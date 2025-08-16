@@ -1,5 +1,10 @@
 # Change Log
 
+## v2.4.11
+    * Fixed DynamoDB permissions for EnrichCloudWatchContextFunction to access GSI indexes
+    * Removed unreliable heuristics fallback logic from CloudWatch enricher
+    * Added complete event logging to enricher for improved debugging
+
 ## v2.4.10
     * The weekly AI report now filters away old data for renamed accounts.
 

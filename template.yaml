@@ -1164,7 +1164,9 @@ Resources:
               Effect: Allow
               Action:
                 - dynamodb:Query
-              Resource: !GetAtt Incidents.Arn
+              Resource: 
+                - !GetAtt Incidents.Arn
+                - !Sub "${Incidents.Arn}/index/*"
       Environment:
         Variables:
           INCIDENTS_TABLE_NAME: !Ref Incidents

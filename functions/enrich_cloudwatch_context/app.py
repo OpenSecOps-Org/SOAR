@@ -38,6 +38,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     Returns:
         Enhanced scratchpad with enriched context data
     """
+    # Log the complete event for debugging purposes
+    print(f"ENRICHER INPUT: {event}")
+    
     finding = event.get('finding', {})
     
     # Check if this is a CloudWatch alarm finding that needs enrichment
@@ -139,8 +142,9 @@ def extract_service_context(finding: Dict[str, Any]) -> Dict[str, Any]:
     """
     Extract service-specific context from CloudWatch alarm finding.
     
-    Primary approach: Check Resources array for supported AWS service types
-    Fallback approach: Parse Description field for service information
+    Only checks Resources array for supported AWS service types - no fallback heuristics.
+    The alarm generator (SOAR-all-alarms-to-sec-hub) is responsible for providing
+    accurate resource information in the ASFF Resources array.
     
     Args:
         finding: ASFF finding data
@@ -148,11 +152,8 @@ def extract_service_context(finding: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Service context including type and enrichment parameters
     """
-    account_id = finding.get('AwsAccountId')
-    region = finding.get('Region')
     resources = finding.get('Resources', [])
     
-    # Primary approach: Extract from Resources array
     # Ensure resources is a list and handle corrupted data gracefully
     if not isinstance(resources, list):
         resources = []
@@ -210,99 +211,15 @@ def extract_service_context(finding: Dict[str, Any]) -> Dict[str, Any]:
                 'detection_method': 'resource_arn'
             }
     
-    # Fallback approach: Parse Description field (backward compatibility)
-    description = finding.get('Description', '').strip()
-    
-    if not description:
-        print("SERVICE DETECTION FAILED: No supported resource types found and no description available")
-        print(f"Available resources: {[r.get('Type', 'Unknown') for r in resources if isinstance(r, dict)]}")
-        return {
-            'service_type': 'generic',
-            'enrichment_enabled': False,
-            'error': 'No supported resource types found and no description available',
-            'detection_method': 'none'
-        }
-    
-    # Handle Step Functions state machines from description
-    # Real example: "The SOARASFFProcessor state machine failed."
-    if 'state machine' in description.lower():
-        # Extract state machine name from description
-        # Look for pattern: "The [StateMachineName] state machine failed."
-        state_machine_name = 'UnknownStateMachine'
-        
-        # Try to extract the state machine name from the description
-        words = description.split()
-        the_index = -1
-        for i, word in enumerate(words):
-            if word.lower() == 'the':
-                the_index = i
-                break
-        
-        if the_index >= 0 and the_index + 1 < len(words):
-            # Get the word after "The" and before "state machine"
-            potential_name = words[the_index + 1]
-            if potential_name and not potential_name.lower() in ['state', 'machine']:
-                state_machine_name = potential_name
-        
-        # Build ARN for the state machine
-        state_machine_arn = f"arn:aws:states:{region}:{account_id}:stateMachine:{state_machine_name}"
-        
-        print(f"SERVICE DETECTED (from description): Step Functions state machine: {state_machine_name}")
-        print(f"Description: {description}")
-        
-        return {
-            'service_type': 'stepfunctions',
-            'state_machine_name': state_machine_name,
-            'state_machine_arn': state_machine_arn,
-            'enrichment_enabled': True,
-            'detection_method': 'description_parsing'
-        }
-    
-    # Handle Lambda functions from description
-    # Expected patterns: "The [FunctionName] function failed." or similar
-    elif 'function' in description.lower() and ('lambda' in description.lower() or 'failed' in description.lower()):
-        # Extract function name from description
-        function_name = 'UnknownFunction'
-        
-        # Try to extract function name from description
-        words = description.split()
-        the_index = -1
-        for i, word in enumerate(words):
-            if word.lower() == 'the':
-                the_index = i
-                break
-        
-        if the_index >= 0 and the_index + 1 < len(words):
-            # Get the word after "The" and before "function"
-            potential_name = words[the_index + 1]
-            if potential_name and not potential_name.lower() in ['function', 'lambda']:
-                function_name = potential_name
-        
-        # Build ARN for the Lambda function
-        function_arn = f"arn:aws:lambda:{region}:{account_id}:function:{function_name}"
-        
-        print(f"SERVICE DETECTED (from description): Lambda function: {function_name}")
-        print(f"Description: {description}")
-        
-        return {
-            'service_type': 'lambda',
-            'function_name': function_name,
-            'function_arn': function_arn,
-            'enrichment_enabled': True,
-            'detection_method': 'description_parsing'
-        }
-    
-    # Generic CloudWatch alarm - couldn't identify specific service
-    else:
-        print("SERVICE DETECTION FAILED: Generic CloudWatch alarm - couldn't identify specific service")
-        print(f"Description: {description}")
-        print(f"Available resources: {[r.get('Type', 'Unknown') for r in resources if isinstance(r, dict)]}")
-        return {
-            'service_type': 'generic',
-            'description': description,
-            'enrichment_enabled': False,
-            'detection_method': 'description_parsing_failed'
-        }
+    # No supported resource found in Resources array - skip enrichment
+    print("SERVICE DETECTION FAILED: No supported resource types found in ASFF Resources array")
+    print(f"Available resources: {[r.get('Type', 'Unknown') for r in resources if isinstance(r, dict)]}")
+    return {
+        'service_type': 'generic',
+        'enrichment_enabled': False,
+        'error': 'No supported resource types found in ASFF Resources array',
+        'detection_method': 'none'
+    }
 
 
 def enrich_stepfunctions_context(finding: Dict[str, Any], service_context: Dict[str, Any]) -> Dict[str, Any]:
