@@ -1136,7 +1136,7 @@ Resources:
   EnrichCloudWatchContextFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: functions/enrich_cloudwatch_context/
+      CodeUri: functions/findings/enrich_cloudwatch_context/
       Policies:
         - Statement:
             - 

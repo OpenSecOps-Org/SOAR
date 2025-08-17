@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.14
+    * Pinned Python library versions across all SOAR functions for build stability
+
 ## v2.4.13
     * Fixed account reassignment preprocessor AccessDeniedException by using generic default ProductArn
 

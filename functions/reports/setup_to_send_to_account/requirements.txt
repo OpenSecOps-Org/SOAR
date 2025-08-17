@@ -1,1 +1,1 @@
-beautifulsoup4
+beautifulsoup4>=4.13.0,<5.0.0

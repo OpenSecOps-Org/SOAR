@@ -1,2 +1,2 @@
 # boto3 is provided by AWS Lambda runtime automatically
-python-dateutil
+python-dateutil>=2.9.0,<3.0.0
