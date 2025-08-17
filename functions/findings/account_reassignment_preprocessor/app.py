@@ -1,4 +1,5 @@
 import os
+import boto3
 from datetime import datetime, timezone
 from aws_utils.clients import get_client
 
@@ -16,6 +17,8 @@ def lambda_handler(data, context):
     when account reassignment is needed, allowing the state machine Choice node
     to route to the existing "Suppress Finding" functionality.
     """
+    # Debug logging: Always log the complete input data for troubleshooting
+    print(f"PREPROCESSOR INPUT DATA: {data}")
     # Critical error check: No finding data
     if not data.get('finding'):
         print("ERROR: No finding data in preprocessor input - returning data unchanged")
@@ -124,6 +127,12 @@ def recreate_asff_finding(account_id, data):
         # Get the original finding from SOAR data
         original_finding = data['finding']
         
+        # Get region from original finding for ProductArn construction
+        region = original_finding.get('Region')
+        if not region:
+            print(f"ERROR: Region not found in original finding")
+            return False
+        
         # Create properly structured ASFF finding for BatchImportFindings
         current_time = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         
@@ -132,7 +141,14 @@ def recreate_asff_finding(account_id, data):
             # Required fields
             'SchemaVersion': original_finding.get('SchemaVersion', '2018-10-08'),
             'Id': f"{original_finding['Id']}-reassigned-{account_id}",  # Make unique for target account
-            'ProductArn': original_finding['ProductArn'],  # Keep original product ARN
+            # ProductArn: Use generic default product for cross-account finding creation
+            # - Original ProductArn (e.g., arn:aws:securityhub:region::product/aws/access-analyzer) 
+            #   caused AccessDeniedException due to service-specific product restrictions
+            # - Generic default product works across all accounts without special permissions
+            # - Same approach used by SOAR-all-alarms-to-sec-hub for creating new findings
+            # - Must use same region as original finding for ProductArn construction
+            # - Format: arn:aws:securityhub:{region}:{account_id}:product/{account_id}/default
+            'ProductArn': f"arn:aws:securityhub:{region}:{account_id}:product/{account_id}/default",
             'GeneratorId': original_finding['GeneratorId'],
             'AwsAccountId': account_id,  # This is the key change
             'Types': original_finding['Types'],

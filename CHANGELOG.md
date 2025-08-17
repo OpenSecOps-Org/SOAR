@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.13
+    * Fixed account reassignment preprocessor AccessDeniedException by using generic default ProductArn
+
 ## v2.4.12
     * Fixed Lambda enrichment to use actual ARN from alarm generator instead of reconstructing it
 
