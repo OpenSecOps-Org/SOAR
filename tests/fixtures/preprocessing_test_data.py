@@ -19,6 +19,7 @@ def get_guardduty_finding_no_correction():
             'Id': 'arn:aws:guardduty:us-east-1:111111111111:detector/test-detector-id/finding/test-finding-id',
             'AwsAccountId': '111111111111',
             'AwsAccountName': 'Security-Adm',
+            'Region': 'us-east-1',  # Add missing Region field
             'Title': 'The user AssumedRole : AWSControlTowerExecution is anomalously invoking APIs commonly used in Discovery tactics.',
             'Description': 'APIs commonly used in Discovery tactics were invoked by user AssumedRole : AWSControlTowerExecution under unusual circumstances.',
             'ProductArn': 'arn:aws:securityhub:us-east-1::product/aws/guardduty',
@@ -99,6 +100,7 @@ def get_access_analyzer_finding_needs_correction_1():
             'Id': 'arn:aws:access-analyzer:eu-west-1:111111111111:analyzer/UnusedAccess-test-analyzer/arn:aws:iam::222222222222:role/example-scheduler-role/UnusedIAMRole',
             'AwsAccountId': '111111111111',
             'AwsAccountName': 'Security-Adm',
+            'Region': 'eu-west-1',  # Add missing Region field
             'Title': 'AwsIamRole/arn:aws:iam::222222222222:role/example-scheduler-role/ contains unused iam role',
             'Description': 'AWS::IAM::Role/arn:aws:iam::222222222222:role/example-scheduler-role/ contains unused iam role',
             'ProductArn': 'arn:aws:securityhub:eu-west-1::product/aws/access-analyzer',
@@ -175,6 +177,7 @@ def get_access_analyzer_finding_needs_correction_2():
             'Id': 'arn:aws:access-analyzer:us-east-1:111111111111:analyzer/ExternalAccess-test-analyzer/arn:aws:iam::333333333333:role/example-sso-role',
             'AwsAccountId': '111111111111',
             'AwsAccountName': 'Security-Adm',
+            'Region': 'us-east-1',  # Add missing Region field
             'Title': 'AwsIamRole/arn:aws:iam::333333333333:role/example-sso-role/ allows cross-account access',
             'Description': 'AWS::IAM::Role/arn:aws:iam::333333333333:role/example-sso-role/ allows cross-account access from Federated arn:aws:iam::333333333333:saml-provider/ExampleSSOProvider',
             'ProductArn': 'arn:aws:securityhub:us-east-1::product/aws/access-analyzer',
@@ -257,6 +260,7 @@ def get_access_analyzer_finding_needs_correction_3():
             'Id': 'arn:aws:access-analyzer:eu-west-1:111111111111:analyzer/ExternalAccess-test-analyzer/arn:aws:iam::444444444444:role/example-github-role',
             'AwsAccountId': '111111111111',
             'AwsAccountName': 'Security-Adm',
+            'Region': 'eu-west-1',  # Add missing Region field
             'Title': 'AwsIamRole/arn:aws:iam::444444444444:role/example-github-role/ allows cross-account access',
             'Description': 'AWS::IAM::Role/arn:aws:iam::444444444444:role/example-github-role/ allows cross-account access from Federated arn:aws:iam::444444444444:oidc-provider/token.actions.githubusercontent.com',
             'ProductArn': 'arn:aws:securityhub:eu-west-1::product/aws/access-analyzer',
@@ -339,6 +343,7 @@ def get_finding_not_in_security_adm_account():
             'Id': 'arn:aws:ec2:us-east-1:555555555555:security-group/sg-12345678',
             'AwsAccountId': '555555555555',  # NOT the security-adm account
             'AwsAccountName': 'Production-Account',
+            'Region': 'us-east-1',  # Add missing Region field
             'Title': 'EC2 Security Group allows unrestricted access',
             'Description': 'Security group sg-12345678 allows unrestricted inbound access',
             'ProductArn': 'arn:aws:securityhub:us-east-1::product/aws/securityhub',

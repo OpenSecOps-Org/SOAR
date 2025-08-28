@@ -78,8 +78,7 @@ def lambda_handler(data, _context):
     region = data['region']
 
     # Get the policy name, if it exists
-    resource = data['resource'] if data['resource'] else {}
-    policy_name = resource.get('Details', {}).get('AwsIamPolicy', {}).get('PolicyName', None)
+    policy_name = data.get('resource', {}).get('Details', {}).get('AwsIamPolicy', {}).get('PolicyName', None)
 
     # Process each line in 'suppress_when' value
     for line in suppress_when['S'].strip().splitlines():

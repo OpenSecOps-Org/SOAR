@@ -51,6 +51,7 @@ Error Handling:
 import os
 import json
 import boto3
+import botocore
 from aws_utils.clients import get_client
 
 ELB_ACCOUNTS = {
@@ -166,11 +167,14 @@ def lambda_handler(data, _context):
             # ALB/NLB uses LoadBalancerArns parameter
             elb_client.describe_load_balancers(LoadBalancerArns=[lb_arn])
         print("Load balancer exists, proceeding with remediation.")
-    except elb_client.exceptions.LoadBalancerNotFound:
-        print(f"Load balancer not found: {lb_arn}")
-        data['messages']['actions_taken'] = f"Load balancer not found: {lb_arn}. This finding has been suppressed."
-        data['actions']['suppress_finding'] = True
-        return data
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] in ['LoadBalancerNotFound', 'LoadBalancerNotFoundException']:
+            print(f"Load balancer not found: {lb_arn}")
+            data['messages']['actions_taken'] = f"Load balancer not found: {lb_arn}. This finding has been suppressed."
+            data['actions']['suppress_finding'] = True
+            return data
+        else:
+            raise e
     except Exception as e:
         print(f"Error checking load balancer existence: {str(e)}")
         data['messages']['actions_taken'] = f"Error checking load balancer existence: {str(e)}. This finding has been suppressed."
@@ -297,11 +301,14 @@ def lambda_handler(data, _context):
                 LoadBalancerArn=lb_arn,
             )
         print(response)
-    except elb_client.exceptions.LoadBalancerNotFound:
-        print(f"Load balancer not found during modification: {lb_arn}")
-        data['messages']['actions_taken'] = f"Load balancer not found during modification: {lb_arn}. This finding has been suppressed."
-        data['actions']['suppress_finding'] = True
-        return data
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] in ['LoadBalancerNotFound', 'LoadBalancerNotFoundException']:
+            print(f"Load balancer not found during modification: {lb_arn}")
+            data['messages']['actions_taken'] = f"Load balancer not found during modification: {lb_arn}. This finding has been suppressed."
+            data['actions']['suppress_finding'] = True
+            return data
+        else:
+            raise e
     except Exception as e:
         print(f"Error modifying load balancer attributes: {str(e)}")
         data['messages']['actions_taken'] = f"Error modifying load balancer attributes: {str(e)}"

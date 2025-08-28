@@ -88,7 +88,7 @@ class TestSpecification_1_BasicFunctionality:
     
     def test_lambda_handler_exists(self):
         """Test that lambda_handler function exists and is callable"""
-        from functions.enrich_cloudwatch_context.app import lambda_handler
+        from functions.findings.enrich_cloudwatch_context.app import lambda_handler
         
         # Verify function exists and is callable
         assert callable(lambda_handler)
@@ -113,7 +113,7 @@ class TestSpecification_2_CloudWatchAlarmDetection:
     
     def test_is_cloudwatch_alarm_finding_positive(self):
         """Test detection of valid CloudWatch alarm finding"""
-        from functions.enrich_cloudwatch_context.app import is_cloudwatch_alarm_finding
+        from functions.findings.enrich_cloudwatch_context.app import is_cloudwatch_alarm_finding
         
         cloudwatch_alarm_finding = get_stepfunctions_alarm_finding_standard()
         result = is_cloudwatch_alarm_finding(cloudwatch_alarm_finding)
@@ -122,7 +122,7 @@ class TestSpecification_2_CloudWatchAlarmDetection:
     
     def test_is_cloudwatch_alarm_finding_negative(self):
         """Test rejection of non-CloudWatch findings"""
-        from functions.enrich_cloudwatch_context.app import is_cloudwatch_alarm_finding
+        from functions.findings.enrich_cloudwatch_context.app import is_cloudwatch_alarm_finding
         
         non_cloudwatch_finding = get_non_cloudwatch_finding()
         result = is_cloudwatch_alarm_finding(non_cloudwatch_finding)
@@ -131,7 +131,7 @@ class TestSpecification_2_CloudWatchAlarmDetection:
 
     def test_cloudwatch_alarm_type_exact_matching(self):
         """Test exact matching against configured CloudWatch alarm type"""
-        from functions.enrich_cloudwatch_context.app import is_cloudwatch_alarm_finding
+        from functions.findings.enrich_cloudwatch_context.app import is_cloudwatch_alarm_finding
         
         # Test with exact match (should return True)
         exact_match_finding = {
@@ -179,7 +179,7 @@ class TestSpecification_3_ServiceContextExtraction:
     
     def test_stepfunctions_detection_with_arbitrary_names(self):
         """REQUIREMENT: Must work with ANY state machine names, not just naming patterns"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         # Test with arbitrary state machine names - no naming pattern required!
         test_cases = [
@@ -224,7 +224,7 @@ class TestSpecification_3_ServiceContextExtraction:
     
     def test_lambda_detection_with_arbitrary_names(self):
         """REQUIREMENT: Must work with ANY Lambda function names, not just naming patterns"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         # Test with arbitrary Lambda function names - no naming pattern required!
         test_cases = [
@@ -269,7 +269,7 @@ class TestSpecification_3_ServiceContextExtraction:
     
     def test_extract_stepfunctions_context_fixture(self):
         """Test Step Functions service context extraction with test fixture"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         stepfunctions_alarm_finding = get_stepfunctions_alarm_finding_standard()
         result = extract_service_context(stepfunctions_alarm_finding)
@@ -280,7 +280,7 @@ class TestSpecification_3_ServiceContextExtraction:
     
     def test_extract_lambda_context_fixture(self):
         """Test Lambda function service context extraction with test fixture"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         lambda_alarm_finding = get_lambda_alarm_finding_standard()
         result = extract_service_context(lambda_alarm_finding)
@@ -291,19 +291,19 @@ class TestSpecification_3_ServiceContextExtraction:
     
     def test_extract_generic_context(self):
         """Test generic service context for unknown alarm types"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         generic_finding = get_generic_alarm_finding()
         result = extract_service_context(generic_finding)
         
-        # Generic alarm with unsupported resource type falls back to description parsing
+        # Generic alarm with unsupported resource type - no enrichment enabled
         assert result['service_type'] == 'generic'
         assert result['enrichment_enabled'] is False
-        assert result['detection_method'] == 'description_parsing_failed'
+        assert result['detection_method'] == 'none'
     
     def test_resource_data_edge_cases(self):
         """Test edge cases for resource-based service detection"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         # Test finding with no resources
         finding_no_resources = {'Title': 'Some alarm', 'Resources': []}
@@ -350,7 +350,7 @@ class TestSpecification_3_ServiceContextExtraction:
     
     def test_resource_detection_takes_priority(self):
         """REQUIREMENT: Resource-based detection MUST take priority over description parsing"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         # Finding with BOTH resource data AND description
         # Resource-based detection should take priority
@@ -382,7 +382,7 @@ class TestSpecification_3_ServiceContextExtraction:
 
     def test_backward_compatibility_with_old_cloudwatch_findings(self):
         """REQUIREMENT: Must handle old CloudWatch findings with only account resources"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         # Old-style CloudWatch finding with only AwsAccountId resource (no monitored resource)
         old_style_stepfunctions_finding = {
@@ -401,11 +401,10 @@ class TestSpecification_3_ServiceContextExtraction:
         
         result = extract_service_context(old_style_stepfunctions_finding)
         
-        # Should fall back to description parsing
-        assert result['service_type'] == 'stepfunctions'
-        assert result['state_machine_name'] == 'SOARASFFProcessor'  # Extracted from description
-        assert result['detection_method'] == 'description_parsing'
-        assert result['enrichment_enabled'] is True
+        # No longer supports description parsing - requires proper ASFF resource types
+        assert result['service_type'] == 'generic'
+        assert result['detection_method'] == 'none'
+        assert result['enrichment_enabled'] is False
         
         # Old-style Lambda finding
         old_style_lambda_finding = {
@@ -424,15 +423,14 @@ class TestSpecification_3_ServiceContextExtraction:
         
         result = extract_service_context(old_style_lambda_finding)
         
-        # Should fall back to description parsing
-        assert result['service_type'] == 'lambda'
-        assert result['function_name'] == 'ProcessFindings'  # Extracted from description
-        assert result['detection_method'] == 'description_parsing'
-        assert result['enrichment_enabled'] is True
+        # No longer supports description parsing - requires proper ASFF resource types
+        assert result['service_type'] == 'generic'
+        assert result['detection_method'] == 'none'
+        assert result['enrichment_enabled'] is False
 
     def test_malformed_enhanced_resource_data(self):
         """REQUIREMENT: Must handle malformed enhanced resource data gracefully"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         # Enhanced finding with malformed state machine resource
         malformed_cases = [
@@ -495,21 +493,14 @@ class TestSpecification_3_ServiceContextExtraction:
         for i, malformed_finding in enumerate(malformed_cases):
             result = extract_service_context(malformed_finding)
             
-            # Should fall back to description parsing when resource data is malformed
-            if 'state machine' in malformed_finding['Description']:
-                assert result['service_type'] == 'stepfunctions', f"Case {i+1} failed"
-                assert result['state_machine_name'] == 'BackupStateMachine', f"Case {i+1} failed"
-                assert result['detection_method'] == 'description_parsing', f"Case {i+1} failed"
-            elif 'function' in malformed_finding['Description']:
-                assert result['service_type'] == 'lambda', f"Case {i+1} failed"
-                assert result['function_name'] == 'BackupFunction', f"Case {i+1} failed"
-                assert result['detection_method'] == 'description_parsing', f"Case {i+1} failed"
-            
-            assert result['enrichment_enabled'] is True, f"Case {i+1} failed"
+            # Malformed resource data results in no enrichment (no description parsing fallback)
+            assert result['service_type'] == 'generic', f"Case {i+1} failed"
+            assert result['detection_method'] == 'none', f"Case {i+1} failed"
+            assert result['enrichment_enabled'] is False, f"Case {i+1} failed"
 
     def test_completely_corrupted_resource_array(self):
         """REQUIREMENT: Must handle completely corrupted or unexpected resource structures"""
-        from functions.enrich_cloudwatch_context.app import extract_service_context
+        from functions.findings.enrich_cloudwatch_context.app import extract_service_context
         
         corrupted_cases = [
             # Case 1: Resources is not a list
@@ -561,20 +552,21 @@ class TestSpecification_3_ServiceContextExtraction:
         ]
         
         for i, corrupted_finding in enumerate(corrupted_cases):
-            # Should not crash and should fall back to description parsing
+            # Should not crash and handle gracefully
             result = extract_service_context(corrupted_finding)
             
-            # All should successfully extract service information
-            assert result['service_type'] == 'stepfunctions', f"Case {i+1} failed"
-            assert result['state_machine_name'] == 'TestStateMachine', f"Case {i+1} failed"
-            assert result['enrichment_enabled'] is True, f"Case {i+1} failed"
-            
-            # Cases 1-3 should fall back to description parsing
-            # Case 4 (mixed valid/invalid) should find the valid resource
+            # Cases 1-3: Corrupted resources result in no enrichment (no description parsing fallback)
+            # Case 4: Mixed valid/invalid should find the valid AwsStatesStateMachine resource
             if i < 3:
-                assert result['detection_method'] == 'description_parsing', f"Case {i+1} should use description parsing"
+                assert result['service_type'] == 'generic', f"Case {i+1} failed"
+                assert result['detection_method'] == 'none', f"Case {i+1} failed"
+                assert result['enrichment_enabled'] is False, f"Case {i+1} failed"
             else:
-                assert result['detection_method'] == 'resource_arn', f"Case {i+1} should use resource detection"
+                # Case 4: Should find valid AwsStatesStateMachine resource despite invalid items
+                assert result['service_type'] == 'stepfunctions', f"Case {i+1} failed"
+                assert result['state_machine_name'] == 'TestStateMachine', f"Case {i+1} failed"
+                assert result['detection_method'] == 'resource_arn', f"Case {i+1} failed"
+                assert result['enrichment_enabled'] is True, f"Case {i+1} failed"
 
 
 class TestSpecification_4_MainWorkflowIntegration:
@@ -589,7 +581,7 @@ class TestSpecification_4_MainWorkflowIntegration:
     
     def test_cloudwatch_alarm_enrichment_workflow(self):
         """Test that CloudWatch alarm findings get enriched"""
-        from functions.enrich_cloudwatch_context.app import lambda_handler
+        from functions.findings.enrich_cloudwatch_context.app import lambda_handler
         
         finding_data = get_stepfunctions_alarm_finding_standard()
         cloudwatch_scratchpad_data = create_asff_test_data(finding_data)
@@ -603,7 +595,7 @@ class TestSpecification_4_MainWorkflowIntegration:
     
     def test_non_cloudwatch_finding_passthrough(self):
         """Test that non-CloudWatch findings pass through unchanged"""
-        from functions.enrich_cloudwatch_context.app import lambda_handler
+        from functions.findings.enrich_cloudwatch_context.app import lambda_handler
         
         finding_data = get_non_cloudwatch_finding()
         non_cloudwatch_scratchpad_data = create_asff_test_data(finding_data)
@@ -627,7 +619,7 @@ class TestSpecification_5_ErrorHandlingAndGracefulDegradation:
     
     def test_malformed_finding_graceful_handling(self):
         """Test that malformed findings are handled gracefully"""
-        from functions.enrich_cloudwatch_context.app import lambda_handler
+        from functions.findings.enrich_cloudwatch_context.app import lambda_handler
         
         # Malformed scratchpad with missing finding
         malformed_event = {
@@ -646,7 +638,7 @@ class TestSpecification_5_ErrorHandlingAndGracefulDegradation:
     
     def test_finding_missing_required_fields(self):
         """Test finding with missing required fields"""
-        from functions.enrich_cloudwatch_context.app import lambda_handler
+        from functions.findings.enrich_cloudwatch_context.app import lambda_handler
         
         # Finding missing Types field
         incomplete_finding_data = {
@@ -666,7 +658,7 @@ class TestSpecification_5_ErrorHandlingAndGracefulDegradation:
     
     def test_generic_service_no_enrichment(self):
         """Test that generic services get no enrichment"""
-        from functions.enrich_cloudwatch_context.app import lambda_handler
+        from functions.findings.enrich_cloudwatch_context.app import lambda_handler
         
         # Generic alarm that doesn't match Step Functions or Lambda patterns
         generic_finding_data = get_generic_alarm_finding()
@@ -703,7 +695,7 @@ class TestStepFunctionsEnrichmentWithAWSMocking:
         mock_stepfunctions_execution_history = get_mock_stepfunctions_execution_history()
         mock_cloudwatch_logs_entries = get_mock_cloudwatch_logs_entries()
         
-        with patch('functions.enrich_cloudwatch_context.app.get_client') as mock_get_client:
+        with patch('functions.findings.enrich_cloudwatch_context.app.get_client') as mock_get_client:
             # Setup mock Step Functions client 
             mock_stepfunctions = MagicMock()
             mock_cloudwatch_logs = MagicMock()
@@ -738,7 +730,7 @@ class TestStepFunctionsEnrichmentWithAWSMocking:
             mock_cloudwatch_logs.filter_log_events.return_value = mock_cloudwatch_logs_entries
             
             # Execute enrichment
-            from functions.enrich_cloudwatch_context.app import lambda_handler
+            from functions.findings.enrich_cloudwatch_context.app import lambda_handler
             result = lambda_handler(scratchpad_data, None)
             
             # Verify enrichment occurred
@@ -771,7 +763,7 @@ class TestStepFunctionsEnrichmentWithAWSMocking:
         stepfunctions_alarm_finding = get_stepfunctions_alarm_finding_standard()
         scratchpad_data = create_asff_test_data(stepfunctions_alarm_finding)
         
-        with patch('functions.enrich_cloudwatch_context.app.get_client') as mock_get_client:
+        with patch('functions.findings.enrich_cloudwatch_context.app.get_client') as mock_get_client:
             mock_stepfunctions = MagicMock()
             mock_get_client.return_value = mock_stepfunctions
             
@@ -782,7 +774,7 @@ class TestStepFunctionsEnrichmentWithAWSMocking:
             )
             
             # Execute enrichment
-            from functions.enrich_cloudwatch_context.app import lambda_handler
+            from functions.findings.enrich_cloudwatch_context.app import lambda_handler
             result = lambda_handler(scratchpad_data, None)
             
             # Should still provide basic enrichment without AWS-specific details
@@ -804,7 +796,7 @@ class TestLambdaFunctionEnrichmentWithAWSMocking:
         lambda_alarm_finding = get_lambda_alarm_finding_standard()
         scratchpad_data = create_asff_test_data(lambda_alarm_finding)
         
-        from functions.enrich_cloudwatch_context.app import lambda_handler
+        from functions.findings.enrich_cloudwatch_context.app import lambda_handler
         result = lambda_handler(scratchpad_data, None)
         
         # Verify enrichment occurred
@@ -822,7 +814,7 @@ class TestStepFunctionsRealIntegration:
     
     def test_list_executions_in_evaluation_window(self):
         """Test listing Step Functions executions within alarm evaluation window"""
-        from functions.enrich_cloudwatch_context.app import list_executions_in_window
+        from functions.findings.enrich_cloudwatch_context.app import list_executions_in_window
         
         # Setup
         state_machine_arn = "arn:aws:states:us-east-1:123456789012:stateMachine:SOARASFFProcessor"
@@ -831,7 +823,7 @@ class TestStepFunctionsRealIntegration:
             'end_time': '2024-01-01T12:30:00.000Z'
         }
         
-        with patch('functions.enrich_cloudwatch_context.app.get_client') as mock_get_client:
+        with patch('functions.findings.enrich_cloudwatch_context.app.get_client') as mock_get_client:
             mock_stepfunctions = MagicMock()
             mock_get_client.return_value = mock_stepfunctions
             
@@ -874,7 +866,7 @@ class TestStepFunctionsRealIntegration:
     
     def test_filter_failed_executions_in_window(self):
         """Test filtering executions to only failed ones within time window"""
-        from functions.enrich_cloudwatch_context.app import filter_failed_executions_in_window
+        from functions.findings.enrich_cloudwatch_context.app import filter_failed_executions_in_window
         
         # Setup execution list with mixed statuses and times
         executions = [
@@ -915,10 +907,10 @@ class TestStepFunctionsRealIntegration:
 class TestLocalDynamoDBAccess:
     """Test that DynamoDB access uses local client, not cross-account roles"""
     
-    @patch('functions.enrich_cloudwatch_context.app.dynamodb_client')
+    @patch('functions.findings.enrich_cloudwatch_context.app.dynamodb_client')
     def test_local_dynamodb_client_used_not_cross_account(self, mock_dynamodb_client):
         """Test that local DynamoDB client is used instead of cross-account role assumption"""
-        from functions.enrich_cloudwatch_context.app import query_dynamodb_incidents
+        from functions.findings.enrich_cloudwatch_context.app import query_dynamodb_incidents
         
         # Mock successful DynamoDB response
         mock_dynamodb_client.query.return_value = {
@@ -940,7 +932,7 @@ class TestLocalDynamoDBAccess:
         mock_dynamodb_client.query.assert_called_once()
         
         # Verify no get_client calls (which would indicate cross-account access)
-        with patch('functions.enrich_cloudwatch_context.app.get_client') as mock_get_client:
+        with patch('functions.findings.enrich_cloudwatch_context.app.get_client') as mock_get_client:
             query_dynamodb_incidents('test-alarm', 30)
             mock_get_client.assert_not_called()
         
@@ -948,10 +940,10 @@ class TestLocalDynamoDBAccess:
         assert len(result) == 1
         assert result[0]['incident_id'] == 'test-incident'
     
-    @patch('functions.enrich_cloudwatch_context.app.dynamodb_client')
+    @patch('functions.findings.enrich_cloudwatch_context.app.dynamodb_client')
     def test_dynamodb_query_uses_environment_table_name(self, mock_dynamodb_client):
         """Test that DynamoDB queries use the environment variable for table name"""
-        from functions.enrich_cloudwatch_context.app import query_dynamodb_incidents
+        from functions.findings.enrich_cloudwatch_context.app import query_dynamodb_incidents
         
         mock_dynamodb_client.query.return_value = {'Items': []}
         
@@ -966,10 +958,10 @@ class TestLocalDynamoDBAccess:
 class TestDynamoDBPatternAnalysis:
     """Test DynamoDB historical incident pattern analysis"""
     
-    @patch('functions.enrich_cloudwatch_context.app.dynamodb_client')
+    @patch('functions.findings.enrich_cloudwatch_context.app.dynamodb_client')
     def test_query_dynamodb_incidents_by_alarm_type(self, mock_dynamodb_client):
         """Test querying DynamoDB incidents table for similar alarm patterns"""
-        from functions.enrich_cloudwatch_context.app import query_dynamodb_incidents
+        from functions.findings.enrich_cloudwatch_context.app import query_dynamodb_incidents
         
         # Setup
         alarm_type = "INFRA-SOAR-ASFF-Processor-SM-Failure"
@@ -1014,7 +1006,7 @@ class TestDynamoDBPatternAnalysis:
     
     def test_classify_incident_pattern_frequent_occurrences(self):
         """Test incident pattern classification for frequent recurring issues"""
-        from functions.enrich_cloudwatch_context.app import classify_incident_pattern
+        from functions.findings.enrich_cloudwatch_context.app import classify_incident_pattern
         
         # Setup - frequent recurring incidents (7+ for frequent classification)
         incidents = [
@@ -1040,7 +1032,7 @@ class TestDynamoDBPatternAnalysis:
     
     def test_classify_incident_pattern_isolated_occurrence(self):
         """Test incident pattern classification for isolated/rare issues"""
-        from functions.enrich_cloudwatch_context.app import classify_incident_pattern
+        from functions.findings.enrich_cloudwatch_context.app import classify_incident_pattern
         
         # Setup - single isolated incident
         incidents = [
@@ -1065,7 +1057,7 @@ class TestDynamoDBPatternAnalysis:
     
     def test_analyze_incident_patterns_integration(self):
         """Test full incident pattern analysis integration"""
-        from functions.enrich_cloudwatch_context.app import analyze_incident_patterns
+        from functions.findings.enrich_cloudwatch_context.app import analyze_incident_patterns
         
         # Setup
         finding = {
@@ -1075,8 +1067,8 @@ class TestDynamoDBPatternAnalysis:
             'Region': 'us-east-1'
         }
         
-        with patch('functions.enrich_cloudwatch_context.app.query_dynamodb_incidents') as mock_query:
-            with patch('functions.enrich_cloudwatch_context.app.classify_incident_pattern') as mock_classify:
+        with patch('functions.findings.enrich_cloudwatch_context.app.query_dynamodb_incidents') as mock_query:
+            with patch('functions.findings.enrich_cloudwatch_context.app.classify_incident_pattern') as mock_classify:
                 # Mock responses
                 mock_query.return_value = [
                     {'incident_id': 'incident-001', 'timestamp': 1704110400},
@@ -1105,16 +1097,16 @@ class TestDynamoDBPatternAnalysis:
 class TestCompleteIntegration:
     """Test complete end-to-end enrichment integration"""
     
-    @patch('functions.enrich_cloudwatch_context.app.dynamodb_client')
+    @patch('functions.findings.enrich_cloudwatch_context.app.dynamodb_client')
     def test_full_enrichment_with_pattern_analysis(self, mock_dynamodb_client):
         """Test complete enrichment with both AWS execution data and pattern analysis"""
-        from functions.enrich_cloudwatch_context.app import lambda_handler
+        from functions.findings.enrich_cloudwatch_context.app import lambda_handler
         
         # Setup
         stepfunctions_alarm_finding = get_stepfunctions_alarm_finding_standard()
         scratchpad_data = create_asff_test_data(stepfunctions_alarm_finding)
         
-        with patch('functions.enrich_cloudwatch_context.app.get_client') as mock_get_client:
+        with patch('functions.findings.enrich_cloudwatch_context.app.get_client') as mock_get_client:
             # Mock AWS clients
             mock_stepfunctions = MagicMock()
             
@@ -1193,7 +1185,7 @@ class TestTimestampHandling:
     
     def test_get_incident_timestamp_prefers_first_observed_at(self):
         """Test that FirstObservedAt is preferred when available"""
-        from functions.enrich_cloudwatch_context.app import get_incident_timestamp
+        from functions.findings.enrich_cloudwatch_context.app import get_incident_timestamp
         
         finding = {
             'CreatedAt': '2024-01-01T12:05:00.000Z',
@@ -1206,7 +1198,7 @@ class TestTimestampHandling:
     
     def test_get_incident_timestamp_fallback_to_last_observed_at(self):
         """Test fallback to LastObservedAt when FirstObservedAt missing"""
-        from functions.enrich_cloudwatch_context.app import get_incident_timestamp
+        from functions.findings.enrich_cloudwatch_context.app import get_incident_timestamp
         
         finding = {
             'CreatedAt': '2024-01-01T12:05:00.000Z',
@@ -1219,7 +1211,7 @@ class TestTimestampHandling:
     
     def test_get_incident_timestamp_fallback_to_created_at(self):
         """Test final fallback to CreatedAt when observation times missing"""
-        from functions.enrich_cloudwatch_context.app import get_incident_timestamp
+        from functions.findings.enrich_cloudwatch_context.app import get_incident_timestamp
         
         finding = {
             'CreatedAt': '2024-01-01T12:05:00.000Z'
@@ -1231,7 +1223,7 @@ class TestTimestampHandling:
     
     def test_get_incident_timestamp_handles_empty_finding(self):
         """Test graceful handling of finding with no timestamps"""
-        from functions.enrich_cloudwatch_context.app import get_incident_timestamp
+        from functions.findings.enrich_cloudwatch_context.app import get_incident_timestamp
         
         finding = {}  # No timestamp fields
         
@@ -1244,7 +1236,7 @@ class TestConfigurationManagement:
     
     def test_environment_variable_configuration(self):
         """Test that function respects environment variable configuration"""
-        from functions.enrich_cloudwatch_context.app import calculate_incident_time_window
+        from functions.findings.enrich_cloudwatch_context.app import calculate_incident_time_window
         
         # Test with ASFF timestamp
         incident_time = '2024-01-01T12:00:00.000Z'
@@ -1259,7 +1251,7 @@ class TestConfigurationManagement:
     
     def test_region_extraction_from_finding(self):
         """Test that region is properly extracted from finding, not hardcoded"""
-        from functions.enrich_cloudwatch_context.app import enrich_stepfunctions_context
+        from functions.findings.enrich_cloudwatch_context.app import enrich_stepfunctions_context
         
         # Test finding with specific region
         finding = {
@@ -1273,7 +1265,7 @@ class TestConfigurationManagement:
             'enrichment_enabled': True
         }
         
-        with patch('functions.enrich_cloudwatch_context.app.get_client') as mock_get_client:
+        with patch('functions.findings.enrich_cloudwatch_context.app.get_client') as mock_get_client:
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
             
@@ -1288,7 +1280,7 @@ class TestConfigurationManagement:
     
     def test_error_when_region_missing(self):
         """Test that missing region raises ValueError"""
-        from functions.enrich_cloudwatch_context.app import enrich_stepfunctions_context
+        from functions.findings.enrich_cloudwatch_context.app import enrich_stepfunctions_context
         
         # Test finding without region
         finding = {

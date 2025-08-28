@@ -119,7 +119,7 @@ class TestRds4SnapshotCopyLogic:
         copy_call = mock_rds.copy_db_snapshot.call_args[1]
         assert copy_call['SourceDBSnapshotIdentifier'] == 'instance-snapshot-unencrypted'
         assert copy_call['TargetDBSnapshotIdentifier'] == 'instance-snapshot-unencrypted-encrypted'
-        assert copy_call['KmsKeyId'] == 'aws/rds'
+        assert copy_call['KmsKeyId'] == 'alias/aws/rds'
         assert copy_call['CopyTags'] is True
         
         # Verify waiter was used
@@ -178,7 +178,7 @@ class TestRds4SnapshotCopyLogic:
         copy_call = mock_rds.copy_db_cluster_snapshot.call_args[1]
         assert copy_call['SourceDBClusterSnapshotIdentifier'] == 'cluster-snapshot-unencrypted'
         assert copy_call['TargetDBClusterSnapshotIdentifier'] == 'cluster-snapshot-unencrypted-encrypted'
-        assert copy_call['KmsKeyId'] == 'aws/rds'
+        assert copy_call['KmsKeyId'] == 'alias/aws/rds'
         assert copy_call['CopyTags'] is True
         
         # Verify waiter was used
@@ -323,7 +323,7 @@ class TestRds4KmsKeyHandling:
         
         # Verify AWS managed key is specified (Encrypted is implied by KmsKeyId)
         copy_call = mock_rds.copy_db_snapshot.call_args[1]
-        assert copy_call['KmsKeyId'] == 'aws/rds'
+        assert copy_call['KmsKeyId'] == 'alias/aws/rds'
         assert copy_call['CopyTags'] is True
 
 
@@ -361,7 +361,7 @@ class TestRds4ErrorHandling:
         copy_call = mock_rds.copy_db_snapshot.call_args[1]
         assert copy_call['SourceDBSnapshotIdentifier'] == 'already-encrypted-snapshot'
         assert copy_call['TargetDBSnapshotIdentifier'] == 'already-encrypted-snapshot-encrypted'
-        assert copy_call['KmsKeyId'] == 'aws/rds'
+        assert copy_call['KmsKeyId'] == 'alias/aws/rds'
         
         # Verify deletion of original snapshot
         mock_rds.delete_db_snapshot.assert_called_once_with(
@@ -529,5 +529,5 @@ class TestRds4MultiStepWorkflow:
         assert copy_call['SourceDBSnapshotIdentifier'] == 'instance-snapshot-unencrypted'
         
         # Key transformation: KmsKeyId should be aws/rds (Encrypted is implied)
-        assert copy_call['KmsKeyId'] == 'aws/rds'
+        assert copy_call['KmsKeyId'] == 'alias/aws/rds'
         assert copy_call['CopyTags'] is True

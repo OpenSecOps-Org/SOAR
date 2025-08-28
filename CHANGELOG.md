@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.15
+    * Added robustness in suppress_locally checking function.
+
 ## v2.4.14
     * Pinned Python library versions across all SOAR functions for build stability
 
