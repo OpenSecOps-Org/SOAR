@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.16
+    * Corrected TooManyRequestsException to Lambda.TooManyRequestsException in two state machine ASL files.
+
 ## v2.4.15
     * Added robustness in suppress_locally checking function.
 
