@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.17
+    * Updated RDS.4 to never delete any empty snapshot, due to unreliable Security HYub size data for Aurora clusters.
+
 ## v2.4.16
     * Corrected TooManyRequestsException to Lambda.TooManyRequestsException in two state machine ASL files.
 

@@ -85,21 +85,10 @@ class TestRds4SnapshotCopyLogic:
         mock_rds = MagicMock()
         mock_get_client.return_value = mock_rds
         
-        # Configure describe_db_snapshots to return unencrypted snapshot
-        mock_rds.describe_db_snapshots.return_value = {
-            'DBSnapshots': [{
-                'DBSnapshotIdentifier': 'instance-snapshot-unencrypted',
-                'DBInstanceIdentifier': 'source-instance-1',
-                'Engine': 'postgres',
-                'Encrypted': False,
-                'AllocatedStorage': 20
-            }]
-        }
-        
         # Configure copy_db_snapshot to succeed
         mock_rds.copy_db_snapshot.return_value = {
             'DBSnapshot': {
-                'DBSnapshotIdentifier': 'instance-snapshot-unencrypted-encrypted-copy-12345678',
+                'DBSnapshotIdentifier': 'instance-snapshot-unencrypted-encrypted',
                 'Encrypted': True,
                 'Status': 'creating'
             }
@@ -144,21 +133,10 @@ class TestRds4SnapshotCopyLogic:
         mock_rds = MagicMock()
         mock_get_client.return_value = mock_rds
         
-        # Configure describe_db_cluster_snapshots to return unencrypted snapshot
-        mock_rds.describe_db_cluster_snapshots.return_value = {
-            'DBClusterSnapshots': [{
-                'DBClusterSnapshotIdentifier': 'cluster-snapshot-unencrypted',
-                'DBClusterIdentifier': 'source-cluster-1',
-                'Engine': 'aurora-postgresql',
-                'Encrypted': False,
-                'AllocatedStorage': 1
-            }]
-        }
-        
         # Configure copy_db_cluster_snapshot to succeed
         mock_rds.copy_db_cluster_snapshot.return_value = {
             'DBClusterSnapshot': {
-                'DBClusterSnapshotIdentifier': 'cluster-snapshot-unencrypted-encrypted-copy-12345678',
+                'DBClusterSnapshotIdentifier': 'cluster-snapshot-unencrypted-encrypted',
                 'Encrypted': True,
                 'Status': 'creating'
             }
@@ -195,26 +173,15 @@ class TestRds4SnapshotCopyLogic:
     @mock_aws
     @patch('functions.auto_remediations.auto_remediate_rds4.app.get_client')
     def test_empty_snapshot_copy_optimization(self, mock_get_client):
-        """Test that empty snapshots (size 0) still get copied but with optimized parameters"""
+        """Test that empty snapshots (size 0) are handled appropriately"""
         # Setup mock RDS client
         mock_rds = MagicMock()
         mock_get_client.return_value = mock_rds
         
-        # Configure describe_db_snapshots to return empty snapshot
-        mock_rds.describe_db_snapshots.return_value = {
-            'DBSnapshots': [{
-                'DBSnapshotIdentifier': 'empty-snapshot-test',
-                'DBInstanceIdentifier': 'source-instance-empty',
-                'Engine': 'mysql',
-                'Encrypted': False,
-                'AllocatedStorage': 0
-            }]
-        }
-        
-        # Configure copy_db_snapshot to succeed
+        # Configure copy_db_snapshot to succeed (the code doesn't check AllocatedStorage)
         mock_rds.copy_db_snapshot.return_value = {
             'DBSnapshot': {
-                'DBSnapshotIdentifier': 'empty-snapshot-test-encrypted-copy-12345678',
+                'DBSnapshotIdentifier': 'empty-snapshot-test-encrypted',
                 'Encrypted': True,
                 'Status': 'creating'
             }
@@ -229,17 +196,17 @@ class TestRds4SnapshotCopyLogic:
         # Call the lambda handler
         response = lambda_handler(test_data, {})
         
-        # Empty snapshots (AllocatedStorage=0) are deleted directly, not copied
-        mock_rds.copy_db_snapshot.assert_not_called()
+        # The code treats empty snapshots the same as regular snapshots
+        mock_rds.copy_db_snapshot.assert_called_once()
         
-        # Verify deletion of original empty snapshot
+        # Verify deletion of original snapshot
         mock_rds.delete_db_snapshot.assert_called_once_with(
             DBSnapshotIdentifier='empty-snapshot-test'
         )
         
-        # Verify empty snapshot response message
+        # Verify response message
         assert 'messages' in response
-        assert response['messages']['actions_taken'] == "The snapshot was empty and has been deleted."
+        assert 'The snapshot has been copied to a new, encrypted snapshot' in response['messages']['actions_taken']
         assert response['messages']['actions_required'] == "None"
 
 
@@ -254,20 +221,9 @@ class TestRds4UniqueNaming:
         mock_rds = MagicMock()
         mock_get_client.return_value = mock_rds
         
-        # Configure describe and copy operations
-        mock_rds.describe_db_snapshots.return_value = {
-            'DBSnapshots': [{
-                'DBSnapshotIdentifier': 'test-snapshot',
-                'DBInstanceIdentifier': 'test-instance',
-                'Engine': 'postgres',
-                'Encrypted': False,
-                'AllocatedStorage': 10
-            }]
-        }
-        
         mock_rds.copy_db_snapshot.return_value = {
             'DBSnapshot': {
-                'DBSnapshotIdentifier': 'test-snapshot-encrypted-copy-12345678',
+                'DBSnapshotIdentifier': 'instance-snapshot-unencrypted-encrypted',
                 'Encrypted': True,
                 'Status': 'creating'
             }
@@ -299,16 +255,6 @@ class TestRds4KmsKeyHandling:
         mock_rds = MagicMock()
         mock_get_client.return_value = mock_rds
         
-        mock_rds.describe_db_snapshots.return_value = {
-            'DBSnapshots': [{
-                'DBSnapshotIdentifier': 'test-snapshot',
-                'DBInstanceIdentifier': 'test-instance',
-                'Engine': 'postgres',
-                'Encrypted': False,
-                'AllocatedStorage': 20
-            }]
-        }
-        
         mock_rds.copy_db_snapshot.return_value = {
             'DBSnapshot': {'DBSnapshotIdentifier': 'test-copy', 'Encrypted': True, 'Status': 'creating'}
         }
@@ -321,7 +267,7 @@ class TestRds4KmsKeyHandling:
         # Call the lambda handler
         lambda_handler(test_data, {})
         
-        # Verify AWS managed key is specified (Encrypted is implied by KmsKeyId)
+        # Verify AWS managed key is specified
         copy_call = mock_rds.copy_db_snapshot.call_args[1]
         assert copy_call['KmsKeyId'] == 'alias/aws/rds'
         assert copy_call['CopyTags'] is True
@@ -378,16 +324,6 @@ class TestRds4ErrorHandling:
         mock_rds = MagicMock()
         mock_get_client.return_value = mock_rds
         
-        mock_rds.describe_db_snapshots.return_value = {
-            'DBSnapshots': [{
-                'DBSnapshotIdentifier': 'test-snapshot',
-                'DBInstanceIdentifier': 'test-instance',
-                'Engine': 'postgres',
-                'Encrypted': False,
-                'AllocatedStorage': 20
-            }]
-        }
-        
         # Configure copy to fail
         mock_rds.copy_db_snapshot.side_effect = Exception('Copy operation failed')
         
@@ -409,16 +345,6 @@ class TestRds4ErrorHandling:
         mock_rds = MagicMock()
         mock_get_client.return_value = mock_rds
         
-        mock_rds.describe_db_snapshots.return_value = {
-            'DBSnapshots': [{
-                'DBSnapshotIdentifier': 'test-snapshot',
-                'DBInstanceIdentifier': 'test-instance',
-                'Engine': 'postgres',
-                'Encrypted': False,
-                'AllocatedStorage': 20
-            }]
-        }
-        
         mock_rds.copy_db_snapshot.return_value = {
             'DBSnapshot': {'DBSnapshotIdentifier': 'test-copy', 'Encrypted': True, 'Status': 'creating'}
         }
@@ -438,6 +364,39 @@ class TestRds4ErrorHandling:
         mock_rds.copy_db_snapshot.assert_called_once()
         mock_waiter.wait.assert_called_once()
         # Delete should not be called if waiter fails
+        mock_rds.delete_db_snapshot.assert_not_called()
+    
+    @mock_aws
+    @patch('functions.auto_remediations.auto_remediate_rds4.app.get_client')
+    @patch('functions.auto_remediations.auto_remediate_rds4.app.handle_not_found_error')
+    def test_encryption_not_supported_error_handling(self, mock_handle_not_found, mock_get_client):
+        """Test handling when encryption is not supported for a snapshot type"""
+        # Setup mock RDS client
+        mock_rds = MagicMock()
+        mock_get_client.return_value = mock_rds
+        mock_handle_not_found.return_value = False  # Error not handled by not_found handler
+        
+        # Configure copy to fail with InvalidParameterValue
+        from botocore.exceptions import ClientError
+        error_response = {
+            'Error': {
+                'Code': 'InvalidParameterValue',
+                'Message': 'Copying unencrypted cluster with encryption is not supported'
+            }
+        }
+        mock_rds.copy_db_snapshot.side_effect = ClientError(error_response, 'CopyDBSnapshot')
+        
+        test_data = prepare_rds_test_data(get_rds4_instance_snapshot_finding)
+        
+        # Call the lambda handler
+        response = lambda_handler(test_data, {})
+        
+        # Verify error was handled gracefully
+        assert response['actions']['autoremediation_not_done'] is True
+        assert 'Cannot encrypt this snapshot type automatically' in response['messages']['actions_taken']
+        assert 'Manual action required' in response['messages']['actions_taken']
+        
+        # Verify delete was not attempted
         mock_rds.delete_db_snapshot.assert_not_called()
 
 
@@ -468,7 +427,7 @@ class TestRds4MultiStepWorkflow:
         # Call the lambda handler
         response = lambda_handler(test_data, {})
         
-        # Verify the sequence of operations (no describe call since data comes from Security Hub)
+        # Verify the sequence of operations
         assert mock_rds.copy_db_snapshot.call_count == 1
         assert mock_rds.get_waiter.call_count == 1
         assert mock_waiter.wait.call_count == 1
@@ -495,22 +454,9 @@ class TestRds4MultiStepWorkflow:
         mock_rds = MagicMock()
         mock_get_client.return_value = mock_rds
         
-        mock_rds.describe_db_snapshots.return_value = {
-            'DBSnapshots': [{
-                'DBSnapshotIdentifier': 'metadata-test-snapshot',
-                'DBInstanceIdentifier': 'production-db-instance',
-                'Engine': 'postgres',
-                'EngineVersion': '14.9',
-                'Encrypted': False,
-                'AllocatedStorage': 100,
-                'Port': 5432,
-                'AvailabilityZone': 'us-east-1a'
-            }]
-        }
-        
         mock_rds.copy_db_snapshot.return_value = {
             'DBSnapshot': {
-                'DBSnapshotIdentifier': 'metadata-test-snapshot-encrypted-copy-12345678',
+                'DBSnapshotIdentifier': 'instance-snapshot-unencrypted-encrypted',
                 'Encrypted': True,
                 'Status': 'creating'
             }
@@ -528,6 +474,7 @@ class TestRds4MultiStepWorkflow:
         copy_call = mock_rds.copy_db_snapshot.call_args[1]
         assert copy_call['SourceDBSnapshotIdentifier'] == 'instance-snapshot-unencrypted'
         
-        # Key transformation: KmsKeyId should be aws/rds (Encrypted is implied)
+        # Key transformation: KmsKeyId should be aws/rds
         assert copy_call['KmsKeyId'] == 'alias/aws/rds'
         assert copy_call['CopyTags'] is True
+        

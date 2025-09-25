@@ -1,7 +1,7 @@
 """
 RDS.4 AUTOREMEDIATION - ENCRYPT RDS SNAPSHOTS
 
-This Lambda function automatically remediates AWS Security Hub findings for RDS.4 
+This Lambda function automatically remediates AWS Security Hub findings for RDS.4
 (RDS DB snapshots should be encrypted at rest).
 
 Target Resources:
@@ -42,6 +42,7 @@ CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
 
 
 def lambda_handler(data, _context):
+    """Main Lambda handler function."""
     print(data)
 
     finding = data['finding']
@@ -54,18 +55,20 @@ def lambda_handler(data, _context):
     resource_type = resource['Type']
     resource_arn = resource['Id']
     details = resource['Details'][resource_type]
-    
-    allocated_storage = details['AllocatedStorage']     # 0 or greater
-    snapshot_type = details['SnapshotType']             # 'manual', etc
-    snapshot_name = resource_arn.split(':')[-1]         # last part of the ARN
+    snapshot_type = details['SnapshotType']  # 'manual', etc
+    snapshot_name = resource_arn.split(':')[-1]  # last part of the ARN
     
     client = get_client('rds', account_id, region)
 
     # Process the appropriate snapshot type
     if resource_type == 'AwsRdsDbClusterSnapshot':
-        return process_cluster_snapshot(client, data, allocated_storage, snapshot_name, snapshot_type)
+        return process_cluster_snapshot(
+            client, data, snapshot_name, snapshot_type
+        )
     else:
-        return process_instance_snapshot(client, data, allocated_storage, snapshot_name, snapshot_type)
+        return process_instance_snapshot(
+            client, data, snapshot_name, snapshot_type
+        )
 
 
 ###########################################################################
@@ -74,27 +77,12 @@ def lambda_handler(data, _context):
 #
 ###########################################################################
 
-def process_cluster_snapshot(client, data, allocated_storage, snapshot_name, snapshot_type):
-    """Process a DB cluster snapshot - delete if empty, otherwise copy with encryption."""
-    # If the snapshot is empty, just delete it and return immediately
-    if allocated_storage == 0:
-        print(f"The cluster snapshot {snapshot_name} is empty. Deleting it...")
-        try:
-            response = client.delete_db_cluster_snapshot(
-                DBClusterSnapshotIdentifier=snapshot_name
-            )
-        except ClientError as error:
-            if handle_not_found_error(error, 'cluster_snapshot', data):
-                return data
-            raise error
-        print(response)
-        data['messages']['actions_taken'] = "The snapshot was empty and has been deleted."
-        data['messages']['actions_required'] = "None"
-        return data
-
+def process_cluster_snapshot(client, data, snapshot_name, snapshot_type):
+    """Process a DB cluster snapshot - copy with encryption."""
     # Copy the snapshot with encryption specified
     print(f"Copying cluster snapshot {snapshot_name} with encryption enabled...")
     snapshot_target_name = f'{snapshot_name}-encrypted'
+    
     try:
         response = client.copy_db_cluster_snapshot(
             SourceDBClusterSnapshotIdentifier=snapshot_name,
@@ -105,21 +93,26 @@ def process_cluster_snapshot(client, data, allocated_storage, snapshot_name, sna
     except ClientError as error:
         if handle_not_found_error(error, 'cluster_snapshot', data):
             return data
+            
         if error.response['Error']['Code'] == 'InvalidParameterValue':
-            if 'Copying unencrypted cluster with encryption is not supported' in error.response['Error']['Message']:
+            error_message = error.response['Error']['Message']
+            if 'Copying unencrypted cluster with encryption is not supported' in error_message:
                 print("The operation is not supported, team must fix.")
                 data['actions']['autoremediation_not_done'] = True
-                data['messages']['actions_taken'] = "Cannot encrypt this snapshot type automatically. Manual action required."
+                data['messages']['actions_taken'] = (
+                    "Cannot encrypt this snapshot type automatically. "
+                    "Manual action required."
+                )
                 return data
         raise error
+    
     print(response)
 
     # Wait for the target (encrypted) snapshot to be available
-    print(f"Waiting for encrypted cluster snapshot {snapshot_target_name} to become available...")
+    print(f"Waiting for encrypted cluster snapshot {snapshot_target_name} "
+          f"to become available...")
     waiter = client.get_waiter('db_cluster_snapshot_available')
-    waiter.wait(
-        DBClusterSnapshotIdentifier=snapshot_target_name
-    )
+    waiter.wait(DBClusterSnapshotIdentifier=snapshot_target_name)
     print(f"Encrypted cluster snapshot {snapshot_target_name} is now available")
 
     # Delete the original snapshot
@@ -132,42 +125,30 @@ def process_cluster_snapshot(client, data, allocated_storage, snapshot_name, sna
     except ClientError as error:
         print(f"Failed to delete original cluster snapshot: {str(error)}")
         data['messages']['actions_taken'] = (
-            f"Created encrypted snapshot '{snapshot_target_name}' but failed to delete "
-            f"the original unencrypted snapshot '{snapshot_name}'. Please delete it manually."
+            f"Created encrypted snapshot '{snapshot_target_name}' but failed "
+            f"to delete the original unencrypted snapshot '{snapshot_name}'. "
+            f"Please delete it manually."
         )
-        data['messages']['actions_required'] = f"Delete unencrypted snapshot '{snapshot_name}' manually."
+        data['messages']['actions_required'] = (
+            f"Delete unencrypted snapshot '{snapshot_name}' manually."
+        )
         return data
 
     # Success
     data['messages']['actions_taken'] = (
-        f"The snapshot has been copied to a new, encrypted snapshot '{snapshot_target_name}'. "
-        f"The original snapshot has been deleted."
+        f"The snapshot has been copied to a new, encrypted snapshot "
+        f"'{snapshot_target_name}'. The original snapshot has been deleted."
     )
     data['messages']['actions_required'] = "None"
     return data
 
 
-def process_instance_snapshot(client, data, allocated_storage, snapshot_name, snapshot_type):
-    """Process a DB instance snapshot - delete if empty, otherwise copy with encryption."""
-    # If the snapshot is empty, just delete it and return immediately
-    if allocated_storage == 0:
-        print(f"The instance snapshot {snapshot_name} is empty. Deleting it...")
-        try:
-            response = client.delete_db_snapshot(
-                DBSnapshotIdentifier=snapshot_name
-            )
-        except ClientError as error:
-            if handle_not_found_error(error, 'snapshot', data):
-                return data
-            raise error
-        print(response)
-        data['messages']['actions_taken'] = "The snapshot was empty and has been deleted."
-        data['messages']['actions_required'] = "None"
-        return data
-
+def process_instance_snapshot(client, data, snapshot_name, snapshot_type):
+    """Process a DB instance snapshot - copy with encryption."""
     # Copy the snapshot with encryption specified
     print(f"Copying instance snapshot {snapshot_name} with encryption enabled...")
     snapshot_target_name = f'{snapshot_name}-encrypted'
+    
     try:
         response = client.copy_db_snapshot(
             SourceDBSnapshotIdentifier=snapshot_name,
@@ -178,21 +159,26 @@ def process_instance_snapshot(client, data, allocated_storage, snapshot_name, sn
     except ClientError as error:
         if handle_not_found_error(error, 'snapshot', data):
             return data
+            
         if error.response['Error']['Code'] == 'InvalidParameterValue':
-            if 'with encryption is not supported' in error.response['Error']['Message']:
+            error_message = error.response['Error']['Message']
+            if 'with encryption is not supported' in error_message:
                 print("The operation is not supported, team must fix.")
                 data['actions']['autoremediation_not_done'] = True
-                data['messages']['actions_taken'] = "Cannot encrypt this snapshot type automatically. Manual action required."
+                data['messages']['actions_taken'] = (
+                    "Cannot encrypt this snapshot type automatically. "
+                    "Manual action required."
+                )
                 return data
         raise error
+    
     print(response)
 
     # Wait for the target (encrypted) snapshot to be available
-    print(f"Waiting for encrypted instance snapshot {snapshot_target_name} to become available...")
+    print(f"Waiting for encrypted instance snapshot {snapshot_target_name} "
+          f"to become available...")
     waiter = client.get_waiter('db_snapshot_available')
-    waiter.wait(
-        DBSnapshotIdentifier=snapshot_target_name
-    )
+    waiter.wait(DBSnapshotIdentifier=snapshot_target_name)
     print(f"Encrypted instance snapshot {snapshot_target_name} is now available")
 
     # Delete the original snapshot
@@ -205,16 +191,19 @@ def process_instance_snapshot(client, data, allocated_storage, snapshot_name, sn
     except ClientError as error:
         print(f"Failed to delete original instance snapshot: {str(error)}")
         data['messages']['actions_taken'] = (
-            f"Created encrypted snapshot '{snapshot_target_name}' but failed to delete "
-            f"the original unencrypted snapshot '{snapshot_name}'. Please delete it manually."
+            f"Created encrypted snapshot '{snapshot_target_name}' but failed "
+            f"to delete the original unencrypted snapshot '{snapshot_name}'. "
+            f"Please delete it manually."
         )
-        data['messages']['actions_required'] = f"Delete unencrypted snapshot '{snapshot_name}' manually."
+        data['messages']['actions_required'] = (
+            f"Delete unencrypted snapshot '{snapshot_name}' manually."
+        )
         return data
 
     # Success
     data['messages']['actions_taken'] = (
-        f"The snapshot has been copied to a new, encrypted snapshot '{snapshot_target_name}'. "
-        f"The original snapshot has been deleted."
+        f"The snapshot has been copied to a new, encrypted snapshot "
+        f"'{snapshot_target_name}'. The original snapshot has been deleted."
     )
     data['messages']['actions_required'] = "None"
     return data
