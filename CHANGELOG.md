@@ -1,5 +1,13 @@
 # Change Log
 
+## v2.4.18
+    * Fixed ticket closure for AWS Security Hub behavior change (July 3, 2025)
+    * Tickets now auto-close when users fix security findings
+    * AWS changed from ARCHIVING fixed findings to keeping them ACTIVE with NOTIFIED+PASSED status
+    * Refactored get_ticket_and_decide with consolidated "is resolved" logic
+    * Added 11 comprehensive tests covering all code paths
+    * Zero regressions (566/566 tests pass)
+
 ## v2.4.17
     * Updated RDS.4 to never delete any empty snapshot, due to unreliable Security HYub size data for Aurora clusters.
 
