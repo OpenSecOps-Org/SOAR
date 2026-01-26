@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.20
+    * Added test coverage for pandas dependencies validating CSV conversion and Decimal handling
+
 ## v2.4.19
     * Pinned pandas to 2.2.2 to avoid compatibility issues with pandas 2.3.x in Lambda environment
 
