@@ -1,5 +1,8 @@
 # Change Log
 
+## v2.4.19
+    * Pinned pandas to 2.2.2 to avoid compatibility issues with pandas 2.3.x in Lambda environment
+
 ## v2.4.18
     * Fixed ticket closure for AWS Security Hub behavior change (July 3, 2025)
     * Tickets now auto-close when users fix security findings
