@@ -1,5 +1,9 @@
 # Change Log
 
+## v2.4.21
+    * Fixed bug: determine_type incorrectly suppressed incidents carrying Compliance metadata without SecurityControlId, causing reassigned findings from the Account Reassignment Preprocessor to silently disappear
+    * Added test coverage for determine_type function (33 tests)
+
 ## v2.4.20
     * Added test coverage for pandas dependencies validating CSV conversion and Decimal handling
 

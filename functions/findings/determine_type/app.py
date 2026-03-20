@@ -34,7 +34,7 @@ def lambda_handler(data, _context):
     title = finding['Title']
     description = finding['Description']
 
-    if finding.get('Compliance', False):
+    if finding.get('Compliance', {}).get('SecurityControlId'):
         print(f"Suppressing unhandled control for product '{product_name}'.")
         return {
             'suppress': True
