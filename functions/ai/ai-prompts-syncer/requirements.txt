@@ -1,3 +1,1 @@
 cfnresponse
-requests>=2.32.4,<2.33.0
-urllib3>=1.26.20,<1.27.0
