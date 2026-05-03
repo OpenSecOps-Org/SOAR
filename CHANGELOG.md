@@ -1,5 +1,9 @@
 # Change Log
 
+## v3.1.1
+    * `SECURITY.md` §4 (Continuous detection) rewritten as a two-layer structure: the release-time gate is joined by a new push-based layer — GitHub Dependabot alerts, now enabled on every OpenSecOps repository. Alerts-only mode (auto-PR security updates and routine version-update PRs are explicitly disabled, consistent with the cathedral governance model). No SLA on detection-to-notification latency. Poll-based daily-scan CI remains a pointer-only follow-up.
+    * No customer action required. `./deploy` workflow is unchanged.
+
 ## v3.1.0
     * Removed pandas and numpy from SOAR. The only use was list-of-dicts → CSV in two report functions, replaced by a 6-line `csv.DictWriter` helper. Smaller bundles, faster cold starts, no manylinux/cross-platform build complexity.
 

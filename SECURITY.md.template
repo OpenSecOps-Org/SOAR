@@ -27,9 +27,10 @@
     §3: tiered SLA describes new-release cadence (no backports).
     §8: every converted component gets the same L1+L2+L3-subset claim.
 
-  Sections 7, 9, 11 carry "deferred to Phase X" pointer notes; their
-  substantive content lands in the phase named in each note. Section 14
-  is filled in (Documentation-repo cross-link).
+  Sections 7, 9, 11 carry "deferred to a follow-up release" pointer notes;
+  their substantive content lands in the release named in each note.
+  Section 4 carries a live Dependabot bullet plus a deferred poll-based
+  pointer; section 14 is filled in (Documentation-repo cross-link).
 -->
 
 # Security Policy — {{COMPONENT_NAME}}
@@ -76,9 +77,12 @@ This SLA is uniform across every OpenSecOps component.
 
 ## 4. Continuous detection
 
-At the current release, the operative continuous-detection layer is the **release-time gate**: `./publish` runs `_check-requirements.sh` as its first step and refuses to release if the lock has drifted from `requirements.in`, if `pip-audit` flags any CVE not on the acknowledged-and-deferred list (§12), if any pinned artefact's SHA-256 fails verification against PyPI, or if any pinned package matches the OSSF malicious-packages feed.
+Two layers operate today:
 
-Push-based and poll-based detection between releases — GitHub Dependabot alerts and a daily scan-only CI workflow on the public OpenSecOps repos — are planned for follow-up releases. When those land, this section gains the corresponding sentences and a brief description of how findings reach the maintainer.
+- **Release-time gate.** `./publish` runs `_check-requirements.sh` as its first step and refuses to release if the lock has drifted from `requirements.in`, if `pip-audit` flags any CVE not on the acknowledged-and-deferred list (§12), if any pinned artefact's SHA-256 fails verification against PyPI, or if any pinned package matches the OSSF malicious-packages feed. Blocks bad bytes from shipping.
+- **Push-based detection between releases.** GitHub Dependabot alerts are enabled on every OpenSecOps repository (development and published). When GitHub's advisory database flags a vulnerable pinned dependency in any committed `requirements.txt`, an alert is created on the affected repository's Security tab and routed to the maintainer via the channels configured in their GitHub notification settings (web, mobile, CLI). Dependabot runs in **alerts-only** mode — Dependabot security updates (auto-PRs against vulnerable deps) and version updates (routine bump PRs) are explicitly disabled, consistent with the no-auto-PR-bots posture in §5. No SLA is claimed on GitHub's detection-to-notification latency; empirical latency is observed but not promised.
+
+A poll-based backstop — a daily scan-only CI workflow on each public OpenSecOps repository — is planned for a follow-up release; when it lands, a third bullet describes the workflow's permission model and findings-routing.
 
 ## 5. Supply-chain posture
 
