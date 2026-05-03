@@ -1,5 +1,8 @@
 # Change Log
 
+## v3.0.3
+    * Pinned pandas to <2.3.3 to keep `manylinux2014_x86_64` wheel compatibility for cross-platform SAM builds (Apple Silicon → x86_64 Lambda).
+
 ## v3.0.2
     * `SECURITY.md` §14 now links to the OpenSecOps Documentation supply-chain page.
 
