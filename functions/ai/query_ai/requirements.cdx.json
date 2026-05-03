@@ -52,18 +52,18 @@
     },
     {
       "bom-ref": "requirements-L11",
-      "description": "requirements line 11: botocore==1.42.94     --hash=sha256:41c6b3b11b073221a41f52b222ba387be34459fb77cdc506e8b74cdaf24bdcce     --hash=sha256:a2143742132ed0f6cdb90204d667b89d0301068b1045e8bc099efa267bf1b348",
+      "description": "requirements line 11: botocore==1.42.97     --hash=sha256:5c0bb00e32d16ff6d278cc8c9e10dc3672d9c1d569031635ac3c908a60de8310     --hash=sha256:77d2c8ce1bc592d3fbd7c01c35836f4a5b0cac2ca03ccdf6ffc60faa16b5fadc",
       "externalReferences": [
         {
           "comment": "implicit dist url",
           "hashes": [
             {
               "alg": "SHA-256",
-              "content": "41c6b3b11b073221a41f52b222ba387be34459fb77cdc506e8b74cdaf24bdcce"
+              "content": "5c0bb00e32d16ff6d278cc8c9e10dc3672d9c1d569031635ac3c908a60de8310"
             },
             {
               "alg": "SHA-256",
-              "content": "a2143742132ed0f6cdb90204d667b89d0301068b1045e8bc099efa267bf1b348"
+              "content": "77d2c8ce1bc592d3fbd7c01c35836f4a5b0cac2ca03ccdf6ffc60faa16b5fadc"
             }
           ],
           "type": "distribution",
@@ -71,9 +71,9 @@
         }
       ],
       "name": "botocore",
-      "purl": "pkg:pypi/botocore@1.42.94",
+      "purl": "pkg:pypi/botocore@1.42.97",
       "type": "library",
-      "version": "1.42.94"
+      "version": "1.42.97"
     },
     {
       "bom-ref": "requirements-L17",
@@ -416,7 +416,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:e497af51-a266-51a3-a59c-4b4cb8108fd1",
+  "serialNumber": "urn:uuid:92a6a547-4189-5971-aa25-4fa49b398736",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",

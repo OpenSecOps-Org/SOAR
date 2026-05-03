@@ -120,23 +120,39 @@ for in_file in "${IN_FILES[@]}"; do
     LOCK_PATHS+=("$txt_file")
 done
 
+# Capture toolchain versions for `metadata.tools` so the SBOM records
+# what produced it. Versions are pure-data, do not affect determinism
+# unless the toolchain is bumped (which it should reflect anyway).
+UV_VERSION="$(uv --version 2>/dev/null | awk '{print $2}' || echo unknown)"
+CYCLONEDX_VERSION="$(uvx --from cyclonedx-bom cyclonedx-py --version 2>/dev/null \
+    | awk '{print $NF; exit}' || echo unknown)"
+
 # Merge into one aggregate. Determinism contract:
 #   - components deduplicated by `purl` (or `bom-ref` when purl absent),
 #     keeping first-seen for stable ordering
 #   - components sorted by purl ascending
+#   - bom-ref set to the purl (stable across regenerations; replaces
+#     cyclonedx-py's line-numbered `requirements-L<N>` which churns
+#     whenever a transitive shifts position in the lock)
+#   - hashes hoisted from externalReferences[].hashes[] to canonical
+#     component.hashes[] (CycloneDX consumers expect them there)
 #   - serialNumber = UUIDv5 over `opensecops:sbom:<component>:<version>:<sha256(sorted lock contents)>`
 #   - metadata.timestamp pinned to fixed epoch (1970-01-01) — same
 #     constant the per-function normaliser uses
+#   - metadata.tools / metadata.lifecycles: pure data; lifecycle = build
 mkdir -p "$(dirname "$OUTPUT")"
 
 uv run --no-project --quiet --python ">=3.11" python - \
-    "$OUTPUT" "$COMPONENT" "$VERSION" "${LOCK_PATHS[@]}" --sboms-- "${SBOM_PATHS[@]}" <<'PY'
+    "$OUTPUT" "$COMPONENT" "$VERSION" \
+    "$UV_VERSION" "$CYCLONEDX_VERSION" \
+    "${LOCK_PATHS[@]}" --sboms-- "${SBOM_PATHS[@]}" <<'PY'
 import hashlib, json, sys, uuid
 
 argv = sys.argv[1:]
 output, component, version = argv[0], argv[1], argv[2]
+uv_version, cyclonedx_version = argv[3], argv[4]
 sep = argv.index("--sboms--")
-locks = argv[3:sep]
+locks = argv[5:sep]
 sboms = argv[sep + 1:]
 
 # Hash of all locks (sorted by path) — feeds the deterministic serialNumber.
@@ -149,6 +165,51 @@ serial = uuid.uuid5(
     uuid.NAMESPACE_URL,
     f"opensecops:sbom:{component}:{version}:{lock_digest}",
 )
+
+
+def canonicalize(c):
+    """Hoist hashes to canonical component.hashes[] and stabilize bom-ref.
+
+    cyclonedx-py's `requirements` mode emits hashes only inside
+    `externalReferences[].hashes[]`, uses line-numbered bom-refs
+    (`requirements-L7`), and writes a `description` field that is the
+    raw line from requirements.txt — package name, version, and every
+    hash repeated verbatim. All three are spec-quirks of that mode, not
+    what consumers expect. We:
+      - copy hashes to `component.hashes[]` (canonical CycloneDX location);
+      - replace the bom-ref with the purl when one is present (the purl
+        is `pkg:pypi/<name>@<version>` — stable across regenerations);
+      - drop the requirements-line `description` (every byte of it is
+        already represented elsewhere in the component object — pyyaml's
+        is 2KB of pure redundancy).
+    `externalReferences` is preserved as-is so any tool that reads from
+    there still works.
+    """
+    purl = c.get("purl")
+    if purl:
+        c["bom-ref"] = purl
+    if not c.get("hashes"):
+        seen_hashes = set()
+        canonical_hashes = []
+        for ref in c.get("externalReferences") or []:
+            for h_entry in ref.get("hashes") or []:
+                alg = h_entry.get("alg")
+                content = h_entry.get("content")
+                if not alg or not content:
+                    continue
+                key = (alg, content)
+                if key in seen_hashes:
+                    continue
+                seen_hashes.add(key)
+                canonical_hashes.append({"alg": alg, "content": content})
+        canonical_hashes.sort(key=lambda x: (x["alg"], x["content"]))
+        if canonical_hashes:
+            c["hashes"] = canonical_hashes
+    desc = c.get("description")
+    if isinstance(desc, str) and desc.startswith("requirements line "):
+        del c["description"]
+    return c
+
 
 # Read every per-function SBOM, accumulate components, dedupe by purl
 # (fallback to bom-ref).
@@ -166,7 +227,7 @@ for s in sboms:
         if key in seen:
             continue
         seen.add(key)
-        merged.append(c)
+        merged.append(canonicalize(c))
 
 merged.sort(key=lambda c: (c.get("purl") or c.get("bom-ref") or "", c.get("name", "")))
 
@@ -177,11 +238,34 @@ aggregate = {
     "version": 1,
     "metadata": {
         "timestamp": "1970-01-01T00:00:00+00:00",
+        "lifecycles": [{"phase": "build"}],
+        "tools": {
+            "components": [
+                {
+                    "type": "application",
+                    "name": "cyclonedx-py",
+                    "version": cyclonedx_version,
+                    "purl": f"pkg:pypi/cyclonedx-bom@{cyclonedx_version}",
+                    "bom-ref": f"pkg:pypi/cyclonedx-bom@{cyclonedx_version}",
+                },
+                {
+                    "type": "application",
+                    "name": "uv",
+                    "version": uv_version,
+                    "bom-ref": f"opensecops:tool:uv@{uv_version}",
+                },
+            ],
+        },
         "component": {
             "type": "application",
             "name": component,
             "version": version,
-            "bom-ref": f"opensecops:{component}:{version}",
+            "bom-ref": f"pkg:generic/{component}@{version}",
+            "description": (
+                f"OpenSecOps {component} component — released artefact. "
+                f"See SECURITY.md in the source repository for the supply-chain "
+                f"posture, governance model, and verification commands."
+            ),
         },
     },
     "components": merged,

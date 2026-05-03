@@ -21,8 +21,14 @@
 #   2. CVE CHECK:
 #      - Run `pip-audit --strict --disable-pip --requirement <txt>` against
 #        the committed lock. Any finding fails the gate.
-#      - The only override path is the acknowledged-and-deferred list in
-#        `SECURITY.md` (Phase 6 wiring; not enforced by this script yet).
+#      - The override path is the `acknowledged_cves` array in
+#        `.security-config.toml` at the repo root: each entry's `cve_id`
+#        is passed to `pip-audit` via `--ignore-vuln <cve>`. The
+#        rendered `SECURITY.md` §12 mirrors the same list with full
+#        context (package, date, reason, expected resolution) so the
+#        decision is publicly accountable. Acknowledging is a deliberate
+#        maintainer action: edit `.security-config.toml`, re-render
+#        `SECURITY.md`, commit both.
 #
 #   3. HASH-INTEGRITY CHECK (catches lock-file tampering / supply-chain
 #      corruption that the recompile-and-diff path cannot catch):
@@ -138,6 +144,57 @@ if ! command -v uv >/dev/null 2>&1; then
     exit 2
 fi
 
+# --- Acknowledged-and-deferred CVEs --------------------------------------
+# Read the repo's .security-config.toml (when present) for any CVE IDs
+# the maintainer has explicitly acknowledged. These are passed to
+# `pip-audit` via `--ignore-vuln <cve>` so the gate skips them.
+# Schema: `acknowledged_cves` is an array of inline tables; each entry
+# must carry at least `cve_id`. Other fields (package, date, reason,
+# expected_resolution) are consumed by the SECURITY.md renderer for
+# the customer-facing §12 table — they are documentation, not gate
+# inputs. Missing TOML or empty array means no acknowledgements.
+IGNORE_VULN_ARGS=()
+ACKED_CVES=()
+CONFIG_FILE="${ROOT}/.security-config.toml"
+if [[ -f "$CONFIG_FILE" ]]; then
+    # uv-shipped Python ≥3.11 (stdlib tomllib; no third-party deps).
+    # Output: one CVE ID per line on stdout; nothing on success-empty.
+    # Any TOML or schema error → non-zero exit, message on stderr.
+    set +e
+    acked_raw="$(uv run --no-project --quiet --python ">=3.11" python - "$CONFIG_FILE" <<'PY'
+import sys, tomllib
+with open(sys.argv[1], "rb") as f:
+    cfg = tomllib.load(f)
+entries = cfg.get("acknowledged_cves", []) or []
+if not isinstance(entries, list):
+    sys.stderr.write("acknowledged_cves must be an array\n")
+    sys.exit(3)
+for entry in entries:
+    if not isinstance(entry, dict):
+        sys.stderr.write(
+            "each acknowledged_cves entry must be an inline table with at least cve_id\n"
+        )
+        sys.exit(3)
+    cve = entry.get("cve_id")
+    if not cve or not isinstance(cve, str):
+        sys.stderr.write("each acknowledged_cves entry needs cve_id (string)\n")
+        sys.exit(3)
+    print(cve)
+PY
+)"
+    rc=$?
+    set -e
+    if [[ $rc -ne 0 ]]; then
+        req_lib_error "  failed to parse acknowledged_cves from ${CONFIG_FILE}"
+        exit 2
+    fi
+    while IFS= read -r cve; do
+        [[ -n "$cve" ]] || continue
+        ACKED_CVES+=("$cve")
+        IGNORE_VULN_ARGS+=("--ignore-vuln" "$cve")
+    done <<< "$acked_raw"
+fi
+
 # --- Output gating --------------------------------------------------------
 # In --public-log mode, suppress sensitive details (package names, CVE
 # IDs, lock contents) and emit a generic redacted line in their place.
@@ -164,6 +221,12 @@ if [[ ${#IN_FILES[@]} -eq 0 ]]; then
 fi
 
 req_lib_info "found ${#IN_FILES[@]} requirements.in file(s)"
+if (( ${#ACKED_CVES[@]} > 0 )); then
+    req_lib_info "honouring ${#ACKED_CVES[@]} acknowledged-and-deferred CVE(s) from .security-config.toml"
+    for cve in "${ACKED_CVES[@]}"; do
+        printf '  - %s\n' "$cve"
+    done
+fi
 
 drift_count=0
 cve_count=0
@@ -204,7 +267,13 @@ for in_file in "${IN_FILES[@]}"; do
         if [[ $PUBLIC_LOG -eq 1 ]]; then
             printf '      %s\n' "sensitive-finding-detected; rerun locally for details"
         else
-            diff <(tail -n +3 "$txt_file") <(tail -n +3 "$tmp") | sed 's/^/      /'
+            # `|| true` so that diff's non-zero exit (when files differ
+            # — which is the expected case in this branch) does not
+            # short-circuit the rest of the gate via `set -euo pipefail`.
+            # Drift still rejects via drift_count below; this fix only
+            # restores the documented "all five checks fire independently"
+            # behaviour for reporting completeness.
+            diff <(tail -n +3 "$txt_file") <(tail -n +3 "$tmp") | sed 's/^/      /' || true
         fi
         req_lib_warn  "      → run \`compile-requirements.sh\` and recommit"
         drift_count=$((drift_count + 1))
@@ -212,14 +281,20 @@ for in_file in "${IN_FILES[@]}"; do
     rm -f "$tmp"
 
     # 2. CVE — pip-audit on committed lock.
+    # `--ignore-vuln` entries come from .security-config.toml's
+    # `acknowledged_cves` array (parsed once, above). Empty when there
+    # are no acknowledgements.
     if uvx pip-audit --strict --disable-pip --requirement "$txt_file" \
+            ${IGNORE_VULN_ARGS[@]+"${IGNORE_VULN_ARGS[@]}"} \
             >/dev/null 2>&1; then
         req_lib_ok "  ✓ pip-audit clean"
     else
         req_lib_error "  ! CVE finding(s):"
         uvx pip-audit --strict --disable-pip --requirement "$txt_file" \
+            ${IGNORE_VULN_ARGS[@]+"${IGNORE_VULN_ARGS[@]}"} \
             2>&1 | emit_sensitive || true
-        req_lib_warn  "      → bump offending package + recompile, or add to acknowledged-and-deferred list in SECURITY.md"
+        req_lib_warn  "      → bump offending package + recompile, or add an"
+        req_lib_warn  "        acknowledged_cves entry in .security-config.toml + re-render SECURITY.md"
         cve_count=$((cve_count + 1))
     fi
 

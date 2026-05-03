@@ -1,5 +1,15 @@
 # Change Log
 
+## v3.0.1
+    * Aggregate CycloneDX SBOM hardening: `metadata.tools` now records the cyclonedx-py and uv versions used to produce each release; `metadata.lifecycles` declares `build`; component hashes are emitted at the canonical `component.hashes[]` path (in addition to `externalReferences[].hashes[]`); `bom-ref` values are derived from each component's `purl` so they remain stable across regenerations instead of using cyclonedx-py's line-numbered `requirements-LN`. The redundant `description` field that re-stated the requirements line + every hash is dropped from each component, shrinking the released SBOM significantly.
+    * New release asset: `SOAR-vX.Y.Z-evidence.tar.gz`, a deterministic per-function evidence bundle of every `requirements.cdx.json` and `requirements.provenance.json` across all 76 Lambda functions. Reviewers performing CycloneDX-mature deep audit pull the tarball; the aggregate SBOM remains the inventory summary. Tarball is byte-deterministic across regenerations.
+    * Per-function lock convergence: three functions (`functions/ai/query_ai`, `functions/reports/setup_account`, `functions/reports/setup_overview_section`) had locks compiled at different points in time and were holding older transitive versions of `botocore` (1.42.94), `humanize` (4.12.0), and `pandas` (2.2.2). Recompiled fresh; the entire SOAR tree now resolves consistently to `botocore==1.42.97`, `humanize==4.15.0`, and `pandas==2.3.3`. The aggregate SBOM lists every component at exactly one version (28 unique components across 76 functions, no duplicates).
+    * `SECURITY.md.template` §10 (SBOM) extended to surface both release assets, document the in-repo per-function evidence paths, and explain union semantics for components that may appear at multiple versions in the aggregate.
+    * `SECURITY.md.template` §5 gains a new §5.1 "Verifiability decomposition" — a four-way breakdown of which guarantees are independently verifiable today (hash integrity, per-function SBOM determinism) and which become so in follow-up releases (Sigstore signing for substitution-in-transit; `# uv-compiled-at:` reproducibility for gate-derivation; SLSA L1 in-toto provenance for gate-execution attestation).
+    * CVE acknowledged-and-deferred override mechanism now wired end-to-end: each entry in `acknowledged_cves` in `.security-config.toml` is passed to `pip-audit` via `--ignore-vuln`, so the release gate honours documented exceptions. The rendered `SECURITY.md` §12 mirrors the same list with full context.
+    * `_check-requirements.sh`: drift-detection no longer short-circuits subsequent gate checks; the documented "all five checks fire independently" behaviour is now true.
+    * No customer action required. `./deploy` workflow is unchanged.
+
 ## v3.0.0
     * BREAKING: removed OpenAI direct integration; AIProvider allowed values are now BEDROCK and NONE. Installs using AIProvider=OPENAI must switch to BEDROCK before upgrading.
     * Removed 4 ChatGPT* CFN parameters, 2 SSM parameter resources (ChatGPTOrganizationId, ChatGPTAPIKey), and 4 CHATGPT_* Lambda env vars from template.yaml

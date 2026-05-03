@@ -123,6 +123,7 @@ fi
 # --- Defaults shared by both modes ----------------------------------------
 SBOM_TMP_DIR=""
 SBOM_PATH=""
+EVIDENCE_PATH=""
 GH_AVAILABLE=false
 GH_AUTHED=false
 
@@ -156,13 +157,21 @@ if [[ "$REPO_IS_CONVERTED" == true ]]; then
     fi
     phase_done
 
-    # --- Aggregate CycloneDX SBOM (release artefact) ----------------------
-    # Generated fresh at release time. Always emitted (including dry-run)
-    # so generation failures surface at gate time, not after the push.
-    # Output goes to a tmp file that the EXIT trap cleans up.
-    phase_banner 2 "aggregate CycloneDX SBOM emission"
+    # --- Aggregate CycloneDX SBOM + per-function evidence tarball ---------
+    # Both generated fresh at release time. Always emitted (including
+    # dry-run) so generation failures surface at gate time, not after the
+    # push. Outputs go to a tmp dir that the EXIT trap cleans up.
+    #
+    # Two assets, one phase:
+    #   - aggregate SBOM (one summary file; what intake reviewers
+    #     consume for component-level inventory)
+    #   - evidence tarball (the per-function .cdx.json + .provenance.json
+    #     witnesses; what a CycloneDX-mature deep review consumes for
+    #     per-function audit)
+    phase_banner 2 "release artefact emission (SBOM + evidence)"
     SBOM_TMP_DIR=$(mktemp -d -t opensecops-publish-XXXXXX)
     SBOM_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json"
+    EVIDENCE_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-evidence.tar.gz"
     trap 'rm -rf "$SBOM_TMP_DIR"' EXIT
 
     if [[ -x scripts/_aggregate-sbom.sh ]]; then
@@ -180,6 +189,24 @@ if [[ "$REPO_IS_CONVERTED" == true ]]; then
         echo "Note: scripts/_aggregate-sbom.sh not present — skipping SBOM emission."
         echo "      Refresh this repo from the Installer to enable SBOM generation."
         SBOM_PATH=""
+    fi
+
+    if [[ -x scripts/_bundle-evidence.sh ]]; then
+        if ! scripts/_bundle-evidence.sh \
+                --component "$COMPONENT_NAME" \
+                --version   "$TAG_VERSION" \
+                --output    "$EVIDENCE_PATH"; then
+            echo
+            echo "Evidence bundle generation FAILED — see output above."
+            echo "  → most likely missing requirements.cdx.json or"
+            echo "    requirements.provenance.json; run compile-requirements"
+            echo "    and recommit, then retry."
+            exit 1
+        fi
+    else
+        echo "Note: scripts/_bundle-evidence.sh not present — skipping evidence bundle."
+        echo "      Refresh this repo from the Installer to enable evidence bundling."
+        EVIDENCE_PATH=""
     fi
     phase_done
 
@@ -217,11 +244,18 @@ if [[ "$DRY_RUN" == true ]]; then
             echo "              tag:    $TAG_VERSION"
             echo "              body:   CHANGELOG slice for $TAG_VERSION + Full-Changelog compare link"
             echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json"
+            if [[ -n "$EVIDENCE_PATH" ]]; then
+                echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-evidence.tar.gz"
+            fi
         fi
     fi
     if [[ -n "$SBOM_PATH" ]]; then
         echo "  Generated:  $SBOM_PATH"
         echo "              (size: $(wc -c < "$SBOM_PATH" | tr -d ' ') bytes; cleaned on exit)"
+    fi
+    if [[ -n "$EVIDENCE_PATH" ]]; then
+        echo "  Generated:  $EVIDENCE_PATH"
+        echo "              (size: $(wc -c < "$EVIDENCE_PATH" | tr -d ' ') bytes; cleaned on exit)"
     fi
     if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
         if [[ "$GH_AVAILABLE" != true ]]; then
@@ -408,13 +442,21 @@ PYEOF
         } >> "$NOTES_FILE"
     fi
 
+    # Assets: aggregate SBOM (always) + evidence tarball (when present).
+    # Evidence is the per-function deep-audit witness set; SBOM is the
+    # component-level inventory summary. Both ship as release assets.
+    RELEASE_ASSETS=("$SBOM_PATH")
+    if [[ -n "$EVIDENCE_PATH" ]]; then
+        RELEASE_ASSETS+=("$EVIDENCE_PATH")
+    fi
+
     echo
     echo "── Creating GitHub Release on ${OWNER_REPO} ──"
     if ! gh release create "$TAG_VERSION" \
             --repo "$OWNER_REPO" \
             --title "$TAG_VERSION" \
             --notes-file "$NOTES_FILE" \
-            "$SBOM_PATH"; then
+            "${RELEASE_ASSETS[@]}"; then
         echo
         echo "Error: gh release create failed."
         echo "  → if the release already exists (republishes are not supported by"

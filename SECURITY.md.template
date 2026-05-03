@@ -93,6 +93,22 @@ The locked-state guarantees for converted components:
 - Direct-dep PyPI provenance is captured in committed `requirements.provenance.json` files and re-checked at release-gate time; drift surfaces as an advisory warning for maintainer review.
 - No release-path CI; no auto-PR dependency bots; updates are deliberate maintainer actions.
 
+### 5.1 Verifiability decomposition
+
+The release artefacts (locks, per-function SBOMs, aggregate SBOM, evidence tarball, eventually signatures and provenance documents) give the customer four distinct *kinds* of independent verification, available at different points in the project's roadmap. Conflating them into a single "is this verifiable?" sentence would invite a careful reviewer to notice the elision; the four-way breakdown below states honestly which guarantees are independently verifiable today and which become so in follow-up releases.
+
+1. **Independently verifiable today, no further release needed.** Two properties of the released artefacts can be reproduced with no maintainer cooperation:
+   - **Hash integrity.** `pip download --require-hashes -r requirements.txt` against any published lock downloads each pinned wheel from PyPI and verifies its SHA-256 against the recorded hash. A mismatch indicates either tampering on the path PyPI → customer, or a stale lock; in either case the customer's `sam build` would also reject. Anyone can run this verification against the published `requirements.txt` files at any tag.
+   - **Per-function SBOM determinism.** Re-running `compile-requirements.sh` against the same `requirements.txt` produces a byte-identical `requirements.cdx.json` (the UUIDv5 serialNumber is derived from `sha256(lock contents)` and the timestamp is pinned to a fixed epoch). The same property holds for the per-function `requirements.provenance.json` baselines. A reviewer who pulls the evidence tarball can regenerate every file in it and compare bit-for-bit.
+
+2. **Documented today, independently verifiable in a follow-up release (substitution-in-transit).** Sigstore signatures on the SBOM, the evidence tarball, and the lock files will attest that the released bytes came from an authorised release identity recorded in the public Sigstore Rekor transparency log. This closes the question "did these bytes actually come from OpenSecOps, or did something between OpenSecOps and me substitute them?". Verification will be a one-line `cosign verify-blob` command; the exact invocation lands in §11 when signing ships.
+
+3. **Documented today, independently verifiable in a follow-up release (gate-derivation, indirect closure).** A second machine recompiling from the committed `.in` files with the recorded compile-time timestamp passed as `--exclude-newer`, a clean `uv` cache, and the pinned `uv` version will produce bit-identical lock bytes. This is independent re-derivation of the gate's drift and hash-integrity outputs: if the lock is reproducible by anyone with the inputs, the gate's "is the lock well-formed and authentic" question is answered without trusting the maintainer's process. Lands when the `# uv-compiled-at:` timestamp header is added to every `requirements.txt`.
+
+4. **Documented today, independently verifiable in a later follow-up release (gate-execution attestation, direct closure).** A SLSA Build L1 in-toto provenance document will declare the build steps that ran (`_check-requirements.sh`, `_aggregate-sbom.sh`, `_bundle-evidence.sh`, `cosign sign-blob`, etc.) for each release. This is the direct answer to "did `./publish`'s gate actually run, or did the maintainer skip it and sign anyway?". The Phase-11 reproducibility check from category 3 closes this question *indirectly* (if the lock is reproducible, the gate's outputs were correct regardless of process); the in-toto provenance closes it *directly* by naming the build steps in a signed attestation.
+
+The categorisation is mechanism-attributed, not phase-bundled. Categories 2 and 3 are independent items inside the same follow-up release; category 4 closes once the in-toto provenance document ships.
+
 ## 6. Governance
 
 OpenSecOps follows the *cathedral* model in [Eric S. Raymond's sense](https://en.wikipedia.org/wiki/The_Cathedral_and_the_Bazaar): a small core team curates the codebase. The source is public for transparency, customer verification, and security review. It is not an invitation to contribute code.
@@ -124,11 +140,19 @@ This claim is uniform across every converted OpenSecOps component.
 
 ## 10. Software Bill of Materials (SBOM)
 
-A CycloneDX SBOM is attached as an asset to every GitHub release of this component on the public OpenSecOps remote:
+Two release assets are attached to every GitHub release of this component on the public OpenSecOps remote:
+
+**Aggregate component-level SBOM** — one summary file (CycloneDX 1.6, gzip uncompressed JSON), the union of every per-function SBOM in the release. This is what intake reviewers and most SBOM tooling consume:
 
 {{SBOM_LOCATION}}
 
-The aggregate component-level SBOM is the union of every per-Lambda-function SBOM in the release, generated fresh at release time by `./publish`. Per-function SBOMs are derived artefacts (regenerated deterministically from `requirements.txt` on demand) and are not committed to the repository. (Sigstore signature/bundle artefacts will be added alongside in Phase 11.)
+**Per-function evidence tarball** — `<COMPONENT>-<VERSION>-evidence.tar.gz`, deterministically built from every `requirements.cdx.json` and `requirements.provenance.json` in the source tree. This is the deep-audit witness set: one CycloneDX SBOM per Lambda function plus its committed PyPI publisher-provenance baseline. The aggregate is one file summarising the union; the evidence tarball carries the per-function records that produced it (typically multiple files per Lambda function across the component). Reviewers performing CycloneDX-mature deep audit should pull the tarball; reviewers needing only the inventory can stop at the aggregate.
+
+The per-function evidence files are also visible in the source tree at the canonical paths `**/requirements.cdx.json` and `**/requirements.provenance.json` next to each `requirements.in`. Customers who clone or browse the source can verify any release's evidence tarball against the corresponding source-tree files at the matching tag — the bundle is byte-deterministic and the source files are directly comparable.
+
+**Union semantics for duplicate components** — the aggregate SBOM may list the same package at multiple versions (for example `botocore` at both 1.42.94 and 1.42.97). This is not an error. Each Lambda function resolves its own dependency graph independently from `requirements.in`, so transitive resolutions can legitimately differ across functions. Collapsing duplicates to "highest wins" would actively misrepresent what is deployed, so the aggregate preserves every distinct version found in any function's resolved lock. The per-function SBOMs (in the evidence tarball) carry the corresponding function-by-function attribution.
+
+(Sigstore signature/bundle artefacts will be added alongside both assets in a follow-up release.)
 
 ## 11. Verifying release artefacts
 
