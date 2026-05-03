@@ -157,7 +157,11 @@ A non-empty result means at least one Lambda function bundle contains the vulner
 
 ## 14. Authoritative supply-chain documentation
 
-> **Deferred to a follow-up Documentation-repo release.** The user-facing supply-chain page in the OpenSecOps Documentation repo is planned. This section will then link to that page.
+For the cross-component customer-facing supply-chain page — covering supply-chain integrity, CVE response, SBOM artefacts, release verification, and an intake-checklist crosswalk for FOSS-intake reviewers, security officers, and engineers — see:
+
+**[OpenSecOps Supply-Chain Security and CVE Response](https://github.com/OpenSecOps-Org/Documentation/blob/main/docs/security/supply-chain.md)**
+
+That document is the authoritative cross-component reference; the per-component sections above describe how the project-wide posture applies to **SOAR** specifically.
 
 ---
 

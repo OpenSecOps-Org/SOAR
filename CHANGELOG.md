@@ -1,5 +1,8 @@
 # Change Log
 
+## v3.0.2
+    * `SECURITY.md` §14 now links to the OpenSecOps Documentation supply-chain page.
+
 ## v3.0.1
     * Aggregate CycloneDX SBOM hardening: `metadata.tools` now records the cyclonedx-py and uv versions used to produce each release; `metadata.lifecycles` declares `build`; component hashes are emitted at the canonical `component.hashes[]` path (in addition to `externalReferences[].hashes[]`); `bom-ref` values are derived from each component's `purl` so they remain stable across regenerations instead of using cyclonedx-py's line-numbered `requirements-LN`. The redundant `description` field that re-stated the requirements line + every hash is dropped from each component, shrinking the released SBOM significantly.
     * New release asset: `SOAR-vX.Y.Z-evidence.tar.gz`, a deterministic per-function evidence bundle of every `requirements.cdx.json` and `requirements.provenance.json` across all 76 Lambda functions. Reviewers performing CycloneDX-mature deep audit pull the tarball; the aggregate SBOM remains the inventory summary. Tarball is byte-deterministic across regenerations.

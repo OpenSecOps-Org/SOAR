@@ -27,8 +27,9 @@
     §3: tiered SLA describes new-release cadence (no backports).
     §8: every converted component gets the same L1+L2+L3-subset claim.
 
-  Sections 7, 9, 11, 14 carry "deferred to Phase X" pointer notes; their
-  substantive content lands in the phase named in each note.
+  Sections 7, 9, 11 carry "deferred to Phase X" pointer notes; their
+  substantive content lands in the phase named in each note. Section 14
+  is filled in (Documentation-repo cross-link).
 -->
 
 # Security Policy — {{COMPONENT_NAME}}
@@ -186,7 +187,11 @@ A non-empty result means at least one Lambda function bundle contains the vulner
 
 ## 14. Authoritative supply-chain documentation
 
-> **Deferred to a follow-up Documentation-repo release.** The user-facing supply-chain page in the OpenSecOps Documentation repo is planned. This section will then link to that page.
+For the cross-component customer-facing supply-chain page — covering supply-chain integrity, CVE response, SBOM artefacts, release verification, and an intake-checklist crosswalk for FOSS-intake reviewers, security officers, and engineers — see:
+
+**[OpenSecOps Supply-Chain Security and CVE Response](https://github.com/OpenSecOps-Org/Documentation/blob/main/docs/security/supply-chain.md)**
+
+That document is the authoritative cross-component reference; the per-component sections above describe how the project-wide posture applies to **{{COMPONENT_NAME}}** specifically.
 
 ---
 
