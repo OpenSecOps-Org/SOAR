@@ -1,11 +1,7 @@
 import os
 import re
 import boto3
-import botocore
-import botocore.exceptions
 import json
-from openai import OpenAI
-from openai import BadRequestError, RateLimitError, APITimeoutError, APIConnectionError, APIStatusError, OpenAIError
 import html2text
 import logging
 from bs4 import BeautifulSoup
@@ -26,28 +22,12 @@ AI_REMOVE_EMAIL_ADDRESSES = os.environ['AI_REMOVE_EMAIL_ADDRESSES']
 BEDROCK_REGION = os.environ['BEDROCK_REGION']
 BEDROCK_MODEL = os.environ['BEDROCK_MODEL']
 
-CHATGPT_DEFAULT_MODEL = os.environ['CHATGPT_DEFAULT_MODEL']
-CHATGPT_FALLBACK_MODEL = os.environ['CHATGPT_FALLBACK_MODEL']
-CHATGPT_ORGANIZATION_ID_PARAMETER_PATH = os.environ['CHATGPT_ORGANIZATION_ID_PARAMETER_PATH']
-CHATGPT_API_KEY_PARAMETER_PATH = os.environ['CHATGPT_API_KEY_PARAMETER_PATH']
-
 SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
 
 # Initialize the SNS client
 sns_client = boto3.client('sns')
 
-# Conditional client initialization
-if AI_PROVIDER == 'OPENAI':
-    # Create a boto3 client for SSM
-    ssm_client = boto3.client('ssm')
-    # Get the OpenAI parameters from SSM
-    openai_organization = ssm_client.get_parameter(Name=CHATGPT_ORGANIZATION_ID_PARAMETER_PATH)['Parameter']['Value']
-    openai_api_key = ssm_client.get_parameter(Name=CHATGPT_API_KEY_PARAMETER_PATH)['Parameter']['Value']
-    # Create the OpenAI client
-    openai_client = OpenAI(organization=openai_organization, api_key=openai_api_key)
-
-elif AI_PROVIDER == 'BEDROCK':
-    # Create the Bedrock client
+if AI_PROVIDER == 'BEDROCK':
     bedrock_client = boto3.client('bedrock-runtime', region_name=BEDROCK_REGION)
 
 
@@ -84,11 +64,7 @@ def lambda_handler(data, _context):
     # Get the user_text from the input data or anonymize the email body
     user_text = data.get('user') or anonymise(data['messages']['email']['body'].split("====================")[0])
 
-    # Call the right API and model and set the HTML result
-    if AI_PROVIDER == 'BEDROCK':
-        html = call_bedrock_api(BEDROCK_MODEL, system_text, user_text)
-    else:  # OPENAI
-        html = call_openai_api(CHATGPT_DEFAULT_MODEL, CHATGPT_FALLBACK_MODEL, system_text, user_text)
+    html = call_bedrock_api(BEDROCK_MODEL, system_text, user_text)
 
     # Post-processing galore
     if not no_html_post_processing:
@@ -148,112 +124,6 @@ def call_bedrock_api(model, system_text, user_text):
         logger.error(f"Error calling Bedrock API: {str(e)}")
         send_sns_notification(f"Bedrock API Error: {str(e)}")
         raise
-
-
-# Call the OpenAI API, with fallback
-def call_openai_api(model, fallback_model, system_text, user_text):
-    """
-    Call OpenAI API with the provided model. If token limit is exceeded,
-    and a fallback model is provided, it retries with the fallback model.
-    """
-    messages = [
-        {"role": "system", "content": system_text},
-        {"role": "user", "content": user_text}
-    ]
-    logger.info(f"OpenAI API input: {messages}")
-
-    try:
-        # Attempt to create a chat completion with the OpenAI API
-        response = openai_client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=0.3,
-            top_p=0.7,
-            frequency_penalty=0.3,
-            presence_penalty=0.1
-        )
-        response = response.model_dump()
-        logger.info(f"OpenAI API response: {response}")
-        # Get the message and html from the response
-        message = response['choices'][0]['message']
-        html = message['content']
-        logger.info(f"HTML: {html}")
-        return html
-
-    except BadRequestError as e:
-        # BadRequestError indicates a problem with the request; it might not be transient.
-        # Check if the error is because of token limit and a fallback model is provided
-        if 'context_length_exceeded' in str(e) and model != fallback_model:
-            # If the error is due to token limit and a fallback model is provided,
-            # retry with the fallback model.
-            logger.info("Token limit exceeded, trying fallback model")
-            return call_openai_api(fallback_model, None, messages)
-        else:
-            # For other bad request errors, log and raise the exception to be caught by the Step Functions state machine.
-            logger.error(f"BadRequestError: {str(e)}")
-            send_sns_notification(f"BadRequestError occurred: {str(e)}")
-            raise
-
-    except RateLimitError as e:
-        # RateLimitError indicates too many requests; it's transient and should be retried.
-        # This will trigger the Retry policy in the Step Functions state machine.
-        logger.error(f"RateLimitError: {str(e)}")
-        send_sns_notification(f"RateLimitError occurred: {str(e)}")
-        raise_lambda_too_many_requests_exception(str(e))
-
-    except APITimeoutError as e:
-        # APITimeoutError indicates a timeout; it's transient and should be retried.
-        # This will trigger the Retry policy in the Step Functions state machine.
-        logger.error(f"APITimeoutError: {str(e)}")
-        send_sns_notification(f"APITimeoutError occurred: {str(e)}")
-        raise_lambda_service_exception(str(e))
-
-    except APIConnectionError as e:
-        # APIConnectionError indicates a network connection error; it's transient and should be retried.
-        # This will trigger the Retry policy in the Step Functions state machine.
-        logger.error(f"APIConnectionError: {str(e)}")
-        send_sns_notification(f"APIConnectionError occurred: {str(e)}")
-        raise_lambda_service_exception(str(e))
-
-    except APIStatusError as e:
-        # APIStatusError is raised for non-200 HTTP status codes from the API.
-        # If the status code is >= 500, it's a server-side error and should be retried.
-        # Other status codes indicate client-side errors and should not be retried.
-        logger.error(f"APIStatusError: {e.status_code} - {str(e.response)}")
-        send_sns_notification(f"APIStatusError occurred: {e.status_code} - {str(e.response)}")
-        if e.status_code >= 500:
-            raise_lambda_service_exception(str(e))
-        else:
-            raise
-
-    except OpenAIError as e:
-        # OpenAIError is a catch-all for any other OpenAI-related exceptions not explicitly caught above.
-        # This will not be retried by the Step Functions state machine and will move to the Catch block.
-        logger.error(f"Unexpected OpenAIError: {str(e)}")
-        send_sns_notification(f"OpenAIError occurred: {str(e)}")
-        raise
-
-    except botocore.exceptions.BotoCoreError as e:
-        # BotoCoreError indicates an issue with the AWS SDK for Python (Boto3).
-        # If the error message is "An unspecified error occurred", it's considered transient and should be retried.
-        # Otherwise, it will not be retried by the Step Functions state machine and will move to the Catch block.
-        logger.error(f"BotoCoreError: {str(e)}")
-        send_sns_notification(f"BotoCoreError occurred: {str(e)}")
-        if str(e) == "An unspecified error occurred":
-            raise_lambda_service_exception("BotoCoreError: An unspecified error occurred")
-        else:
-            raise
-
-
-# Helper function to raise a Lambda TooManyRequestsException
-def raise_lambda_too_many_requests_exception(error_message):
-    error_code = 'Lambda.TooManyRequestsException'
-    raise botocore.exceptions.BotoCoreError(error_code=error_code, message=error_message)
-
-# Helper function to raise a Lambda ServiceException
-def raise_lambda_service_exception(error_message):
-    error_code = 'Lambda.ServiceException'
-    raise botocore.exceptions.BotoCoreError(error_code=error_code, message=error_message)
 
 
 # Helper function to send an SNS notification

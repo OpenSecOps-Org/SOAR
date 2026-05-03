@@ -1,0 +1,169 @@
+<!--
+  THIS FILE IS A TEMPLATE.
+  Do not edit the rendered <repo>/SECURITY.md directly — edit this template
+  in the Installer repo (canonical source) or the per-repo .security-config.toml
+  (per-component values), then re-run _generate-security-md.sh.
+
+  Distribution: Installer/templates/SECURITY.md.template is copied byte-identically
+  to every component repo by Installer/refresh. The local _generate-security-md.sh
+  in each repo reads this template plus <repo>/.security-config.toml and writes
+  <repo>/SECURITY.md. Idempotent — running it twice produces no diff.
+
+  Placeholder set:
+
+    {{COMPONENT_NAME}}      — auto-derived by the generator from
+                              `git remote get-url OpenSecOps`
+                              (override by setting `component_name` in the TOML).
+    {{SBOM_LOCATION}}       — derived URL pattern using {{COMPONENT_NAME}} and
+                              {{converted_in}}; not stored in the TOML.
+    {{SUPPLY_CHAIN_STATUS}} — rendered by the generator from `converted` (bool)
+                              + `converted_in` (string, e.g. "v3.0.0") in the TOML.
+    {{ACKNOWLEDGED_CVES}}   — rendered from the TOML `acknowledged_cves` array;
+                              defaults to "_None at this time._" when empty/absent.
+
+  Sections 1, 3, 8 are uniform inline prose — no placeholders, no per-repo
+  variability. The values are uniform suite-wide:
+    §1: there is no support matrix; security fixes ship as new releases.
+    §3: tiered SLA describes new-release cadence (no backports).
+    §8: every converted component gets the same L1+L2+L3-subset claim.
+
+  Sections 7, 9, 11, 14 carry "deferred to Phase X" pointer notes; their
+  substantive content lands in the phase named in each note.
+-->
+
+# Security Policy — {{COMPONENT_NAME}}
+
+This document describes the security posture, governance model, vulnerability-reporting channel, and supply-chain assurances for the **{{COMPONENT_NAME}}** component of the OpenSecOps system. It is the single canonical reference for both supply-chain posture and governance posture; there is no separate `GOVERNANCE.md`.
+
+OpenSecOps is published as source-available under MPL-2.0. The cathedral governance model (transparent source, no external pull requests; vulnerability reports welcomed and credited) applies to all components, including this one.
+
+---
+
+## 1. Supported versions
+
+Security fixes are delivered as **new releases**. There is no patch-level support for prior releases — backporting fixes against older release lines is explicitly out of scope. A customer running an older version receives a fix by upgrading to the current release.
+
+This policy is uniform across every OpenSecOps component. It is honest about what a small core team can sustainably support, and it aligns with the cathedral governance model in §6: the core team curates one moving release line per component, and customers track it.
+
+The "Am I affected?" recipe in §13 lets a customer determine, at any point, whether their currently-deployed version is exposed to a specific CVE. The remediation, when exposed, is to upgrade to the current release.
+
+## 2. Vulnerability reporting
+
+We welcome vulnerability reports from anyone. Reporters receive named credit in the release notes for the version that ships the fix, unless they request anonymity.
+
+Preferred channel: the GitHub Security Advisory ("Report a vulnerability") flow on the relevant component repository. This produces a private advisory visible to the maintainer team.
+
+Public bug reports for non-security defects belong on the standard Issues tab; security reports must use the private channel above.
+
+External *patches* (pull requests) are not accepted under the cathedral governance model documented in §6. This applies to security and non-security changes alike. Vulnerability *reports* are an explicit carve-out and are always welcome.
+
+## 3. CVE response SLA
+
+The SLA describes the **cadence at which a fix-bearing release ships**, not patch turnaround on old versions (§1: there are no patches against old versions — fixes always ship as new releases). When a CVE is confirmed against a currently-supported release, the maintainer commits to cutting a new release within the following windows:
+
+| Severity      | Time to next release          |
+| ------------- | ----------------------------- |
+| Critical      | within **3 business days**    |
+| High          | within **10 business days**   |
+| Medium / Low  | next regular release          |
+
+Critical and high severities trigger an out-of-band release; medium and low ride the regular release cadence. The clock starts when the maintainer accepts the report as a confirmed vulnerability against current code.
+
+This SLA is uniform across every OpenSecOps component.
+
+**Severity authority** — for SLA classification only (the release gate fails on any `pip-audit` finding regardless of severity, unless the entry is on the acknowledged-and-deferred list in §12): GHSA severity is authoritative when present; otherwise NVD or OSV CVSS severity. If severity is absent, conflicting, or not yet classified, the finding is treated as **high** until manually re-classified.
+
+## 4. Continuous detection
+
+At the current release, the operative continuous-detection layer is the **release-time gate**: `./publish` runs `_check-requirements.sh` as its first step and refuses to release if the lock has drifted from `requirements.in`, if `pip-audit` flags any CVE not on the acknowledged-and-deferred list (§12), if any pinned artefact's SHA-256 fails verification against PyPI, or if any pinned package matches the OSSF malicious-packages feed.
+
+Push-based and poll-based detection between releases — GitHub Dependabot alerts and a daily scan-only CI workflow on the public OpenSecOps repos — are planned for follow-up releases. When those land, this section gains the corresponding sentences and a brief description of how findings reach the maintainer.
+
+## 5. Supply-chain posture
+
+{{SUPPLY_CHAIN_STATUS}}
+
+The locked-state guarantees for converted components:
+
+- Every direct dependency is declared in a hand-edited `requirements.in` per Lambda function, with explicit version ranges.
+- Every concrete dependency (direct + transitive) is pinned in a hash-verified `requirements.txt` generated by `uv pip compile --generate-hashes`.
+- `pip` enforces the recorded SHA-256 hashes at install time inside `sam build`.
+- The release gate (§4) re-verifies hashes against PyPI before any artefact ships, so byte-tampering is caught **before** the deploy reaches a customer.
+- Pinned packages are cross-referenced against the OSSF malicious-packages feed at release-gate time; any match fails the gate with the matching `MAL-*` advisory ID.
+- Direct-dep PyPI provenance is captured in committed `requirements.provenance.json` files and re-checked at release-gate time; drift surfaces as an advisory warning for maintainer review.
+- No release-path CI; no auto-PR dependency bots; updates are deliberate maintainer actions.
+
+## 6. Governance
+
+OpenSecOps follows the *cathedral* model in [Eric S. Raymond's sense](https://en.wikipedia.org/wiki/The_Cathedral_and_the_Bazaar): a small core team curates the codebase. The source is public for transparency, customer verification, and security review. It is not an invitation to contribute code.
+
+External pull requests are not accepted on any OpenSecOps repository. Forks under MPL-2.0 are of course permitted by the license.
+
+Vulnerability *reports* are the explicit carve-out: they are welcomed from anyone (§2) and reporters receive named credit. The reporter/contributor distinction is intentional: anyone can tell us something is broken; only the core team writes the fix.
+
+Release-signing identities are core-team members; the set of valid signing identities is published in §7 once Sigstore signing ships.
+
+## 7. Valid release-signing identities
+
+> **Deferred to a follow-up release.** Release-artefact signing via Sigstore is planned. This section will then list the OIDC identities customers should accept when running `cosign verify-blob` against an OpenSecOps release artefact, alongside the exact verification command in §11.
+
+## 8. Maturity claims (S2C2F)
+
+This component implements **S2C2F L1 + L2 baseline plus the locally-runnable subset of L3**:
+
+- **L1 + L2 baseline**: hand-edited abstract dependency spec; hash-verified resolved lock; release-time CVE scan; explicit acknowledged-and-deferred override (§12); deterministic regeneration of the lock from the same `.in` files plus the same `uv` version.
+- **L3 subset**: OSSF malicious-packages feed gating at release time; direct-dependency PyPI provenance advisory at release time. Both gates run uniformly against any converted component (the same gates fire wherever hashed locks exist).
+
+The maturity claim is honest about scope. Where a control requires write-capable CI infrastructure (signed-from-CI rebuilds, hermetic builds, automated update bots, auto-merge on green), it is **explicitly out of scope** for OpenSecOps and we do not claim it. The same applies to all S2C2F L4 controls (rebuilding OSS on trusted infrastructure, signing rebuilt OSS, implementing upstream fixes locally).
+
+This claim is uniform across every converted OpenSecOps component.
+
+## 9. SLSA level
+
+> **Deferred to a future release.** A formal SLSA Build L1 provenance claim, with selected L2-adjacent controls (Sigstore signing; deterministic hash-pinned dependency resolution; reproducibility verification on a second machine) documented alongside, lands when an in-toto provenance document is generated by `./publish` per release. This section will then state the level *and* the L2-adjacent controls explicitly.
+
+## 10. Software Bill of Materials (SBOM)
+
+A CycloneDX SBOM is attached as an asset to every GitHub release of this component on the public OpenSecOps remote:
+
+{{SBOM_LOCATION}}
+
+The aggregate component-level SBOM is the union of every per-Lambda-function SBOM in the release, generated fresh at release time by `./publish`. Per-function SBOMs are derived artefacts (regenerated deterministically from `requirements.txt` on demand) and are not committed to the repository. (Sigstore signature/bundle artefacts will be added alongside in Phase 11.)
+
+## 11. Verifying release artefacts
+
+> **Deferred to a follow-up release.** Release-artefact signing via Sigstore is planned. Once it ships, this section will contain the exact `cosign verify-blob` invocation customers can copy-paste, including the `--certificate-identity` and `--certificate-oidc-issuer` values that match the actual signing flow used.
+
+## 12. Acknowledged-and-deferred CVEs
+
+This is the override mechanism for the release gate: any CVE listed here is permitted to ship, on the documented rationale, until the resolution date.
+
+{{ACKNOWLEDGED_CVES}}
+
+Each entry, when present, contains: CVE ID, affected package, date acknowledged, reason (development-only dependency, contested advisory, fix pending upstream, no exploitable code path, etc.), and expected resolution.
+
+Adding an entry is a deliberate maintainer action, reviewed at release time. Entries are removed as soon as the underlying issue is fixed; the audit trail remains in `git log`.
+
+## 13. "Am I affected?" recipe
+
+To determine whether a specific CVE applies to a deployment of this component, run the following against the deployed `requirements.txt` files inside the SAM build artefacts:
+
+```bash
+grep -rE '<package>==<vulnerable-version-pattern>' path/to/.aws-sam/build
+```
+
+Worked example — checking exposure to a hypothetical urllib3 CVE that affects all versions before 2.6.3:
+
+```bash
+grep -rE '^urllib3==(0\.|1\.|2\.[0-5]\.|2\.6\.[0-2])' .aws-sam/build/
+```
+
+A non-empty result means at least one Lambda function bundle contains the vulnerable version. Cross-reference with §12 to determine whether the exposure is a release-gate failure that escaped (file a bug) or an acknowledged-and-deferred entry (consult the resolution date). Per §1, the remediation when exposed is to upgrade to the current release.
+
+## 14. Authoritative supply-chain documentation
+
+> **Deferred to a follow-up Documentation-repo release.** The user-facing supply-chain page in the OpenSecOps Documentation repo is planned. This section will then link to that page.
+
+---
+
+*This document is generated from `SECURITY.md.template` and `.security-config.toml` by `_generate-security-md.sh`. Edit those files, not this one. See the comment at the top of `SECURITY.md.template` for placeholder semantics.*

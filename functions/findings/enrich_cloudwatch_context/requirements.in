@@ -1,0 +1,2 @@
+-r ../../../boto3.in
+python-dateutil>=2.9.0,<3.0.0

@@ -1,0 +1,11 @@
+# SOAR — Security policy generator config.
+#
+# Read by scripts/_generate-security-md.sh together with SECURITY.md.template
+# to render SECURITY.md.
+#
+# Required keys: `converted` (bool), `converted_in` (string, e.g. "v3.0.0").
+# Optional: `component_name` (auto-derived from `git remote get-url OpenSecOps`),
+# `acknowledged_cves` (array of inline tables; defaults to empty).
+
+converted    = true
+converted_in = "v3.0.0"

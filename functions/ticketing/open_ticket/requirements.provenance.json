@@ -1,0 +1,69 @@
+{
+  "direct_deps": {
+    "boto3": {
+      "author": "Amazon Web Services",
+      "author_email": "",
+      "home_page": "https://github.com/boto/boto3",
+      "maintainer": "",
+      "maintainer_email": "",
+      "project_urls": {
+        "Documentation": "https://docs.aws.amazon.com/boto3/latest/",
+        "Homepage": "https://github.com/boto/boto3",
+        "Source": "https://github.com/boto/boto3"
+      }
+    },
+    "charset_normalizer": {
+      "author": "",
+      "author_email": "\"Ahmed R. TAHRI\" <tahri.ahmed@proton.me>",
+      "home_page": "",
+      "maintainer": "",
+      "maintainer_email": "\"Ahmed R. TAHRI\" <tahri.ahmed@proton.me>",
+      "project_urls": {
+        "Changelog": "https://github.com/jawah/charset_normalizer/blob/master/CHANGELOG.md",
+        "Code": "https://github.com/jawah/charset_normalizer",
+        "Documentation": "https://charset-normalizer.readthedocs.io/",
+        "Issue tracker": "https://github.com/jawah/charset_normalizer/issues"
+      }
+    },
+    "jira": {
+      "author": "",
+      "author_email": "Ben Speakmon <ben.speakmon@gmail.com>",
+      "home_page": "",
+      "maintainer": "",
+      "maintainer_email": "Sorin Sbarnea <sorin.sbarnea@gmail.com>",
+      "project_urls": {
+        "Bug Tracker": "https://github.com/pycontribs/jira/issues",
+        "CI: GitHub Actions": "https://github.com/pycontribs/jira/actions",
+        "Documentation": "https://jira.readthedocs.io",
+        "Forum": "https://community.atlassian.com/t5/tag/jira-python/tg-p?sort=recent",
+        "Homepage": "https://github.com/pycontribs/jira",
+        "Release Management": "https://github.com/pycontribs/jira/projects",
+        "Source Code": "https://github.com/pycontribs/jira.git"
+      }
+    },
+    "requests": {
+      "author": "",
+      "author_email": "Kenneth Reitz <me@kennethreitz.org>",
+      "home_page": "",
+      "maintainer": "",
+      "maintainer_email": "Ian Stapleton Cordasco <graffatcolmingov@gmail.com>, Nate Prewitt <nate.prewitt@gmail.com>",
+      "project_urls": {
+        "Documentation": "https://requests.readthedocs.io",
+        "Source": "https://github.com/psf/requests"
+      }
+    },
+    "urllib3": {
+      "author": "",
+      "author_email": "Andrey Petrov <andrey.petrov@shazow.net>",
+      "home_page": "",
+      "maintainer": "",
+      "maintainer_email": "Seth Michael Larson <sethmichaellarson@gmail.com>, Quentin Pradet <quentin@pradet.me>, Illia Volochii <illia.volochii@gmail.com>",
+      "project_urls": {
+        "Changelog": "https://github.com/urllib3/urllib3/blob/main/CHANGES.rst",
+        "Code": "https://github.com/urllib3/urllib3",
+        "Documentation": "https://urllib3.readthedocs.io",
+        "Issue tracker": "https://github.com/urllib3/urllib3/issues"
+      }
+    }
+  }
+}

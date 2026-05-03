@@ -1,0 +1,28 @@
+{
+  "direct_deps": {
+    "boto3": {
+      "author": "Amazon Web Services",
+      "author_email": "",
+      "home_page": "https://github.com/boto/boto3",
+      "maintainer": "",
+      "maintainer_email": "",
+      "project_urls": {
+        "Documentation": "https://docs.aws.amazon.com/boto3/latest/",
+        "Homepage": "https://github.com/boto/boto3",
+        "Source": "https://github.com/boto/boto3"
+      }
+    },
+    "python-dateutil": {
+      "author": "Gustavo Niemeyer",
+      "author_email": "gustavo@niemeyer.net",
+      "home_page": "https://github.com/dateutil/dateutil",
+      "maintainer": "Paul Ganssle",
+      "maintainer_email": "dateutil@python.org",
+      "project_urls": {
+        "Documentation": "https://dateutil.readthedocs.io/en/stable/",
+        "Homepage": "https://github.com/dateutil/dateutil",
+        "Source": "https://github.com/dateutil/dateutil"
+      }
+    }
+  }
+}

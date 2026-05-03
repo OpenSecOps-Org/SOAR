@@ -1,0 +1,37 @@
+{
+  "direct_deps": {
+    "beautifulsoup4": {
+      "author": "",
+      "author_email": "Leonard Richardson <leonardr@segfault.org>",
+      "home_page": "",
+      "maintainer": "",
+      "maintainer_email": "",
+      "project_urls": {
+        "Download": "https://www.crummy.com/software/BeautifulSoup/bs4/download/",
+        "Homepage": "https://www.crummy.com/software/BeautifulSoup/bs4/"
+      }
+    },
+    "boto3": {
+      "author": "Amazon Web Services",
+      "author_email": "",
+      "home_page": "https://github.com/boto/boto3",
+      "maintainer": "",
+      "maintainer_email": "",
+      "project_urls": {
+        "Documentation": "https://docs.aws.amazon.com/boto3/latest/",
+        "Homepage": "https://github.com/boto/boto3",
+        "Source": "https://github.com/boto/boto3"
+      }
+    },
+    "html2text": {
+      "author": "",
+      "author_email": "Aaron Swartz <me@aaronsw.com>",
+      "home_page": "",
+      "maintainer": "",
+      "maintainer_email": "Alireza Savand <alireza.savand@gmail.com>",
+      "project_urls": {
+        "Homepage": "https://github.com/Alir3z4/html2text/"
+      }
+    }
+  }
+}

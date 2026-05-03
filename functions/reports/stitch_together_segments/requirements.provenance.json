@@ -1,0 +1,16 @@
+{
+  "direct_deps": {
+    "boto3": {
+      "author": "Amazon Web Services",
+      "author_email": "",
+      "home_page": "https://github.com/boto/boto3",
+      "maintainer": "",
+      "maintainer_email": "",
+      "project_urls": {
+        "Documentation": "https://docs.aws.amazon.com/boto3/latest/",
+        "Homepage": "https://github.com/boto/boto3",
+        "Source": "https://github.com/boto/boto3"
+      }
+    }
+  }
+}

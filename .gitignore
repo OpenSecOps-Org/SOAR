@@ -2,13 +2,14 @@
 .vscode
 .pytest_cache
 
+# Personal Claude Code workspace files (per-maintainer, not shared).
+CLAUDE.md
+.claude
+
 samconfig*
 !samconfig*.example
 
 /apps/
-
-CLAUDE.md
-.claude
 
 
 # Created by https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode

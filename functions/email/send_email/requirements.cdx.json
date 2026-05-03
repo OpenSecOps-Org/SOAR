@@ -1,0 +1,340 @@
+{
+  "components": [
+    {
+      "bom-ref": "requirements-L3",
+      "description": "requirements line 3: boto3==1.42.94     --hash=sha256:56d53bce75629cc7c78a32da8b62de74cee3e2a3d54a2b60ba1a65f9f1b129da     --hash=sha256:5b6056a661c19e974aaea3cb97690ddbe30d10c31e4f887df3bff06574f34510",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "56d53bce75629cc7c78a32da8b62de74cee3e2a3d54a2b60ba1a65f9f1b129da"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "5b6056a661c19e974aaea3cb97690ddbe30d10c31e4f887df3bff06574f34510"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/boto3/"
+        }
+      ],
+      "name": "boto3",
+      "purl": "pkg:pypi/boto3@1.42.94",
+      "type": "library",
+      "version": "1.42.94"
+    },
+    {
+      "bom-ref": "requirements-L7",
+      "description": "requirements line 7: botocore==1.42.97     --hash=sha256:5c0bb00e32d16ff6d278cc8c9e10dc3672d9c1d569031635ac3c908a60de8310     --hash=sha256:77d2c8ce1bc592d3fbd7c01c35836f4a5b0cac2ca03ccdf6ffc60faa16b5fadc",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "5c0bb00e32d16ff6d278cc8c9e10dc3672d9c1d569031635ac3c908a60de8310"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "77d2c8ce1bc592d3fbd7c01c35836f4a5b0cac2ca03ccdf6ffc60faa16b5fadc"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/botocore/"
+        }
+      ],
+      "name": "botocore",
+      "purl": "pkg:pypi/botocore@1.42.97",
+      "type": "library",
+      "version": "1.42.97"
+    },
+    {
+      "bom-ref": "requirements-L13",
+      "description": "requirements line 13: html2text==2025.4.15     --hash=sha256:00569167ffdab3d7767a4cdf589b7f57e777a5ed28d12907d8c58769ec734acc     --hash=sha256:948a645f8f0bc3abe7fd587019a2197a12436cd73d0d4908af95bfc8da337588",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "00569167ffdab3d7767a4cdf589b7f57e777a5ed28d12907d8c58769ec734acc"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "948a645f8f0bc3abe7fd587019a2197a12436cd73d0d4908af95bfc8da337588"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/html2text/"
+        }
+      ],
+      "name": "html2text",
+      "purl": "pkg:pypi/html2text@2025.4.15",
+      "type": "library",
+      "version": "2025.4.15"
+    },
+    {
+      "bom-ref": "requirements-L17",
+      "description": "requirements line 17: jmespath==1.1.0     --hash=sha256:472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d     --hash=sha256:a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/jmespath/"
+        }
+      ],
+      "name": "jmespath",
+      "purl": "pkg:pypi/jmespath@1.1.0",
+      "type": "library",
+      "version": "1.1.0"
+    },
+    {
+      "bom-ref": "requirements-L23",
+      "description": "requirements line 23: python-dateutil==2.9.0.post0     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3     --hash=sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/python-dateutil/"
+        }
+      ],
+      "name": "python-dateutil",
+      "purl": "pkg:pypi/python-dateutil@2.9.0.post0",
+      "type": "library",
+      "version": "2.9.0.post0"
+    },
+    {
+      "bom-ref": "requirements-L27",
+      "description": "requirements line 27: s3transfer==0.16.1     --hash=sha256:61bcd00ccb83b21a0fe7e91a553fff9729d46c83b4e0106e7c314a733891f7c2     --hash=sha256:8e424355754b9ccb32467bdc568edf55be82692ef2002d934b1311dbb3b9e524",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "61bcd00ccb83b21a0fe7e91a553fff9729d46c83b4e0106e7c314a733891f7c2"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "8e424355754b9ccb32467bdc568edf55be82692ef2002d934b1311dbb3b9e524"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/s3transfer/"
+        }
+      ],
+      "name": "s3transfer",
+      "purl": "pkg:pypi/s3transfer@0.16.1",
+      "type": "library",
+      "version": "0.16.1"
+    },
+    {
+      "bom-ref": "requirements-L31",
+      "description": "requirements line 31: six==1.17.0     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/six/"
+        }
+      ],
+      "name": "six",
+      "purl": "pkg:pypi/six@1.17.0",
+      "type": "library",
+      "version": "1.17.0"
+    },
+    {
+      "bom-ref": "requirements-L35",
+      "description": "requirements line 35: urllib3==2.6.3     --hash=sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed     --hash=sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4",
+      "externalReferences": [
+        {
+          "comment": "implicit dist url",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed"
+            },
+            {
+              "alg": "SHA-256",
+              "content": "bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4"
+            }
+          ],
+          "type": "distribution",
+          "url": "https://pypi.org/simple/urllib3/"
+        }
+      ],
+      "name": "urllib3",
+      "purl": "pkg:pypi/urllib3@2.6.3",
+      "type": "library",
+      "version": "2.6.3"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "requirements-L13"
+    },
+    {
+      "ref": "requirements-L17"
+    },
+    {
+      "ref": "requirements-L23"
+    },
+    {
+      "ref": "requirements-L27"
+    },
+    {
+      "ref": "requirements-L3"
+    },
+    {
+      "ref": "requirements-L31"
+    },
+    {
+      "ref": "requirements-L35"
+    },
+    {
+      "ref": "requirements-L7"
+    }
+  ],
+  "metadata": {
+    "timestamp": "1970-01-01T00:00:00+00:00",
+    "tools": {
+      "components": [
+        {
+          "description": "CycloneDX Software Bill of Materials (SBOM) generator for Python projects and environments",
+          "externalReferences": [
+            {
+              "type": "build-system",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/actions"
+            },
+            {
+              "type": "distribution",
+              "url": "https://pypi.org/project/cyclonedx-bom/"
+            },
+            {
+              "type": "documentation",
+              "url": "https://cyclonedx-bom-tool.readthedocs.io/"
+            },
+            {
+              "type": "issue-tracker",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/issues"
+            },
+            {
+              "type": "license",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/blob/main/LICENSE"
+            },
+            {
+              "type": "release-notes",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/blob/main/CHANGELOG.md"
+            },
+            {
+              "type": "vcs",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/"
+            },
+            {
+              "type": "website",
+              "url": "https://github.com/CycloneDX/cyclonedx-python/#readme"
+            }
+          ],
+          "group": "CycloneDX",
+          "licenses": [
+            {
+              "license": {
+                "acknowledgement": "declared",
+                "id": "Apache-2.0"
+              }
+            }
+          ],
+          "name": "cyclonedx-py",
+          "type": "application",
+          "version": "7.3.0"
+        },
+        {
+          "description": "Python library for CycloneDX",
+          "externalReferences": [
+            {
+              "type": "build-system",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/actions"
+            },
+            {
+              "type": "distribution",
+              "url": "https://pypi.org/project/cyclonedx-python-lib/"
+            },
+            {
+              "type": "documentation",
+              "url": "https://cyclonedx-python-library.readthedocs.io/"
+            },
+            {
+              "type": "issue-tracker",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/issues"
+            },
+            {
+              "type": "license",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/LICENSE"
+            },
+            {
+              "type": "release-notes",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/blob/main/CHANGELOG.md"
+            },
+            {
+              "type": "vcs",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib"
+            },
+            {
+              "type": "website",
+              "url": "https://github.com/CycloneDX/cyclonedx-python-lib/#readme"
+            }
+          ],
+          "group": "CycloneDX",
+          "licenses": [
+            {
+              "license": {
+                "acknowledgement": "declared",
+                "id": "Apache-2.0"
+              }
+            }
+          ],
+          "name": "cyclonedx-python-lib",
+          "type": "library",
+          "version": "11.7.0"
+        }
+      ]
+    }
+  },
+  "serialNumber": "urn:uuid:05ae976d-7123-539e-91d9-077996619ac3",
+  "version": 1,
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6"
+}

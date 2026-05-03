@@ -1,10 +1,18 @@
 # Change Log
 
+## v3.0.0
+    * BREAKING: removed OpenAI direct integration; AIProvider allowed values are now BEDROCK and NONE. Installs using AIProvider=OPENAI must switch to BEDROCK before upgrading.
+    * Removed 4 ChatGPT* CFN parameters, 2 SSM parameter resources (ChatGPTOrganizationId, ChatGPTAPIKey), and 4 CHATGPT_* Lambda env vars from template.yaml
+    * All Lambda function Python dependencies are now pinned to exact versions and verified by SHA-256 hash at install time (deterministic, reproducible builds across every function).
+    * AWS Marketplace permissions added to the QueryAI function, so it can manage new model subscriptions transparently.
+    * Added `SECURITY.md` at the SOAR root, documenting the supply-chain posture, governance model, vulnerability-reporting channel, and CVE response SLA.
+    * GitHub Releases now include a CycloneDX SBOM as a downloadable asset (`SOAR-<VERSION>-sbom.cdx.json`). Customers and intake reviewers can verify the dependency tree without cloning.
+    * **Action required**: pull the Installer first and apply the `apps/soar/parameters.toml` edits documented in its v3.0.0 entry — delete the 4 deprecated `ChatGPT*` lines and switch `AIProvider` from `"OPENAI"` to `"BEDROCK"` (or `"NONE"`). Without those edits the deploy will fail because `template.yaml` no longer accepts the `ChatGPT*` parameters.
+
 ## v2.5.0
     * Security: closes 5 CVEs (requests CVE-2026-25645; urllib3 CVE-2025-50181, CVE-2025-66418, CVE-2025-66471, CVE-2026-21441)
     * Removed orphan requests/urllib3 pins from ai/query_ai and ai/ai-prompts-syncer (declared but never imported)
     * Bumped requests>=2.33.0 and urllib3>=2.6.3 in ticketing/open_ticket, ticketing/close_ticket, ticketing/save_to_ms_sentinel
-    * 604/604 tests pass, zero regressions
 
 ## v2.4.21
     * Fixed bug: determine_type incorrectly suppressed incidents carrying Compliance metadata without SecurityControlId, causing reassigned findings from the Account Reassignment Preprocessor to silently disappear
@@ -22,7 +30,6 @@
     * AWS changed from ARCHIVING fixed findings to keeping them ACTIVE with NOTIFIED+PASSED status
     * Refactored get_ticket_and_decide with consolidated "is resolved" logic
     * Added 11 comprehensive tests covering all code paths
-    * Zero regressions (566/566 tests pass)
 
 ## v2.4.17
     * Updated RDS.4 to never delete any empty snapshot, due to unreliable Security HYub size data for Aurora clusters.

@@ -463,9 +463,8 @@ Parameters:
     Default: BEDROCK
     AllowedValues:
       - BEDROCK
-      - OPENAI
       - NONE
-    Description: The AI provider to use (BEDROCK, OPENAI, or NONE)
+    Description: The AI provider to use (BEDROCK or NONE)
 
   AIIaCSnippets:
     Type: String
@@ -523,26 +522,6 @@ Parameters:
     Type: String
     Description: The recipient or recipients of the weekly AI-based security report.
     Default: ''
-
-  ChatGPTDefaultModel:
-    Type: String
-    Description: The GPT model to use by default.
-    Default: 'gpt-4o'
-
-  ChatGPTFallbackModel:
-    Type: String
-    Description: The fallback GPT model.
-    Default: 'gpt-3.5-turbo-16k'
-
-  ChatGPTOrganizationIdParameterPath:
-    Type: String
-    Description: The ChatGPT Organization ID.
-    Default: '/soar/chatgpt/organization-id'
-
-  ChatGPTAPIKeyParameterPath:
-    Type: String
-    Description: The ChatGPT API key.
-    Default: '/soar/chatgpt/api-key'
 
   BedrockRegion:
     Type: String
@@ -709,29 +688,6 @@ Resources:
       Type: String
       Value: REPLACE_ME # Don't replace here, use the console or the CLI
       Description: The Microsoft Sentinel log type.
-
-
-  #-------------------------------------------------------------------------------
-  #
-  # Parameter Store for ChatGPT credentials
-  #
-  #-------------------------------------------------------------------------------
-  
-  ChatGPTOrganizationId:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Ref ChatGPTOrganizationIdParameterPath
-      Type: String
-      Value: REPLACE_ME # Don't replace here, use the console or the CLI
-      Description: The ChatGPT Organization ID.
-
-  ChatGPTAPIKey:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Ref ChatGPTAPIKeyParameterPath
-      Type: String
-      Value: REPLACE_ME # Don't replace here, use the console or the CLI
-      Description: The ChatGPT API key.
 
 
   #-------------------------------------------------------------------------------
@@ -1720,6 +1676,13 @@ Resources:
               Action:
                 - bedrock:InvokeModel
               Resource: '*'
+            -
+              Sid: MarketplacePermissions
+              Effect: Allow
+              Action:
+                - aws-marketplace:ViewSubscriptions
+                - aws-marketplace:Subscribe
+              Resource: '*'
       Environment:
         Variables:
           AI_PROVIDER: !Ref AIProvider
@@ -1730,14 +1693,10 @@ Resources:
           AI_REMOVE_EMAIL_ADDRESSES: !Ref AIRemoveEmailAddresses
           BEDROCK_REGION: !Ref BedrockRegion
           BEDROCK_MODEL: !Ref BedrockModel
-          CHATGPT_DEFAULT_MODEL: !Ref ChatGPTDefaultModel
-          CHATGPT_FALLBACK_MODEL: !Ref ChatGPTFallbackModel
-          CHATGPT_ORGANIZATION_ID_PARAMETER_PATH: !Ref ChatGPTOrganizationIdParameterPath
-          CHATGPT_API_KEY_PARAMETER_PATH: !Ref ChatGPTAPIKeyParameterPath
           SNS_TOPIC_ARN: !Ref ExternalCallFailureSNSTopic
 
 
-  # External services such as OpenAI and Microsoft Sentinel must not create incidents or
+  # External services such as Microsoft Sentinel must not create incidents or
   # SOAR failures. Instead, we send a message to this SNS topic when errors involving
   # external services occur.
   ExternalCallFailureSNSTopic:
