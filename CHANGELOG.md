@@ -1,5 +1,8 @@
 # Change Log
 
+## v3.1.0
+    * Removed pandas and numpy from SOAR. The only use was list-of-dicts → CSV in two report functions, replaced by a 6-line `csv.DictWriter` helper. Smaller bundles, faster cold starts, no manylinux/cross-platform build complexity.
+
 ## v3.0.3
     * Pinned pandas to <2.3.3 to keep `manylinux2014_x86_64` wheel compatibility for cross-platform SAM builds (Apple Silicon → x86_64 Lambda).
 

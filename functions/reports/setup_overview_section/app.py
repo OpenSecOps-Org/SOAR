@@ -1,13 +1,29 @@
+import csv
+import io
 import os
 import datetime as dt
 import boto3
 from datetime import datetime, timezone, timedelta, date
 from dateutil import parser
-import pandas as pd
 import humanize
 from collections import defaultdict
 import json
 import decimal
+
+
+def dict_list_to_csv(records):
+    """Convert list-of-dicts to a CSV string with header row.
+    Byte-equivalent to pd.DataFrame(records).to_csv(index=False) for the
+    scalar-typed records this module produces (str, int, bool, Decimal).
+    Empty input returns '\\n' to match pandas.
+    """
+    if not records:
+        return "\n"
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=list(records[0].keys()), lineterminator='\n')
+    writer.writeheader()
+    writer.writerows(records)
+    return buf.getvalue()
 
 
 # Get environment variables
@@ -209,9 +225,9 @@ def lambda_handler(data, _context):
 
 
     # Convert to CSV for compactness, to save tokens.
-    TW_open_tickets_redux = pd.DataFrame(TW_open_tickets_redux).to_csv(index=False)
-    TW_autoremediations_redux = pd.DataFrame(TW_autoremediations_redux).to_csv(index=False)
-    TW_incidents_redux = pd.DataFrame(TW_incidents_redux).to_csv(index=False)
+    TW_open_tickets_redux = dict_list_to_csv(TW_open_tickets_redux)
+    TW_autoremediations_redux = dict_list_to_csv(TW_autoremediations_redux)
+    TW_incidents_redux = dict_list_to_csv(TW_incidents_redux)
 
     # Modify the input and return it
     data['bb']['n_accounts'] = n_accounts

@@ -1,11 +1,27 @@
+import csv
+import io
 import os
 import boto3
 from datetime import datetime, timezone, timedelta
 from dateutil import parser
-import pandas as pd
 import humanize
 import json
 import decimal
+
+
+def dict_list_to_csv(records):
+    """Convert list-of-dicts to a CSV string with header row.
+    Byte-equivalent to pd.DataFrame(records).to_csv(index=False) for the
+    scalar-typed records this module produces (str, int, bool, Decimal).
+    Empty input returns '\\n' to match pandas.
+    """
+    if not records:
+        return "\n"
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=list(records[0].keys()), lineterminator='\n')
+    writer.writeheader()
+    writer.writerows(records)
+    return buf.getvalue()
 
 
 # Get environment variables
@@ -115,9 +131,9 @@ def lambda_handler(data, _context):
     LW_n_incidents = len(LW_incidents)
 
     # Convert to CSV for compactness, to save tokens.
-    TW_open_tickets = pd.DataFrame(TW_open_tickets).to_csv(index=False)
-    TW_autoremediations = pd.DataFrame(TW_autoremediations).to_csv(index=False)
-    TW_incidents = pd.DataFrame(TW_incidents).to_csv(index=False)
+    TW_open_tickets = dict_list_to_csv(TW_open_tickets)
+    TW_autoremediations = dict_list_to_csv(TW_autoremediations)
+    TW_incidents = dict_list_to_csv(TW_incidents)
 
     # Prepare the return data
     data['messages']['report']['html'] = ''

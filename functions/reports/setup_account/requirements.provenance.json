@@ -26,33 +26,6 @@
         "Release notes": "https://github.com/python-humanize/humanize/releases",
         "Source": "https://github.com/python-humanize/humanize"
       }
-    },
-    "numpy": {
-      "author": "Travis E. Oliphant et al.",
-      "author_email": "",
-      "home_page": "",
-      "maintainer": "",
-      "maintainer_email": "NumPy Developers <numpy-discussion@python.org>",
-      "project_urls": {
-        "documentation": "https://numpy.org/doc/",
-        "download": "https://pypi.org/project/numpy/#files",
-        "homepage": "https://numpy.org",
-        "release notes": "https://numpy.org/doc/stable/release",
-        "source": "https://github.com/numpy/numpy",
-        "tracker": "https://github.com/numpy/numpy/issues"
-      }
-    },
-    "pandas": {
-      "author": "",
-      "author_email": "The Pandas Development Team <pandas-dev@python.org>",
-      "home_page": "",
-      "maintainer": "",
-      "maintainer_email": "",
-      "project_urls": {
-        "documentation": "https://pandas.pydata.org/docs/",
-        "homepage": "https://pandas.pydata.org",
-        "repository": "https://github.com/pandas-dev/pandas"
-      }
     }
   }
 }
