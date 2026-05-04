@@ -72,7 +72,7 @@ fi
 # now takes minutes (full hash-integrity download per dep + per-function
 # CycloneDX SBOM generation). Timer per phase records wallclock elapsed
 # so regressions in any one phase are noticed.
-PHASE_TOTAL=4
+PHASE_TOTAL=5
 phase_start=0
 phase_banner() {
     # phase_banner <N> <description>
@@ -124,8 +124,11 @@ fi
 SBOM_TMP_DIR=""
 SBOM_PATH=""
 EVIDENCE_PATH=""
+PROVENANCE_PATH=""
+SIGNED_BUNDLES=()
 GH_AVAILABLE=false
 GH_AUTHED=false
+COSIGN_AVAILABLE=false
 
 if [[ "$REPO_IS_CONVERTED" == true ]]; then
     # ----- Converted-repo path: full Phase 6 flow -------------------------
@@ -136,9 +139,15 @@ if [[ "$REPO_IS_CONVERTED" == true ]]; then
     phase_banner 1 "supply-chain release gate (drift / CVE / hash / OSV / provenance / SECURITY.md)"
 
     if [[ -x scripts/_check-requirements.sh ]]; then
-        if ! scripts/_check-requirements.sh; then
+        # --reproducible: drift check uses a clean uv cache and the
+        # committed `# uv-compiled-at:` timestamp as `--exclude-newer`,
+        # so the gate verifies the lock is bit-reproducible from .in +
+        # pinned uv + clean cache + timestamp (the §4.11 cat. 3 property).
+        # The default-mode drift check trusts the maintainer's cache and
+        # is fine for interactive use, but ./publish needs the strict form.
+        if ! scripts/_check-requirements.sh --reproducible; then
             echo
-            echo "Supply-chain gate FAILED: drift, CVE, or hash mismatch detected above."
+            echo "Supply-chain gate FAILED: drift, CVE, hash, malware, or reproducibility issue detected above."
             echo "  → fix the issues, recompile (./compile-requirements), recommit, and retry."
             exit 1
         fi
@@ -168,10 +177,11 @@ if [[ "$REPO_IS_CONVERTED" == true ]]; then
     #   - evidence tarball (the per-function .cdx.json + .provenance.json
     #     witnesses; what a CycloneDX-mature deep review consumes for
     #     per-function audit)
-    phase_banner 2 "release artefact emission (SBOM + evidence)"
+    phase_banner 2 "release artefact emission (SBOM + evidence + provenance)"
     SBOM_TMP_DIR=$(mktemp -d -t opensecops-publish-XXXXXX)
     SBOM_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json"
     EVIDENCE_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-evidence.tar.gz"
+    PROVENANCE_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-provenance.intoto.json"
     trap 'rm -rf "$SBOM_TMP_DIR"' EXIT
 
     if [[ -x scripts/_aggregate-sbom.sh ]]; then
@@ -208,6 +218,30 @@ if [[ "$REPO_IS_CONVERTED" == true ]]; then
         echo "      Refresh this repo from the Installer to enable evidence bundling."
         EVIDENCE_PATH=""
     fi
+
+    # SLSA Build L1 in-toto provenance — must run AFTER SBOM + evidence
+    # because both are subjects of the provenance document (their
+    # SHA-256 digests appear in the in-toto Statement's `subject` array).
+    # The provenance closes §4.11 cat. 4 (gate-execution attestation,
+    # direct closure) — a signed declaration of which build steps ran
+    # for this release.
+    if [[ -x scripts/_generate-provenance.sh && -n "$SBOM_PATH" ]]; then
+        SUBJECTS=("$SBOM_PATH")
+        [[ -n "$EVIDENCE_PATH" ]] && SUBJECTS+=("$EVIDENCE_PATH")
+        if ! scripts/_generate-provenance.sh \
+                --component "$COMPONENT_NAME" \
+                --version   "$TAG_VERSION" \
+                --output    "$PROVENANCE_PATH" \
+                "${SUBJECTS[@]}"; then
+            echo
+            echo "Provenance generation FAILED — see output above."
+            exit 1
+        fi
+    else
+        echo "Note: scripts/_generate-provenance.sh not present — skipping SLSA provenance."
+        echo "      Refresh this repo from the Installer to enable provenance generation."
+        PROVENANCE_PATH=""
+    fi
     phase_done
 
     # --- gh auth precheck (warn-only in dry-run, hard-fail in real run) ---
@@ -216,6 +250,11 @@ if [[ "$REPO_IS_CONVERTED" == true ]]; then
         if gh auth status --hostname github.com >/dev/null 2>&1; then
             GH_AUTHED=true
         fi
+    fi
+
+    # --- cosign precheck (warn-only in dry-run, hard-fail in real run) ----
+    if command -v cosign >/dev/null 2>&1; then
+        COSIGN_AVAILABLE=true
     fi
 else
     # ----- Unconverted-repo path: oldtime publish -------------------------
@@ -244,8 +283,14 @@ if [[ "$DRY_RUN" == true ]]; then
             echo "              tag:    $TAG_VERSION"
             echo "              body:   CHANGELOG slice for $TAG_VERSION + Full-Changelog compare link"
             echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json"
+            echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json.bundle  (Sigstore signature)"
             if [[ -n "$EVIDENCE_PATH" ]]; then
                 echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-evidence.tar.gz"
+                echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-evidence.tar.gz.bundle  (Sigstore signature)"
+            fi
+            if [[ -n "$PROVENANCE_PATH" ]]; then
+                echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-provenance.intoto.json  (SLSA Build L1)"
+                echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-provenance.intoto.json.bundle  (Sigstore signature)"
             fi
         fi
     fi
@@ -257,12 +302,20 @@ if [[ "$DRY_RUN" == true ]]; then
         echo "  Generated:  $EVIDENCE_PATH"
         echo "              (size: $(wc -c < "$EVIDENCE_PATH" | tr -d ' ') bytes; cleaned on exit)"
     fi
+    if [[ -n "$PROVENANCE_PATH" ]]; then
+        echo "  Generated:  $PROVENANCE_PATH"
+        echo "              (size: $(wc -c < "$PROVENANCE_PATH" | tr -d ' ') bytes; cleaned on exit)"
+    fi
     if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
         if [[ "$GH_AVAILABLE" != true ]]; then
             echo "  WARNING:    gh CLI not on PATH — required for GitHub Release creation."
             echo "              install: https://cli.github.com/"
         elif [[ "$GH_AUTHED" != true ]]; then
             echo "  WARNING:    gh CLI present but not authenticated — run \`gh auth login\`."
+        fi
+        if [[ "$COSIGN_AVAILABLE" != true ]]; then
+            echo "  WARNING:    cosign not on PATH — required for Sigstore signing of release artefacts."
+            echo "              install: brew install cosign  (macOS)  |  https://docs.sigstore.dev/cosign/installation/"
         fi
     fi
     echo
@@ -286,6 +339,12 @@ if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
     if [[ "$GH_AUTHED" != true ]]; then
         echo "Error: gh CLI not authenticated against github.com."
         echo "  → run: gh auth login --hostname github.com --scopes repo"
+        exit 1
+    fi
+    if [[ "$COSIGN_AVAILABLE" != true ]]; then
+        echo "Error: cosign not on PATH — required to sign release artefacts."
+        echo "  → install: brew install cosign  (macOS)"
+        echo "             or see https://docs.sigstore.dev/cosign/installation/"
         exit 1
     fi
 fi
@@ -313,8 +372,52 @@ cleanup() {
 # tmp-only trap with one that also restores the working branch).
 trap cleanup EXIT
 
+# --- Phase 3: Sigstore signing of release artefacts ----------------------
+# Signs SBOM + evidence tarball via `cosign sign-blob --yes` using the
+# maintainer's GitHub OIDC identity (keyless, ephemeral cert minted by
+# Fulcio per signing event, transparency-logged in Rekor). Each artefact
+# gets a self-contained `<artefact>.bundle` (cert + sig + Rekor entry)
+# attached as an additional release asset; customers verify with
+# `cosign verify-blob --bundle <artefact>.bundle <artefact>` against the
+# valid release-signing identities published in SECURITY.md §7.
+#
+# Note: each cosign sign-blob invocation triggers a fresh OIDC
+# round-trip (device flow with code prompt), so signing two artefacts
+# means two browser/device-code interactions per release. This is a
+# known cosign 3.x ergonomic; no in-process token cache is exposed.
+if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
+    SIGN_TARGETS=()
+    [[ -n "$SBOM_PATH"       ]] && SIGN_TARGETS+=("$SBOM_PATH")
+    [[ -n "$EVIDENCE_PATH"   ]] && SIGN_TARGETS+=("$EVIDENCE_PATH")
+    [[ -n "$PROVENANCE_PATH" ]] && SIGN_TARGETS+=("$PROVENANCE_PATH")
+
+    if [[ ${#SIGN_TARGETS[@]} -gt 0 ]]; then
+        phase_banner 3 "sign release artefacts (Sigstore keyless OIDC)"
+        echo "  identity captured from your GitHub OIDC login;"
+        echo "  device-flow code will print below — open the URL and approve."
+        for target in "${SIGN_TARGETS[@]}"; do
+            bundle="${target}.bundle"
+            echo
+            echo "  ── signing $(basename "$target") ──"
+            if ! cosign sign-blob --yes --bundle "$bundle" "$target"; then
+                echo
+                echo "Error: cosign sign-blob failed for $(basename "$target")."
+                echo "  → check OIDC auth, network connectivity, and Sigstore status."
+                echo "    Sigstore status: https://status.sigstore.dev/"
+                exit 1
+            fi
+            if [[ ! -s "$bundle" ]]; then
+                echo "Error: cosign produced no bundle file at $bundle"
+                exit 1
+            fi
+            SIGNED_BUNDLES+=("$bundle")
+        done
+        phase_done
+    fi
+fi
+
 if [[ "$REPO_IS_CONVERTED" == true ]]; then
-    phase_banner 3 "build releases branch + tag + push to remotes"
+    phase_banner 4 "build releases branch + tag + push to remotes"
 else
     # Oldtime publish — single phase, no [N/M] framing.
     phase_start=$SECONDS
@@ -379,7 +482,7 @@ phase_done
 # version + auto-appended Full-Changelog compare link when a prior tag
 # exists on the OpenSecOps remote.
 if [[ "$HAS_OPENSECOPS_REMOTE" == true && -n "$SBOM_PATH" ]]; then
-    phase_banner 4 "create GitHub Release + upload SBOM asset"
+    phase_banner 5 "create GitHub Release + upload SBOM + signature assets"
     OWNER_REPO="OpenSecOps-Org/${COMPONENT_NAME}"
     NOTES_FILE="${SBOM_TMP_DIR}/release-notes.md"
 
@@ -442,13 +545,21 @@ PYEOF
         } >> "$NOTES_FILE"
     fi
 
-    # Assets: aggregate SBOM (always) + evidence tarball (when present).
+    # Assets: aggregate SBOM (always) + evidence tarball (when present),
+    # each accompanied by its Sigstore .bundle (Phase 3 signing output).
     # Evidence is the per-function deep-audit witness set; SBOM is the
-    # component-level inventory summary. Both ship as release assets.
+    # component-level inventory summary; the .bundle alongside each is
+    # what the customer's `cosign verify-blob` consumes.
     RELEASE_ASSETS=("$SBOM_PATH")
     if [[ -n "$EVIDENCE_PATH" ]]; then
         RELEASE_ASSETS+=("$EVIDENCE_PATH")
     fi
+    if [[ -n "$PROVENANCE_PATH" ]]; then
+        RELEASE_ASSETS+=("$PROVENANCE_PATH")
+    fi
+    for bundle in "${SIGNED_BUNDLES[@]}"; do
+        RELEASE_ASSETS+=("$bundle")
+    done
 
     echo
     echo "── Creating GitHub Release on ${OWNER_REPO} ──"

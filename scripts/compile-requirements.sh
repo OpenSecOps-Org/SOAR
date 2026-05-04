@@ -86,7 +86,23 @@ for in_file in "${IN_FILES[@]}"; do
         failures=$((failures + 1))
         continue
     fi
-    req_lib_ok "  ✓ compiled → ${txt_file}"
+
+    # 1a. Insert a reproducibility timestamp as line 3 of the lock.
+    #     `_check-requirements.sh --reproducible` reads this back as the
+    #     `--exclude-newer` fence: any second machine recompiling later
+    #     in time can pin the candidate set to packages uploaded on or
+    #     before this moment, eliminating spurious drift caused by newer
+    #     PyPI uploads inside declared version ranges. uv does not emit
+    #     this header itself; we post-process it in.
+    ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    {
+        sed -n '1,2p' "$txt_file"
+        printf '# uv-compiled-at: %s\n' "$ts"
+        sed -n '3,$p' "$txt_file"
+    } > "${txt_file}.uvh.tmp"
+    mv "${txt_file}.uvh.tmp" "$txt_file"
+
+    req_lib_ok "  ✓ compiled → ${txt_file}  (uv-compiled-at: ${ts})"
 
     # 2. pip-audit (informational here; release-gate is check-requirements.sh)
     if uvx pip-audit --strict --disable-pip --requirement "$txt_file" \

@@ -1,8 +1,8 @@
 {
   "components": [
     {
-      "bom-ref": "requirements-L3",
-      "description": "requirements line 3: beautifulsoup4==4.14.3     --hash=sha256:0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb     --hash=sha256:6292b1c5186d356bba669ef9f7f051757099565ad9ada5dd630bd9de5fa7fb86",
+      "bom-ref": "requirements-L4",
+      "description": "requirements line 4: beautifulsoup4==4.14.3     --hash=sha256:0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb     --hash=sha256:6292b1c5186d356bba669ef9f7f051757099565ad9ada5dd630bd9de5fa7fb86",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -26,8 +26,8 @@
       "version": "4.14.3"
     },
     {
-      "bom-ref": "requirements-L7",
-      "description": "requirements line 7: soupsieve==2.8.3     --hash=sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349     --hash=sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95",
+      "bom-ref": "requirements-L8",
+      "description": "requirements line 8: soupsieve==2.8.3     --hash=sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349     --hash=sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -51,8 +51,8 @@
       "version": "2.8.3"
     },
     {
-      "bom-ref": "requirements-L11",
-      "description": "requirements line 11: typing-extensions==4.15.0     --hash=sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466     --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548",
+      "bom-ref": "requirements-L12",
+      "description": "requirements line 12: typing-extensions==4.15.0     --hash=sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466     --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548",
       "externalReferences": [
         {
           "comment": "implicit dist url",
@@ -78,13 +78,13 @@
   ],
   "dependencies": [
     {
-      "ref": "requirements-L11"
+      "ref": "requirements-L12"
     },
     {
-      "ref": "requirements-L3"
+      "ref": "requirements-L4"
     },
     {
-      "ref": "requirements-L7"
+      "ref": "requirements-L8"
     }
   ],
   "metadata": {
@@ -192,7 +192,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:a99486ce-d094-5b62-aa44-d904e731263c",
+  "serialNumber": "urn:uuid:1047ed2f-9a1e-5246-aec8-2b8bcddea333",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",

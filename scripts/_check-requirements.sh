@@ -126,10 +126,12 @@ source "$SCRIPT_DIR/_requirements_lib.sh"
 
 # --- Argument parsing -----------------------------------------------------
 PUBLIC_LOG=0
+REPRODUCIBLE=0
 ROOT="."
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --public-log) PUBLIC_LOG=1; shift ;;
+        --public-log)   PUBLIC_LOG=1; shift ;;
+        --reproducible) REPRODUCIBLE=1; shift ;;
         -h|--help)
             sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
             exit 0 ;;
@@ -207,7 +209,11 @@ emit_sensitive() {
 }
 
 # --- Walk -----------------------------------------------------------------
-req_lib_info "check-requirements: scanning ${ROOT} for requirements.in files (mode: $([[ $PUBLIC_LOG -eq 1 ]] && echo public-log || echo full))"
+_mode_label="full"
+[[ $PUBLIC_LOG   -eq 1 ]] && _mode_label="public-log"
+[[ $REPRODUCIBLE -eq 1 ]] && _mode_label="${_mode_label}+reproducible"
+req_lib_info "check-requirements: scanning ${ROOT} for requirements.in files (mode: ${_mode_label})"
+unset _mode_label
 
 IN_FILES=()
 while IFS= read -r _f; do
@@ -246,36 +252,93 @@ for in_file in "${IN_FILES[@]}"; do
         continue
     fi
 
-    # 1. DRIFT — seed-from-committed-lock recompile, then diff.
+    # 1. DRIFT — recompile-and-diff. Two modes:
+    #
+    #   default: seed from committed lock + trust maintainer's uv cache.
+    #     Fast; catches "forgot to recompile after editing .in" and
+    #     "someone hand-edited a hash in the lock". Used by every
+    #     interactive run of this script and by compile-requirements.sh
+    #     informationally.
+    #
+    #   --reproducible: clean uv cache + `--exclude-newer <ts>` fence,
+    #     where <ts> is the `# uv-compiled-at:` header committed in the
+    #     lock. Stricter; verifies that any second machine producing the
+    #     same lock from .in + pinned uv version + clean cache + recorded
+    #     timestamp gets bit-identical output. This is the §4.11 cat. 3
+    #     gate-derivation reproducibility property; ./publish runs in
+    #     this mode at release time.
     tmp="$(mktemp -t check-req.XXXXXX)"
-    cp "$txt_file" "$tmp"
-    if ! ( cd "$dir" && uv pip compile --generate-hashes --quiet \
-            requirements.in -o "$tmp" ) 2>/dev/null; then
-        req_lib_error "  recompile FAILED — toolchain or .in error"
-        drift_count=$((drift_count + 1))
-        rm -f "$tmp"
-        continue
+    if [[ $REPRODUCIBLE -eq 1 ]]; then
+        ts="$(grep -m1 '^# uv-compiled-at:' "$txt_file" \
+                | sed 's/^# uv-compiled-at:[[:space:]]*//')"
+        if [[ -z "$ts" ]]; then
+            req_lib_error "  no '# uv-compiled-at:' header in $txt_file"
+            req_lib_warn  "      → run compile-requirements.sh and recommit to add the reproducibility timestamp"
+            drift_count=$((drift_count + 1))
+            rm -f "$tmp"
+            continue
+        fi
+        clean_cache="$(mktemp -d -t uv-clean-cache.XXXXXX)"
+        if ! ( cd "$dir" && UV_CACHE_DIR="$clean_cache" uv pip compile \
+                --generate-hashes --quiet \
+                --exclude-newer "$ts" \
+                requirements.in -o "$tmp" ) 2>/dev/null; then
+            req_lib_error "  recompile FAILED in --reproducible mode (clean cache + --exclude-newer $ts)"
+            drift_count=$((drift_count + 1))
+            rm -f "$tmp"
+            rm -rf "$clean_cache"
+            continue
+        fi
+        rm -rf "$clean_cache"
+    else
+        cp "$txt_file" "$tmp"
+        if ! ( cd "$dir" && uv pip compile --generate-hashes --quiet \
+                requirements.in -o "$tmp" ) 2>/dev/null; then
+            req_lib_error "  recompile FAILED — toolchain or .in error"
+            drift_count=$((drift_count + 1))
+            rm -f "$tmp"
+            continue
+        fi
     fi
 
-    # uv records the literal `-o <path>` argv in the 2-line autogen
-    # header; our temp path differs from the committed `requirements.txt`
-    # path, so we strip those two lines before diffing actual lock content.
-    if diff -q <(tail -n +3 "$tmp") <(tail -n +3 "$txt_file") >/dev/null 2>&1; then
-        req_lib_ok "  ✓ no drift"
+    # Diff after stripping (a) uv's 2-line autogen header (its `-o <path>`
+    # argv differs between committed and temp paths) and (b) the optional
+    # `# uv-compiled-at:` metadata line (an *input* to resolution under
+    # --exclude-newer, not evidence of regeneration timing; uv does not
+    # emit it, compile-requirements.sh post-processes it in, so a fresh
+    # recompile temp file lacks it). Stripping is uniform across both
+    # modes and handles legacy locks (no timestamp) as a no-op.
+    if diff -q \
+            <(tail -n +3 "$tmp"      | grep -v '^# uv-compiled-at:') \
+            <(tail -n +3 "$txt_file" | grep -v '^# uv-compiled-at:') \
+            >/dev/null 2>&1; then
+        if [[ $REPRODUCIBLE -eq 1 ]]; then
+            req_lib_ok "  ✓ no drift (reproducible: clean cache + --exclude-newer ${ts})"
+        else
+            req_lib_ok "  ✓ no drift"
+        fi
     else
         req_lib_error "  ! DRIFT detected — committed requirements.txt differs from .in resolution"
         if [[ $PUBLIC_LOG -eq 1 ]]; then
             printf '      %s\n' "sensitive-finding-detected; rerun locally for details"
         else
-            # `|| true` so that diff's non-zero exit (when files differ
-            # — which is the expected case in this branch) does not
-            # short-circuit the rest of the gate via `set -euo pipefail`.
-            # Drift still rejects via drift_count below; this fix only
-            # restores the documented "all five checks fire independently"
-            # behaviour for reporting completeness.
-            diff <(tail -n +3 "$txt_file") <(tail -n +3 "$tmp") | sed 's/^/      /' || true
+            # `|| true` so that diff's non-zero exit (the expected case
+            # in this branch) does not short-circuit subsequent checks
+            # via `set -euo pipefail`. Drift still rejects via
+            # drift_count; the trailing `|| true` is for reporting
+            # completeness only.
+            diff \
+                <(tail -n +3 "$txt_file" | grep -v '^# uv-compiled-at:') \
+                <(tail -n +3 "$tmp"      | grep -v '^# uv-compiled-at:') \
+                | sed 's/^/      /' || true
         fi
-        req_lib_warn  "      → run \`compile-requirements.sh\` and recommit"
+        if [[ $REPRODUCIBLE -eq 1 ]]; then
+            req_lib_warn  "      → in --reproducible mode this means the lock is not bit-reproducible from .in"
+            req_lib_warn  "        + pinned uv version + clean cache + recorded timestamp;"
+            req_lib_warn  "        either the toolchain has drifted (uv version) or the lock has been hand-edited"
+        else
+            req_lib_warn  "      → run \`compile-requirements.sh\` and recommit"
+        fi
         drift_count=$((drift_count + 1))
     fi
     rm -f "$tmp"

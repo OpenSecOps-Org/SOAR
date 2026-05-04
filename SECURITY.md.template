@@ -27,8 +27,9 @@
     §3: tiered SLA describes new-release cadence (no backports).
     §8: every converted component gets the same L1+L2+L3-subset claim.
 
-  Sections 7, 9, 11 carry "deferred to a follow-up release" pointer notes;
-  their substantive content lands in the release named in each note.
+  Sections 7, 9, 11 contain live content: the valid release-signing
+  identity list (§7), the SLSA Build L1 claim with L2-adjacent controls
+  (§9), and the customer-facing `cosign verify-blob` invocation (§11).
   Section 4 carries a live Dependabot bullet plus a deferred poll-based
   pointer; section 14 is filled in (Documentation-repo cross-link).
 -->
@@ -100,19 +101,19 @@ The locked-state guarantees for converted components:
 
 ### 5.1 Verifiability decomposition
 
-The release artefacts (locks, per-function SBOMs, aggregate SBOM, evidence tarball, eventually signatures and provenance documents) give the customer four distinct *kinds* of independent verification, available at different points in the project's roadmap. Conflating them into a single "is this verifiable?" sentence would invite a careful reviewer to notice the elision; the four-way breakdown below states honestly which guarantees are independently verifiable today and which become so in follow-up releases.
+The release artefacts (locks, per-function SBOMs, aggregate SBOM, evidence tarball, Sigstore signature bundles, SLSA in-toto provenance document) give the customer four distinct *kinds* of independent verification. Conflating them into a single "is this verifiable?" sentence would invite a careful reviewer to notice the elision; the four-way breakdown below names the mechanism that closes each.
 
-1. **Independently verifiable today, no further release needed.** Two properties of the released artefacts can be reproduced with no maintainer cooperation:
-   - **Hash integrity.** `pip download --require-hashes -r requirements.txt` against any published lock downloads each pinned wheel from PyPI and verifies its SHA-256 against the recorded hash. A mismatch indicates either tampering on the path PyPI → customer, or a stale lock; in either case the customer's `sam build` would also reject. Anyone can run this verification against the published `requirements.txt` files at any tag.
-   - **Per-function SBOM determinism.** Re-running `compile-requirements.sh` against the same `requirements.txt` produces a byte-identical `requirements.cdx.json` (the UUIDv5 serialNumber is derived from `sha256(lock contents)` and the timestamp is pinned to a fixed epoch). The same property holds for the per-function `requirements.provenance.json` baselines. A reviewer who pulls the evidence tarball can regenerate every file in it and compare bit-for-bit.
+All four categories are **independently verifiable today, no further release needed.**
 
-2. **Documented today, independently verifiable in a follow-up release (substitution-in-transit).** Sigstore signatures on the SBOM, the evidence tarball, and the lock files will attest that the released bytes came from an authorised release identity recorded in the public Sigstore Rekor transparency log. This closes the question "did these bytes actually come from OpenSecOps, or did something between OpenSecOps and me substitute them?". Verification will be a one-line `cosign verify-blob` command; the exact invocation lands in §11 when signing ships.
+1. **Hash integrity + per-function SBOM determinism.** `pip download --require-hashes -r requirements.txt` against any published lock downloads each pinned wheel from PyPI and verifies its SHA-256 against the recorded hash. A mismatch indicates either tampering on the path PyPI → customer, or a stale lock; in either case the customer's `sam build` would also reject. Re-running `compile-requirements.sh` against the same `requirements.txt` produces a byte-identical `requirements.cdx.json` (the UUIDv5 serialNumber is derived from `sha256(lock contents)` and the timestamp is pinned to a fixed epoch); the same property holds for the per-function `requirements.provenance.json` baselines. A reviewer who pulls the evidence tarball can regenerate every file in it and compare bit-for-bit.
 
-3. **Documented today, independently verifiable in a follow-up release (gate-derivation, indirect closure).** A second machine recompiling from the committed `.in` files with the recorded compile-time timestamp passed as `--exclude-newer`, a clean `uv` cache, and the pinned `uv` version will produce bit-identical lock bytes. This is independent re-derivation of the gate's drift and hash-integrity outputs: if the lock is reproducible by anyone with the inputs, the gate's "is the lock well-formed and authentic" question is answered without trusting the maintainer's process. Lands when the `# uv-compiled-at:` timestamp header is added to every `requirements.txt`.
+2. **Substitution-in-transit (Sigstore).** Every release artefact is signed via Sigstore keyless OIDC, with the `.bundle` file (cert + signature + Rekor transparency-log entry) attached as an additional release asset. `cosign verify-blob --bundle <artefact>.bundle <artefact>` (see §11 for the full invocation including identity and issuer) attests that the bytes the customer downloaded came from an authorised release identity recorded in Sigstore's Rekor public transparency log. Closes the question "did these bytes actually come from OpenSecOps, or did something between OpenSecOps and me substitute them?".
 
-4. **Documented today, independently verifiable in a later follow-up release (gate-execution attestation, direct closure).** A SLSA Build L1 in-toto provenance document will declare the build steps that ran (`_check-requirements.sh`, `_aggregate-sbom.sh`, `_bundle-evidence.sh`, `cosign sign-blob`, etc.) for each release. This is the direct answer to "did `./publish`'s gate actually run, or did the maintainer skip it and sign anyway?". The Phase-11 reproducibility check from category 3 closes this question *indirectly* (if the lock is reproducible, the gate's outputs were correct regardless of process); the in-toto provenance closes it *directly* by naming the build steps in a signed attestation.
+3. **Gate-derivation reproducibility (indirect closure of the gate's drift/hash-integrity outputs).** A second machine recompiling from the committed `.in` files with the `# uv-compiled-at:` timestamp recorded in each `requirements.txt` passed as `--exclude-newer`, a clean `uv` cache, and the pinned `uv` version produces bit-identical lock bytes. The release-time gate runs this verification on every publish via `_check-requirements.sh --reproducible`. If the lock is reproducible by anyone with the inputs, the gate's "is the lock well-formed and authentic" question is answered without trusting the maintainer's process.
 
-The categorisation is mechanism-attributed, not phase-bundled. Categories 2 and 3 are independent items inside the same follow-up release; category 4 closes once the in-toto provenance document ships.
+4. **Gate-execution attestation (direct closure).** A SLSA Build L1 in-toto provenance document is generated alongside every release, declaring the build steps that ran (`_check-requirements.sh --reproducible`, `_aggregate-sbom.sh`, `_bundle-evidence.sh`, `cosign sign-blob`) and the toolchain versions (`uv`, `cosign`, `python`) that produced the artefacts. The provenance document is itself Sigstore-signed and attached as a release asset (`<component>-<version>-provenance.intoto.json` + `.bundle`). Direct answer to "did `./publish`'s gate actually run, or did the maintainer skip it and sign anyway?" — by naming the build steps in a signed attestation. Category 3 closes the same question *indirectly* via reproducibility; category 4 closes it *directly* via the named-step provenance.
+
+The categorisation is mechanism-attributed: each of the four properties has its own primary verification mechanism (hash-and-determinism, Sigstore, reproducibility, in-toto provenance). A customer choosing which to apply for a given assurance question can pick the most appropriate one rather than having to run all four.
 
 ## 6. Governance
 
@@ -126,7 +127,15 @@ Release-signing identities are core-team members; the set of valid signing ident
 
 ## 7. Valid release-signing identities
 
-> **Deferred to a follow-up release.** Release-artefact signing via Sigstore is planned. This section will then list the OIDC identities customers should accept when running `cosign verify-blob` against an OpenSecOps release artefact, alongside the exact verification command in §11.
+When verifying release artefacts via `cosign verify-blob` (§11), customers must accept signatures issued to one of the following OIDC identities:
+
+| Identity                  | OIDC issuer                      | Role                |
+| ------------------------- | -------------------------------- | ------------------- |
+| `peter@peterbengtson.com` | `https://github.com/login/oauth` | Maintainer (Peter)  |
+
+The cathedral governance model in §6 means signing identities correspond to individual core-team members, not shared role mailboxes. Each listed identity is a verified email on the GitHub account that authenticates with Sigstore at sign time; the OIDC issuer is the upstream provider GitHub uses for browser-OAuth sign-in, recorded by Sigstore's Fulcio in the cert's extension and by Rekor in the transparency log per signing event.
+
+Additional identities will be appended to this table as the core team expands. Existing identities remain listed as long as releases signed with them are in support, so historical verification continues to work after a rotation. Sigstore's public transparency log at https://search.sigstore.dev/ provides an externally-auditable record of every signing event against the listed identities.
 
 ## 8. Maturity claims (S2C2F)
 
@@ -141,11 +150,21 @@ This claim is uniform across every converted OpenSecOps component.
 
 ## 9. SLSA level
 
-> **Deferred to a future release.** A formal SLSA Build L1 provenance claim, with selected L2-adjacent controls (Sigstore signing; deterministic hash-pinned dependency resolution; reproducibility verification on a second machine) documented alongside, lands when an in-toto provenance document is generated by `./publish` per release. This section will then state the level *and* the L2-adjacent controls explicitly.
+This component meets **SLSA Build Level 1** under [SLSA v1.2](https://slsa.dev/spec/v1.2/levels). Provenance is generated, signed, and distributed alongside every release. The provenance document is an [in-toto Statement v1](https://github.com/in-toto/attestation/blob/main/spec/v1/statement.md) carrying a [SLSA Provenance v1](https://slsa.dev/spec/v1.2/provenance) predicate. It lists the actual build steps that ran (`_check-requirements.sh --reproducible`, `_aggregate-sbom.sh`, `_bundle-evidence.sh`, `cosign sign-blob`) and the exact toolchain versions (`uv`, `cosign`, `python`) so the customer has a direct, signed answer to "did `./publish`'s release gate actually fire?" — not an indirect inference from reproducibility.
+
+In addition to the L1 claim, the following **L2-adjacent controls** are documented and operational on every release:
+
+- **Sigstore signing of every release artefact** — keyless, ephemeral-cert, transparency-logged in Rekor. See §11 for the verification command.
+- **Hash-pinned deterministic dependency resolution** — every direct and transitive dependency is hash-pinned via `uv pip compile --generate-hashes`; `pip` enforces SHA-256 hashes at install time inside `sam build`, and the release gate (§4) re-verifies them against PyPI before any artefact ships.
+- **Reproducibility verification on a second machine** — every committed `requirements.txt` carries a `# uv-compiled-at:` timestamp; any second machine recompiling from the `.in` files plus the pinned `uv` version plus a clean `uv` cache plus the recorded timestamp passed as `--exclude-newer` produces bit-identical lock bytes. The release-time gate runs this verification on every publish via `_check-requirements.sh --reproducible`.
+
+SLSA Build **L2** explicitly requires a hosted build platform that generates and signs the provenance. The maintainer-laptop release model documented in §6 cannot meet that bar without adding release-path CI, which is out of scope per OpenSecOps's posture (no release-path CI; signing happens on the maintainer machine with the maintainer's identity, see §7). Should L2 be required by a specific enterprise customer, the path forward is a scoped, read-only, signing-capable hosted build runner — that is a deliberate future decision, not the current posture.
+
+The L1 claim with the named L2-adjacent controls is uniform across every converted OpenSecOps component.
 
 ## 10. Software Bill of Materials (SBOM)
 
-Two release assets are attached to every GitHub release of this component on the public OpenSecOps remote:
+Three release assets are attached to every GitHub release of this component on the public OpenSecOps remote, each accompanied by a Sigstore signature bundle:
 
 **Aggregate component-level SBOM** — one summary file (CycloneDX 1.6, gzip uncompressed JSON), the union of every per-function SBOM in the release. This is what intake reviewers and most SBOM tooling consume:
 
@@ -157,11 +176,31 @@ The per-function evidence files are also visible in the source tree at the canon
 
 **Union semantics for duplicate components** — the aggregate SBOM may list the same package at multiple versions (for example `botocore` at both 1.42.94 and 1.42.97). This is not an error. Each Lambda function resolves its own dependency graph independently from `requirements.in`, so transitive resolutions can legitimately differ across functions. Collapsing duplicates to "highest wins" would actively misrepresent what is deployed, so the aggregate preserves every distinct version found in any function's resolved lock. The per-function SBOMs (in the evidence tarball) carry the corresponding function-by-function attribution.
 
-(Sigstore signature/bundle artefacts will be added alongside both assets in a follow-up release.)
+**SLSA Build L1 in-toto provenance** — `<COMPONENT>-<VERSION>-provenance.intoto.json`, an in-toto Statement v1 with a SLSA Provenance v1 predicate, naming the build steps and toolchain versions that produced the SBOM and evidence tarball. See §9 for the level claim and L2-adjacent controls; see §11 for verification.
+
+Each of the three release-asset files above is accompanied by a Sigstore signature bundle (`.bundle` file extension; cert + signature + Rekor transparency-log entry, self-contained for verification with `cosign verify-blob`).
 
 ## 11. Verifying release artefacts
 
-> **Deferred to a follow-up release.** Release-artefact signing via Sigstore is planned. Once it ships, this section will contain the exact `cosign verify-blob` invocation customers can copy-paste, including the `--certificate-identity` and `--certificate-oidc-issuer` values that match the actual signing flow used.
+Every release artefact attached to a GitHub Release of this component (the aggregate SBOM, the evidence tarball, and the SLSA provenance document) is signed via Sigstore keyless OIDC. Each artefact ships alongside a self-contained `<artefact>.bundle` file (cert + signature + Rekor transparency-log entry).
+
+To verify an artefact, install [cosign](https://docs.sigstore.dev/cosign/installation/) and run:
+
+```bash
+cosign verify-blob \
+  --certificate-identity     peter@peterbengtson.com \
+  --certificate-oidc-issuer  https://github.com/login/oauth \
+  --bundle                   <artefact>.bundle \
+                             <artefact>
+```
+
+Replace `<artefact>` with the actual release-asset filename (e.g. `{{COMPONENT_NAME}}-vX.Y.Z-sbom.cdx.json`). A successful verification prints `Verified OK`. Any other output indicates the bytes do not match what OpenSecOps published, the signature was made by an identity not listed in §7, or the Rekor transparency-log entry has been tampered with.
+
+If the core team has rotated signing identities and a release was signed with an older identity, replace the `--certificate-identity` value with the identity from §7 that matches that release. The Rekor transparency log at https://search.sigstore.dev/ records which identity signed each entry; if you are unsure which identity to use, search there by the artefact's SHA-256 digest.
+
+For the SLSA provenance document specifically, after verifying the signature, the JSON itself can be inspected with `jq` to read the build-time toolchain versions, the git commit SHA the release was built from, and the named build steps under `predicate.runDetails.byproducts`.
+
+Customers who want to verify the lock files reproduce bit-identically from the released abstract spec should follow the recipe in [the Documentation supply-chain page](https://github.com/OpenSecOps-Org/Documentation/blob/main/docs/security/supply-chain.md) §9.
 
 ## 12. Acknowledged-and-deferred CVEs
 

@@ -1,5 +1,8 @@
 # Change Log
 
+## v3.1.2
+    * Release artefacts now Sigstore-signed. See `SECURITY.md` §11 for the `cosign verify-blob` recipe.
+
 ## v3.1.1
     * `SECURITY.md` §4 (Continuous detection) rewritten as a two-layer structure: the release-time gate is joined by a new push-based layer — GitHub Dependabot alerts, now enabled on every OpenSecOps repository. Alerts-only mode (auto-PR security updates and routine version-update PRs are explicitly disabled, consistent with the cathedral governance model). No SLA on detection-to-notification latency. Poll-based daily-scan CI remains a pointer-only follow-up.
     * No customer action required. `./deploy` workflow is unchanged.
