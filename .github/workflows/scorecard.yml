@@ -10,12 +10,22 @@
 # findings. The score is the single most-frequently-cited supply-chain
 # signal in 2026 FOSS-intake conversations.
 #
-# `publish_results: true` requires the repo to be public and grants
-# scorecard.dev permission to display the result. The `id-token: write`
-# permission below is used to authenticate the publication.
+# `publish_results` is currently set to `false` as a temporary workaround
+# for an upstream bundled-trusted-root vs live-keys mismatch in the
+# scorecard-action Docker image (Sigstore TUF rotation that v2.4.3's
+# bundled `trusted_root.json` cannot chain forward through). With
+# publication off, the workflow runs the analysis and uploads SARIF to
+# GitHub Code Scanning but does NOT sign + publish to scorecard.dev, so
+# the README badge stays unpopulated. Flip back to `true` when ossf
+# ships v2.4.4 (or later) with a refreshed bundled trusted_root. See
+# `SUPPLY_CHAIN_SECURITY.md` for the full record.
+#
+# `id-token: write` is retained for the (currently disabled) publication
+# path so re-enabling is a one-line edit.
 #
 # SARIF upload (final step) surfaces Scorecard findings in GitHub's
-# Security tab alongside Dependabot alerts.
+# Security tab alongside Dependabot alerts. This works regardless of
+# publish_results, so analysis findings remain visible.
 
 name: OpenSSF Scorecard
 
@@ -54,11 +64,11 @@ jobs:
           persist-credentials: false
 
       - name: Run analysis
-        uses: ossf/scorecard-action@13ec8c77e8a5dae7e0a0d47bde3e3004df15d34f  # v2
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2.4.3
         with:
           results_file: results.sarif
           results_format: sarif
-          publish_results: true
+          publish_results: false
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4

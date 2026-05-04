@@ -72,7 +72,7 @@ fi
 # now takes minutes (full hash-integrity download per dep + per-function
 # CycloneDX SBOM generation). Timer per phase records wallclock elapsed
 # so regressions in any one phase are noticed.
-PHASE_TOTAL=5
+PHASE_TOTAL=6
 phase_start=0
 phase_banner() {
     # phase_banner <N> <description>
@@ -118,6 +118,25 @@ if git remote 2>/dev/null | grep -q '^OpenSecOps$'; then
 else
     COMPONENT_NAME=$(basename -s .git "$(git remote get-url origin)")
     HAS_OPENSECOPS_REMOTE=false
+fi
+
+# --- GitHub status pre-flight (FIRST real-run check) ---------------------
+# Run this BEFORE the gate, emit, or sign — those are minutes of work and
+# we don't want to burn them only to fail at GitHub Release creation.
+# The pre-flight is skipped in dry-run mode (dry-run is read-only and
+# doesn't talk to GitHub) and for unconverted/no-OpenSecOps repos
+# (oldtime publish doesn't go through gh release create at all).
+if [[ "$DRY_RUN" != true && "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
+    GH_STATUS=$(curl -sS --max-time 10 https://www.githubstatus.com/api/v2/status.json 2>/dev/null \
+                  | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"]["indicator"])' 2>/dev/null)
+    if [[ -z "$GH_STATUS" ]]; then
+        echo "Warning: could not reach githubstatus.com — proceeding anyway."
+    elif [[ "$GH_STATUS" != "none" ]]; then
+        echo "Error: GitHub reports status '$GH_STATUS' (not 'none'). Release-asset"
+        echo "  upload is the most fragile step and reliably fails during degradation."
+        echo "  → check https://www.githubstatus.com/ and retry when it's all-clear."
+        exit 1
+    fi
 fi
 
 # --- Defaults shared by both modes ----------------------------------------
@@ -347,6 +366,22 @@ if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
         echo "             or see https://docs.sigstore.dev/cosign/installation/"
         exit 1
     fi
+
+    # Re-check GitHub status here too: the early pre-flight (right after
+    # component-identity detection) catches a degraded GH before we burn
+    # time on gate/emit/sign, but GH can degrade during the multi-minute
+    # run as well. This second check fires right before the destructive
+    # phases (push branches, GH release) so a mid-run degradation aborts
+    # us cleanly without leaving partial state behind.
+    GH_STATUS=$(curl -sS --max-time 10 https://www.githubstatus.com/api/v2/status.json 2>/dev/null \
+                  | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"]["indicator"])' 2>/dev/null)
+    if [[ -z "$GH_STATUS" ]]; then
+        echo "Warning: could not reach githubstatus.com — proceeding anyway."
+    elif [[ "$GH_STATUS" != "none" ]]; then
+        echo "Error: GitHub reports status '$GH_STATUS' (degraded mid-run). Aborting"
+        echo "  before any destructive operation. Re-run when GitHub is all-clear."
+        exit 1
+    fi
 fi
 
 # Check if the tag already exists
@@ -381,10 +416,14 @@ trap cleanup EXIT
 # `cosign verify-blob --bundle <artefact>.bundle <artefact>` against the
 # valid release-signing identities published in SECURITY.md §7.
 #
-# Note: each cosign sign-blob invocation triggers a fresh OIDC
-# round-trip (device flow with code prompt), so signing two artefacts
-# means two browser/device-code interactions per release. This is a
-# known cosign 3.x ergonomic; no in-process token cache is exposed.
+# Token reuse: by default each `cosign sign-blob` would trigger its own
+# OIDC device-flow round-trip (cosign 3.x exposes no in-process token
+# cache). We avoid that by acquiring one OIDC id_token up front via
+# `_acquire-oidc-token.sh` (a single device-flow approval) and exporting
+# it as `SIGSTORE_ID_TOKEN`; cosign reads that env var and skips its own
+# OIDC dance, so all artefacts in this release share one OAuth round-trip.
+# If the helper is missing (older refresh distribution) we fall through
+# to the legacy per-sign device-flow behaviour.
 if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
     SIGN_TARGETS=()
     [[ -n "$SBOM_PATH"       ]] && SIGN_TARGETS+=("$SBOM_PATH")
@@ -393,8 +432,23 @@ if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
 
     if [[ ${#SIGN_TARGETS[@]} -gt 0 ]]; then
         phase_banner 3 "sign release artefacts (Sigstore keyless OIDC)"
-        echo "  identity captured from your GitHub OIDC login;"
-        echo "  device-flow code will print below — open the URL and approve."
+
+        # Acquire one OIDC id_token to share across all sign-blob calls.
+        # On success: prints user-facing prompt to stderr (visible),
+        # token to stdout (captured into the env var, not echoed).
+        if [[ -x scripts/_acquire-oidc-token.sh ]]; then
+            echo "  acquiring single OIDC token (one device-flow approval covers all artefacts)..."
+            if SIGSTORE_ID_TOKEN=$(scripts/_acquire-oidc-token.sh) && [[ -n "$SIGSTORE_ID_TOKEN" ]]; then
+                export SIGSTORE_ID_TOKEN
+            else
+                echo "  (token acquisition failed — falling back to per-sign device-flow)"
+                unset SIGSTORE_ID_TOKEN
+            fi
+        else
+            echo "  scripts/_acquire-oidc-token.sh not present — using legacy per-sign device-flow"
+            echo "  (refresh this repo from the Installer to pick up the single-token helper)"
+        fi
+
         for target in "${SIGN_TARGETS[@]}"; do
             bundle="${target}.bundle"
             echo
@@ -412,14 +466,18 @@ if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
             fi
             SIGNED_BUNDLES+=("$bundle")
         done
+
+        unset SIGSTORE_ID_TOKEN
         phase_done
     fi
 fi
 
 if [[ "$REPO_IS_CONVERTED" == true ]]; then
-    phase_banner 4 "build releases branch + tag + push to remotes"
+    phase_banner 4 "build releases branch + push branches (tag pushes last, after GH release succeeds)"
 else
-    # Oldtime publish — single phase, no [N/M] framing.
+    # Oldtime publish — single phase, no [N/M] framing. Oldtime keeps
+    # tag + branch pushed together (no GitHub Release object to
+    # synchronise against, so the reorder doesn't apply).
     phase_start=$SECONDS
     echo
     echo "── tag + push to remotes ──"
@@ -456,22 +514,40 @@ RELEASE_COMMIT=$(git commit-tree -m "Release $TAG_VERSION" $MAIN_TREE -p release
 # Move the 'releases' branch to the new commit
 git reset --hard $RELEASE_COMMIT
 
-# Tag the release
-git tag $TAG_VERSION
-
-# Push the release branch and tags to the origin repo
-git push origin releases --tags
-if [ $? -ne 0 ]; then
-    echo "Error: Pushing to origin failed."
-    exit 1
-fi
-
-# Push the releases branch to the OpenSecOps repo's main branch
-if [[ "$HAS_OPENSECOPS_REMOTE" == true ]]; then
-    git push OpenSecOps releases:main --tags
+if [[ "$REPO_IS_CONVERTED" == true ]]; then
+    # Converted-mode reorder: push branch only (no tag yet). Tag is
+    # created and pushed in step 6, AFTER the GitHub Release exists
+    # with all assets. If step 5 fails persistently, the worst-case
+    # state is "branches advanced but no tag, no release" — invisible
+    # to customers (no release-page entry, no tag-watch notification)
+    # and recoverable by retrying ./publish without manual cleanup.
+    git push origin releases
     if [ $? -ne 0 ]; then
-        echo "Error: Pushing to OpenSecOps failed."
+        echo "Error: Pushing releases branch to origin failed."
         exit 1
+    fi
+    if [[ "$HAS_OPENSECOPS_REMOTE" == true ]]; then
+        git push OpenSecOps releases:main
+        if [ $? -ne 0 ]; then
+            echo "Error: Pushing releases:main to OpenSecOps failed."
+            exit 1
+        fi
+    fi
+else
+    # Oldtime path: tag now and push everything together (no GH
+    # release synchronisation point to worry about).
+    git tag $TAG_VERSION
+    git push origin releases --tags
+    if [ $? -ne 0 ]; then
+        echo "Error: Pushing to origin failed."
+        exit 1
+    fi
+    if [[ "$HAS_OPENSECOPS_REMOTE" == true ]]; then
+        git push OpenSecOps releases:main --tags
+        if [ $? -ne 0 ]; then
+            echo "Error: Pushing to OpenSecOps failed."
+            exit 1
+        fi
     fi
 fi
 phase_done
@@ -563,20 +639,61 @@ PYEOF
 
     echo
     echo "── Creating GitHub Release on ${OWNER_REPO} ──"
-    if ! gh release create "$TAG_VERSION" \
-            --repo "$OWNER_REPO" \
-            --title "$TAG_VERSION" \
-            --notes-file "$NOTES_FILE" \
-            "${RELEASE_ASSETS[@]}"; then
+    # Retry the release+upload call: GitHub's release-create endpoint
+    # bundles release-object creation and asset upload in one call and
+    # is the flakiest step in the pipeline. A 5xx during degraded service
+    # can leave a partial draft behind; we delete any orphan before retry.
+    GH_RELEASE_OK=false
+    for attempt in 1 2 3 4 5; do
+        # --target $RELEASE_COMMIT: the tag does not yet exist on either
+        # remote (we deferred tag-push to step 6); GitHub creates the
+        # tag at this commit on the OpenSecOps-Org side as part of
+        # release creation.
+        if gh release create "$TAG_VERSION" \
+                --repo "$OWNER_REPO" \
+                --target "$RELEASE_COMMIT" \
+                --title "$TAG_VERSION" \
+                --notes-file "$NOTES_FILE" \
+                "${RELEASE_ASSETS[@]}"; then
+            GH_RELEASE_OK=true
+            break
+        fi
+        echo "  attempt $attempt/5 failed — sleeping before retry"
+        # Clean up any partial draft left behind by the failed call so
+        # the next attempt isn't blocked by "release already exists".
+        gh release delete "$TAG_VERSION" --repo "$OWNER_REPO" --yes --cleanup-tag >/dev/null 2>&1 || true
+        if (( attempt < 5 )); then
+            sleep $((attempt * 15))
+        fi
+    done
+    if [[ "$GH_RELEASE_OK" != true ]]; then
         echo
-        echo "Error: gh release create failed."
-        echo "  → if the release already exists (republishes are not supported by"
-        echo "    OpenSecOps policy), bump the version in CHANGELOG.md and re-run."
+        echo "Error: gh release create failed after 5 attempts (transient GitHub failures)."
+        echo "  → check https://www.githubstatus.com/ and retry when it's all-clear."
         echo "    The git tag has already been pushed; manual cleanup may be"
         echo "    required if the version is dropped before re-publishing."
         exit 1
     fi
     echo "✓ GitHub Release created: https://github.com/${OWNER_REPO}/releases/tag/${TAG_VERSION}"
+    phase_done
+fi
+
+# --- Phase 6: push tag to remotes (last step — runs ONLY after GH release exists) ---
+# Tag-push deferred from step 4 so a step 5 failure leaves no tag
+# anywhere. Now that the GitHub Release exists with all assets, we
+# create the matching local tag at the release commit and push it to
+# origin. OpenSecOps already has the tag from `gh release create
+# --target` in step 5.
+if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
+    phase_banner 6 "push tag to remotes (last; safe because GH Release exists)"
+    git tag "$TAG_VERSION" "$RELEASE_COMMIT"
+    git push origin "$TAG_VERSION"
+    if [ $? -ne 0 ]; then
+        echo "Warning: pushing $TAG_VERSION to origin failed (release is live on OpenSecOps;"
+        echo "  you can push the tag to origin manually later: git push origin $TAG_VERSION)."
+    fi
+    # Ensure OpenSecOps has it too (idempotent — it does, from step 5).
+    git push OpenSecOps "$TAG_VERSION" >/dev/null 2>&1 || true
     phase_done
 fi
 

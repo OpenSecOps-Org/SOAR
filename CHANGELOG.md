@@ -1,5 +1,9 @@
 # Change Log
 
+## v3.1.5
+
+- `SECURITY.md` and `README` updated re: OpenSSF Scorecard publication status. See [supply-chain documentation](https://github.com/OpenSecOps-Org/Documentation/blob/main/docs/security/supply-chain.md) §5.5.
+
 ## v3.1.4
     * CI workflow action versions bumped for Node 24 readiness ahead of GitHub's June 2026 deprecation. No customer action required.
 
