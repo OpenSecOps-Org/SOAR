@@ -78,12 +78,11 @@ This SLA is uniform across every OpenSecOps component.
 
 ## 4. Continuous detection
 
-Two layers operate today:
+Three layers operate today:
 
-- **Release-time gate.** `./publish` runs `_check-requirements.sh` as its first step and refuses to release if the lock has drifted from `requirements.in`, if `pip-audit` flags any CVE not on the acknowledged-and-deferred list (§12), if any pinned artefact's SHA-256 fails verification against PyPI, or if any pinned package matches the OSSF malicious-packages feed. Blocks bad bytes from shipping.
+- **Release-time gate.** `./publish` runs `_check-requirements.sh --reproducible` as its first step and refuses to release if the lock has drifted from `requirements.in`, if `pip-audit` flags any CVE not on the acknowledged-and-deferred list (§12), if any pinned artefact's SHA-256 fails verification against PyPI, or if any pinned package matches the OSSF malicious-packages feed. Blocks bad bytes from shipping.
 - **Push-based detection between releases.** GitHub Dependabot alerts are enabled on every OpenSecOps repository (development and published). When GitHub's advisory database flags a vulnerable pinned dependency in any committed `requirements.txt`, an alert is created on the affected repository's Security tab and routed to the maintainer via the channels configured in their GitHub notification settings (web, mobile, CLI). Dependabot runs in **alerts-only** mode — Dependabot security updates (auto-PRs against vulnerable deps) and version updates (routine bump PRs) are explicitly disabled, consistent with the no-auto-PR-bots posture in §5. No SLA is claimed on GitHub's detection-to-notification latency; empirical latency is observed but not promised.
-
-A poll-based backstop — a daily scan-only CI workflow on each public OpenSecOps repository — is planned for a follow-up release; when it lands, a third bullet describes the workflow's permission model and findings-routing.
+- **Poll-based daily scan.** A scheduled GitHub Actions workflow (`.github/workflows/daily-scan.yml`) runs the same release-gate checks against the published locks once a day, in `--public-log` mode (sensitive details redacted from the world-readable workflow log; package names, versions, CVE IDs, and lock contents do not appear). The workflow runs with `contents: read` permission only — no write access, no auto-PR, no issue creation. A finding fails the workflow run, which surfaces as a GitHub notification to the maintainer; the response is a new release shipping the fix, consistent with §3's SLA. No SLA on detection-to-notification latency (GitHub Actions cron typically fires within 5–30 minutes of the scheduled tick).
 
 ## 5. Supply-chain posture
 
@@ -97,7 +96,14 @@ The locked-state guarantees for converted components:
 - The release gate (§4) re-verifies hashes against PyPI before any artefact ships, so byte-tampering is caught **before** the deploy reaches a customer.
 - Pinned packages are cross-referenced against the OSSF malicious-packages feed at release-gate time; any match fails the gate with the matching `MAL-*` advisory ID.
 - Direct-dep PyPI provenance is captured in committed `requirements.provenance.json` files and re-checked at release-gate time; drift surfaces as an advisory warning for maintainer review.
-- No release-path CI; no auto-PR dependency bots; updates are deliberate maintainer actions.
+- No release-path CI for customer-facing artefact emission (release authority remains on the maintainer machine; signing happens with the maintainer's identity, see §7); no auto-PR dependency bots; updates are deliberate maintainer actions.
+
+**Externally-verifiable signals.** Two third-party signals are published continuously for this component, both surfaced as badges in the repository README:
+
+- **OpenSSF Scorecard** — automated supply-chain posture analysis covering ~18 dimensions (branch protection, signed releases, pinned dependencies, dangerous workflow patterns, etc.). Score and per-check findings published at https://scorecard.dev/viewer/?uri=github.com/OpenSecOps-Org/{{COMPONENT_NAME}}.
+- **Daily-scan workflow status** — GitHub Actions workflow run status for the daily CVE scan (see §4 third bullet). A passing badge means the most recent scheduled scan exited clean against the published locks.
+
+Both badges are externally readable without OpenSecOps cooperation. Combined with the Sigstore-signed release artefacts (§11) and the SLSA Build L1 in-toto provenance (§9), they constitute the customer-facing supply-chain assurance set.
 
 ### 5.1 Verifiability decomposition
 

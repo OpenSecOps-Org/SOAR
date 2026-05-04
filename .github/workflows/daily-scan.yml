@@ -1,0 +1,48 @@
+# Daily CVE scan — runs the release-gate checks against the committed
+# locks once a day. Distributed by Installer/refresh as
+# `daily-scan.yml.disabled`; rename to `daily-scan.yml` in each component
+# repo to enable. The workflow runs on both the DEV mirror and the
+# published OpenSecOps-Org repo (whichever has the file on its default
+# branch); the customer-facing surface is the published repo's failure
+# notification.
+#
+# Public-log mode redacts package names, versions, CVE IDs, and lock
+# contents from the workflow log (which is world-readable on the
+# published repo) and exits non-zero on any finding. Maintainers
+# reproduce details locally with `_check-requirements.sh` (no flag).
+#
+# No SLA on detection-to-notification latency. GitHub Actions cron
+# typically delays scheduled runs by 5–30 minutes; advisories appear in
+# the GitHub Advisory Database with their own latency. The customer-
+# facing supply-chain.md page is honest about this.
+#
+# Cathedral-consistent: a finding triggers a new release, not an
+# auto-PR or a tracked issue. Workflow failure = maintainer
+# notification = next release cuts the fix.
+
+name: Daily CVE scan
+
+on:
+  schedule:
+    # 10:00 UTC = 12:00 Stockholm CEST (summer) / 11:00 Stockholm CET (winter)
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Release-gate checks (public-log mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39  # v3
+
+      - name: Run release-gate checks
+        run: scripts/_check-requirements.sh --public-log

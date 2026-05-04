@@ -1,5 +1,8 @@
 # Change Log
 
+## v3.1.3
+    * Daily CVE scan + OpenSSF Scorecard public badges. See `SECURITY.md` §4 / §5 and the badges at the top of `README.md`.
+
 ## v3.1.2
     * Release artefacts now Sigstore-signed. See `SECURITY.md` §11 for the `cosign verify-blob` recipe.
 

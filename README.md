@@ -1,5 +1,7 @@
 # SOAR Central Processors
 
+[![Daily CVE scan](https://github.com/OpenSecOps-Org/SOAR/actions/workflows/daily-scan.yml/badge.svg)](https://github.com/OpenSecOps-Org/SOAR/actions/workflows/daily-scan.yml) [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/OpenSecOps-Org/SOAR/badge)](https://scorecard.dev/viewer/?uri=github.com/OpenSecOps-Org/SOAR)
+
 This project contains nested state machines for OpenSecOps SOAR. Together, they constitute the central
 processors of security data:
   1. `SOARSecHubFindingsProcessor`: The main state machine triggered on ASFF data from Security Hub.
