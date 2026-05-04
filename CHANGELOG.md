@@ -1,5 +1,8 @@
 # Change Log
 
+## v3.1.4
+    * CI workflow action versions bumped for Node 24 readiness ahead of GitHub's June 2026 deprecation. No customer action required.
+
 ## v3.1.3
     * Daily CVE scan + OpenSSF Scorecard public badges. See `SECURITY.md` §4 / §5 and the badges at the top of `README.md`.
 
