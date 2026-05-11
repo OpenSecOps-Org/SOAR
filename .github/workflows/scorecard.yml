@@ -49,6 +49,15 @@ jobs:
   analysis:
     name: Scorecard analysis
     runs-on: ubuntu-latest
+    # Skip on private DEV mirrors (PeterBengtson/*-DEV). Scorecard measures
+    # repository posture, not vulnerabilities — and the posture-relevant
+    # files are byte-identical between DEV and public via ./publish, so a
+    # DEV-side score is either a redundant duplicate of the public score
+    # or a structurally-guaranteed-low artefact of the dual-repo model
+    # (solo author, no releases cut from DEV, no published packages,
+    # different branch-protection rules). Vulnerability scanning lives in
+    # daily-scan.yml, which runs on both sides intentionally.
+    if: github.repository_owner == 'OpenSecOps-Org'
     timeout-minutes: 30
 
     permissions:
@@ -56,6 +65,12 @@ jobs:
       security-events: write
       # Required to authenticate the publication to scorecard.dev.
       id-token: write
+      # Required for actions/checkout on private repos: a job-level
+      # `permissions:` block fully replaces the workflow-level one, so
+      # without this the token has no `contents` scope and the initial
+      # checkout fails with "Repository not found" on private mirrors
+      # (e.g. PeterBengtson/*-DEV). Harmless on public repos.
+      contents: read
 
     steps:
       - name: Checkout

@@ -236,11 +236,12 @@ A non-empty result means at least one Lambda function bundle contains the vulner
 
 ## 14. Authoritative supply-chain documentation
 
-For the cross-component customer-facing supply-chain page — covering supply-chain integrity, CVE response, SBOM artefacts, release verification, and an intake-checklist crosswalk for FOSS-intake reviewers, security officers, and engineers — see:
+Two entry points cover the cross-component customer-facing material:
 
-**[OpenSecOps Supply-Chain Security and CVE Response](https://github.com/OpenSecOps-Org/Documentation/blob/main/docs/security/supply-chain.md)**
+- **[Trust page](https://www.opensecops.org/trust.html)** — the landing-page synthesis: posture statement, release artefacts, four independent verifications you can run, continuous-detection layers, governance model, vulnerability disclosure channel. Best for procurement reviewers and security officers reading the project for the first time.
+- **[OpenSecOps Supply-Chain Security and CVE Response](https://github.com/OpenSecOps-Org/Documentation/blob/main/docs/security/supply-chain.md)** — the canonical reference: supply-chain integrity, CVE response, SBOM artefacts, release verification recipes, framework citations, and an intake-checklist crosswalk. Best for engineers verifying a release and reviewers cross-referencing specific framework controls.
 
-That document is the authoritative cross-component reference; the per-component sections above describe how the project-wide posture applies to **{{COMPONENT_NAME}}** specifically.
+Together they are the authoritative cross-component references; the per-component sections above describe how the project-wide posture applies to **{{COMPONENT_NAME}}** specifically.
 
 ---
 

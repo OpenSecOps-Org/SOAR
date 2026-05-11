@@ -1,0 +1,78 @@
+# Auto-close external pull requests.
+#
+# OpenSecOps follows a cathedral governance model — see CONTRIBUTING.md
+# in https://github.com/OpenSecOps-Org/.github and the Trust page at
+# https://www.opensecops.org/trust.html. External pull requests are not
+# accepted on any OpenSecOps repository, for any change. This workflow
+# enforces the policy by closing PRs from non-team authors immediately
+# with a comment redirecting to the right channel (issue / GHSA / fork).
+#
+# Carve-outs:
+# - MEMBER and OWNER PRs pass through unclosed. Core team members can
+#   still use PRs internally for branch review if they choose to.
+# - Only runs on the public OpenSecOps-Org organisation; private DEV
+#   mirrors are skipped via the same `if:` guard pattern used by
+#   scorecard.yml.
+# - Dependabot version-update PRs would need a carve-out here
+#   (`author_association == 'MANNEQUIN'`) — not needed today because
+#   Dependabot runs in alerts-only mode per the supply-chain policy.
+#   If version-update mode is ever enabled, extend the `if:` guard.
+#
+# `pull_request_target` (not `pull_request`) is required: it runs in
+# the target-repo context with target-repo permissions, which is the
+# secure event for any workflow that mutates the target repo from a
+# PR trigger originating in a fork.
+
+name: Close external pull requests
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+  issues: write
+  contents: read
+
+jobs:
+  close:
+    name: Close PR with redirect
+    runs-on: ubuntu-latest
+    if: >
+      github.repository_owner == 'OpenSecOps-Org' &&
+      github.event.pull_request.author_association != 'MEMBER' &&
+      github.event.pull_request.author_association != 'OWNER'
+    steps:
+      - name: Close PR and post redirect comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        with:
+          script: |
+            const body = [
+              "Thanks for the interest — but external pull requests are not accepted on any OpenSecOps repository, for any change.",
+              "",
+              "OpenSecOps runs in customer accounts with admin-equivalent privilege scope, and governance follows the cathedral model: a small core team curates the codebase, with one chain of accountability and one signing identity per release. The full reasoning is in [CONTRIBUTING.md](https://github.com/OpenSecOps-Org/.github/blob/main/CONTRIBUTING.md).",
+              "",
+              "**If you opened this PR because you wanted to:**",
+              "",
+              "- **Report a bug (non-security)** — please open an issue on this repository using the [bug report template](https://github.com/OpenSecOps-Org/.github/blob/main/ISSUE_TEMPLATE/bug_report.md). Public, accepted, and acknowledged.",
+              "- **Report a vulnerability** — please use the GitHub Security Advisory flow (\"Report a vulnerability\") on this repository, not a public PR or issue. A public report of an unpatched vulnerability is itself a disclosure event. Fallback channel: `security@opensecops.org`. Reporters receive named credit per the coordinated-disclosure timeline in each component's `SECURITY.md`.",
+              "- **Fork and modify the code for your own use** — permitted by the MPL-2.0 licence; no coordination needed.",
+              "",
+              "For the substantive supply-chain posture and verification artefacts, see the [Trust page](https://www.opensecops.org/trust.html), each component's `SECURITY.md`, and the [canonical supply-chain document](https://github.com/OpenSecOps-Org/Documentation/blob/main/docs/security/supply-chain.md).",
+              "",
+              "*This comment was posted by an automated workflow that closes external PRs on OpenSecOps repositories. Closing without review is the policy, not a judgement on the contribution itself.*",
+            ].join("\n");
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: body,
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              state: "closed",
+            });
