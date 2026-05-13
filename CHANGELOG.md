@@ -1,5 +1,8 @@
 # Change Log
 
+## v3.1.9
+    * `README.md` gains the OpenSSF Best Practices Passing-level badge (project entry [bestpractices.dev/projects/12827](https://www.bestpractices.dev/projects/12827)).
+
 ## v3.1.8
     * Carries Installer v3.0.11 customer-side release verification. `scripts/deploy.py` now verifies the Sigstore signature of every released artefact (SBOM, evidence, SLSA provenance) against the maintainer identity (`peter@peterbengtson.com` via `https://github.com/login/oauth`) before any `sam build` / `cfn deploy` / script execution; the shared verifier lives in `scripts/_verify_release.py` (distributed by `refresh`). Tampered artefacts, wrong signer, or missing bundles fail the deploy. New `--unsafe-untagged` flag on `./deploy` for emergency overrides (loud red audit banner). No code changes in this component; the verifier rides along with `refresh`-distributed scripts.
 

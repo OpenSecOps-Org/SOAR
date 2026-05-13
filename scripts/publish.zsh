@@ -100,10 +100,31 @@ TOTAL_START=$SECONDS
 # per-repo opt-in. Unconverted repos run the "oldtime" publish:
 # tag + push only, no supply-chain gate, no SBOM, no GitHub Release
 # object.
+#
+# Converted repos split further by whether they ship library dependencies.
+# Detection is filesystem-based — the presence of any `requirements.in`
+# file (excluding the usual non-source dirs) means "Python deps; run the
+# full SBOM/CVE gate"; the absence of any means "libraryless; produce a
+# signed source archive + provenance instead." No config flag is
+# required because reality is the source of truth.
 if [[ -f .security-config.toml ]]; then
     REPO_IS_CONVERTED=true
 else
     REPO_IS_CONVERTED=false
+fi
+
+REPO_HAS_LIBRARY_DEPS=true
+if [[ "$REPO_IS_CONVERTED" == true ]]; then
+    _first_in=$(find . \
+            \( -name .git -o -name .aws-sam -o -name .venv -o -name venv \
+               -o -name node_modules -o -name __pycache__ \
+               -o -name .pytest_cache \) -prune \
+            -o -type f -name 'requirements.in' -print 2>/dev/null \
+        | head -n 1)
+    if [[ -z "$_first_in" ]]; then
+        REPO_HAS_LIBRARY_DEPS=false
+    fi
+    unset _first_in
 fi
 
 # --- Component identity ---------------------------------------------------
@@ -144,6 +165,7 @@ SBOM_TMP_DIR=""
 SBOM_PATH=""
 EVIDENCE_PATH=""
 PROVENANCE_PATH=""
+SOURCE_ARCHIVE_PATH=""     # populated only in libraryless mode
 SIGNED_BUNDLES=()
 GH_AVAILABLE=false
 GH_AUTHED=false
@@ -155,9 +177,13 @@ if [[ "$REPO_IS_CONVERTED" == true ]]; then
     # --- Supply-chain release gate
     # Refuse to publish on drift, CVE, hash mismatch, or stale SECURITY.md.
     # Both checks are read-only; no file modifications.
-    phase_banner 1 "supply-chain release gate (drift / CVE / hash / OSV / provenance / SECURITY.md)"
+    if [[ "$REPO_HAS_LIBRARY_DEPS" == true ]]; then
+        phase_banner 1 "supply-chain release gate (drift / CVE / hash / OSV / provenance / SECURITY.md)"
+    else
+        phase_banner 1 "release gate (SECURITY.md only — no requirements.in files in repo)"
+    fi
 
-    if [[ -x scripts/_check-requirements.sh ]]; then
+    if [[ "$REPO_HAS_LIBRARY_DEPS" == true && -x scripts/_check-requirements.sh ]]; then
         # --reproducible: drift check uses a clean uv cache and the
         # committed `# uv-compiled-at:` timestamp as `--exclude-newer`,
         # so the gate verifies the lock is bit-reproducible from .in +
@@ -170,10 +196,13 @@ if [[ "$REPO_IS_CONVERTED" == true ]]; then
             echo "  → fix the issues, recompile (./compile-requirements), recommit, and retry."
             exit 1
         fi
-    else
+    elif [[ "$REPO_HAS_LIBRARY_DEPS" == true ]]; then
         echo "Note: scripts/_check-requirements.sh not present — skipping supply-chain checks."
         echo "      Refresh this repo from the Installer to enable the release gate."
     fi
+    # Libraryless mode (cve_scanning = false): no .in files exist, so the
+    # drift / CVE / hash / OSV / provenance-drift checks are not applicable.
+    # The signed source archive in Phase 2 is the integrity primitive here.
 
     if [[ -x scripts/_generate-security-md.sh ]]; then
         if ! scripts/_generate-security-md.sh --check .; then
@@ -185,68 +214,102 @@ if [[ "$REPO_IS_CONVERTED" == true ]]; then
     fi
     phase_done
 
-    # --- Aggregate CycloneDX SBOM + per-function evidence tarball ---------
-    # Both generated fresh at release time. Always emitted (including
-    # dry-run) so generation failures surface at gate time, not after the
-    # push. Outputs go to a tmp dir that the EXIT trap cleans up.
+    # --- Release-artefact emission ---------------------------------------
+    # Two paths:
     #
-    # Two assets, one phase:
-    #   - aggregate SBOM (one summary file; what intake reviewers
-    #     consume for component-level inventory)
-    #   - evidence tarball (the per-function .cdx.json + .provenance.json
-    #     witnesses; what a CycloneDX-mature deep review consumes for
-    #     per-function audit)
-    phase_banner 2 "release artefact emission (SBOM + evidence + provenance)"
+    # (a) Python-deps mode (REPO_HAS_LIBRARY_DEPS=true, the default):
+    #     aggregate SBOM + evidence tarball + SLSA provenance(SBOM, evidence).
+    #     The customer's verifier checks three signed bundles.
+    #
+    # (b) Libraryless mode (REPO_HAS_LIBRARY_DEPS=false, set by
+    #     `cve_scanning = false` in .security-config.toml):
+    #     deterministic source archive (git archive HEAD) + SLSA
+    #     provenance(source-archive). Two signed bundles. There is no
+    #     SBOM because there are no library dependencies to bill of;
+    #     the source archive itself is the integrity primitive the
+    #     customer verifies.
+    #
+    # All outputs go to a tmp dir that the EXIT trap cleans up.
+    if [[ "$REPO_HAS_LIBRARY_DEPS" == true ]]; then
+        phase_banner 2 "release artefact emission (SBOM + evidence + provenance)"
+    else
+        phase_banner 2 "release artefact emission (source archive + provenance)"
+    fi
     SBOM_TMP_DIR=$(mktemp -d -t opensecops-publish-XXXXXX)
-    SBOM_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json"
-    EVIDENCE_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-evidence.tar.gz"
     PROVENANCE_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-provenance.intoto.json"
     trap 'rm -rf "$SBOM_TMP_DIR"' EXIT
 
-    if [[ -x scripts/_aggregate-sbom.sh ]]; then
-        if ! scripts/_aggregate-sbom.sh \
-                --component "$COMPONENT_NAME" \
-                --version   "$TAG_VERSION" \
-                --output    "$SBOM_PATH"; then
-            echo
-            echo "Aggregate SBOM generation FAILED — see output above."
-            echo "  → most likely a missing requirements.txt; run compile-requirements"
-            echo "    and recommit, then retry."
-            exit 1
+    if [[ "$REPO_HAS_LIBRARY_DEPS" == true ]]; then
+        SBOM_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json"
+        EVIDENCE_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-evidence.tar.gz"
+
+        if [[ -x scripts/_aggregate-sbom.sh ]]; then
+            if ! scripts/_aggregate-sbom.sh \
+                    --component "$COMPONENT_NAME" \
+                    --version   "$TAG_VERSION" \
+                    --output    "$SBOM_PATH"; then
+                echo
+                echo "Aggregate SBOM generation FAILED — see output above."
+                echo "  → most likely a missing requirements.txt; run compile-requirements"
+                echo "    and recommit, then retry."
+                exit 1
+            fi
+        else
+            echo "Note: scripts/_aggregate-sbom.sh not present — skipping SBOM emission."
+            echo "      Refresh this repo from the Installer to enable SBOM generation."
+            SBOM_PATH=""
+        fi
+
+        if [[ -x scripts/_bundle-evidence.sh ]]; then
+            if ! scripts/_bundle-evidence.sh \
+                    --component "$COMPONENT_NAME" \
+                    --version   "$TAG_VERSION" \
+                    --output    "$EVIDENCE_PATH"; then
+                echo
+                echo "Evidence bundle generation FAILED — see output above."
+                echo "  → most likely missing requirements.cdx.json or"
+                echo "    requirements.provenance.json; run compile-requirements"
+                echo "    and recommit, then retry."
+                exit 1
+            fi
+        else
+            echo "Note: scripts/_bundle-evidence.sh not present — skipping evidence bundle."
+            echo "      Refresh this repo from the Installer to enable evidence bundling."
+            EVIDENCE_PATH=""
         fi
     else
-        echo "Note: scripts/_aggregate-sbom.sh not present — skipping SBOM emission."
-        echo "      Refresh this repo from the Installer to enable SBOM generation."
-        SBOM_PATH=""
-    fi
-
-    if [[ -x scripts/_bundle-evidence.sh ]]; then
-        if ! scripts/_bundle-evidence.sh \
-                --component "$COMPONENT_NAME" \
-                --version   "$TAG_VERSION" \
-                --output    "$EVIDENCE_PATH"; then
+        # Libraryless: deterministic source archive via `git archive`.
+        # --prefix gives the customer a sensible top-level dir on extract;
+        # using HEAD ties the archive to the current commit (which is the
+        # tagged release commit by the time publish reaches this point).
+        SOURCE_ARCHIVE_PATH="${SBOM_TMP_DIR}/${COMPONENT_NAME}-${TAG_VERSION}-source.tar.gz"
+        if ! git archive \
+                --format=tar.gz \
+                --prefix="${COMPONENT_NAME}-${TAG_VERSION}/" \
+                -o "$SOURCE_ARCHIVE_PATH" \
+                HEAD; then
             echo
-            echo "Evidence bundle generation FAILED — see output above."
-            echo "  → most likely missing requirements.cdx.json or"
-            echo "    requirements.provenance.json; run compile-requirements"
-            echo "    and recommit, then retry."
+            echo "Source archive generation FAILED — git archive returned non-zero."
             exit 1
         fi
-    else
-        echo "Note: scripts/_bundle-evidence.sh not present — skipping evidence bundle."
-        echo "      Refresh this repo from the Installer to enable evidence bundling."
-        EVIDENCE_PATH=""
+        echo "✓ source archive written to $SOURCE_ARCHIVE_PATH"
     fi
 
-    # SLSA Build L1 in-toto provenance — must run AFTER SBOM + evidence
-    # because both are subjects of the provenance document (their
-    # SHA-256 digests appear in the in-toto Statement's `subject` array).
-    # The provenance closes §4.11 cat. 4 (gate-execution attestation,
-    # direct closure) — a signed declaration of which build steps ran
-    # for this release.
-    if [[ -x scripts/_generate-provenance.sh && -n "$SBOM_PATH" ]]; then
-        SUBJECTS=("$SBOM_PATH")
-        [[ -n "$EVIDENCE_PATH" ]] && SUBJECTS+=("$EVIDENCE_PATH")
+    # SLSA Build L1 in-toto provenance — must run AFTER subject artefacts
+    # exist because their SHA-256 digests appear in the in-toto Statement's
+    # `subject` array. Subjects differ by mode:
+    #   - Python-deps mode: SBOM + evidence (both bill-of-materials docs).
+    #   - Libraryless mode: source archive (the deliverable itself).
+    if [[ -x scripts/_generate-provenance.sh ]]; then
+        SUBJECTS=()
+        [[ -n "$SBOM_PATH"           ]] && SUBJECTS+=("$SBOM_PATH")
+        [[ -n "$EVIDENCE_PATH"       ]] && SUBJECTS+=("$EVIDENCE_PATH")
+        [[ -n "$SOURCE_ARCHIVE_PATH" ]] && SUBJECTS+=("$SOURCE_ARCHIVE_PATH")
+        if (( ${#SUBJECTS[@]} == 0 )); then
+            echo
+            echo "No subjects available for provenance — internal error."
+            exit 1
+        fi
         if ! scripts/_generate-provenance.sh \
                 --component "$COMPONENT_NAME" \
                 --version   "$TAG_VERSION" \
@@ -289,7 +352,11 @@ if [[ "$DRY_RUN" == true ]]; then
     echo "── Dry-run preview ──"
     echo "  Component:  $COMPONENT_NAME"
     if [[ "$REPO_IS_CONVERTED" == true ]]; then
-        echo "  Mode:       converted (full Phase 6 flow)"
+        if [[ "$REPO_HAS_LIBRARY_DEPS" == true ]]; then
+            echo "  Mode:       converted (Python-deps: SBOM + evidence + provenance)"
+        else
+            echo "  Mode:       converted (libraryless: source archive + provenance)"
+        fi
     else
         echo "  Mode:       unconverted (oldtime publish — tag + push only)"
     fi
@@ -301,11 +368,17 @@ if [[ "$DRY_RUN" == true ]]; then
             echo "  Would create GitHub Release on OpenSecOps-Org/${COMPONENT_NAME}:"
             echo "              tag:    $TAG_VERSION"
             echo "              body:   CHANGELOG slice for $TAG_VERSION + Full-Changelog compare link"
-            echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json"
-            echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json.bundle  (Sigstore signature)"
+            if [[ -n "$SBOM_PATH" ]]; then
+                echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json"
+                echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-sbom.cdx.json.bundle  (Sigstore signature)"
+            fi
             if [[ -n "$EVIDENCE_PATH" ]]; then
                 echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-evidence.tar.gz"
                 echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-evidence.tar.gz.bundle  (Sigstore signature)"
+            fi
+            if [[ -n "$SOURCE_ARCHIVE_PATH" ]]; then
+                echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-source.tar.gz  (git archive HEAD)"
+                echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-source.tar.gz.bundle  (Sigstore signature)"
             fi
             if [[ -n "$PROVENANCE_PATH" ]]; then
                 echo "              asset:  ${COMPONENT_NAME}-${TAG_VERSION}-provenance.intoto.json  (SLSA Build L1)"
@@ -320,6 +393,10 @@ if [[ "$DRY_RUN" == true ]]; then
     if [[ -n "$EVIDENCE_PATH" ]]; then
         echo "  Generated:  $EVIDENCE_PATH"
         echo "              (size: $(wc -c < "$EVIDENCE_PATH" | tr -d ' ') bytes; cleaned on exit)"
+    fi
+    if [[ -n "$SOURCE_ARCHIVE_PATH" ]]; then
+        echo "  Generated:  $SOURCE_ARCHIVE_PATH"
+        echo "              (size: $(wc -c < "$SOURCE_ARCHIVE_PATH" | tr -d ' ') bytes; cleaned on exit)"
     fi
     if [[ -n "$PROVENANCE_PATH" ]]; then
         echo "  Generated:  $PROVENANCE_PATH"
@@ -426,9 +503,10 @@ trap cleanup EXIT
 # to the legacy per-sign device-flow behaviour.
 if [[ "$REPO_IS_CONVERTED" == true && "$HAS_OPENSECOPS_REMOTE" == true ]]; then
     SIGN_TARGETS=()
-    [[ -n "$SBOM_PATH"       ]] && SIGN_TARGETS+=("$SBOM_PATH")
-    [[ -n "$EVIDENCE_PATH"   ]] && SIGN_TARGETS+=("$EVIDENCE_PATH")
-    [[ -n "$PROVENANCE_PATH" ]] && SIGN_TARGETS+=("$PROVENANCE_PATH")
+    [[ -n "$SBOM_PATH"           ]] && SIGN_TARGETS+=("$SBOM_PATH")
+    [[ -n "$EVIDENCE_PATH"       ]] && SIGN_TARGETS+=("$EVIDENCE_PATH")
+    [[ -n "$SOURCE_ARCHIVE_PATH" ]] && SIGN_TARGETS+=("$SOURCE_ARCHIVE_PATH")
+    [[ -n "$PROVENANCE_PATH"     ]] && SIGN_TARGETS+=("$PROVENANCE_PATH")
 
     if [[ ${#SIGN_TARGETS[@]} -gt 0 ]]; then
         phase_banner 3 "sign release artefacts (Sigstore keyless OIDC)"
@@ -557,7 +635,7 @@ phase_done
 # retains tags but no Release object). Body = CHANGELOG slice for this
 # version + auto-appended Full-Changelog compare link when a prior tag
 # exists on the OpenSecOps remote.
-if [[ "$HAS_OPENSECOPS_REMOTE" == true && -n "$SBOM_PATH" ]]; then
+if [[ "$HAS_OPENSECOPS_REMOTE" == true && ( -n "$SBOM_PATH" || -n "$SOURCE_ARCHIVE_PATH" ) ]]; then
     phase_banner 5 "create GitHub Release + upload SBOM + signature assets"
     OWNER_REPO="OpenSecOps-Org/${COMPONENT_NAME}"
     NOTES_FILE="${SBOM_TMP_DIR}/release-notes.md"
@@ -621,18 +699,15 @@ PYEOF
         } >> "$NOTES_FILE"
     fi
 
-    # Assets: aggregate SBOM (always) + evidence tarball (when present),
-    # each accompanied by its Sigstore .bundle (Phase 3 signing output).
-    # Evidence is the per-function deep-audit witness set; SBOM is the
-    # component-level inventory summary; the .bundle alongside each is
-    # what the customer's `cosign verify-blob` consumes.
-    RELEASE_ASSETS=("$SBOM_PATH")
-    if [[ -n "$EVIDENCE_PATH" ]]; then
-        RELEASE_ASSETS+=("$EVIDENCE_PATH")
-    fi
-    if [[ -n "$PROVENANCE_PATH" ]]; then
-        RELEASE_ASSETS+=("$PROVENANCE_PATH")
-    fi
+    # Assets: aggregate SBOM + evidence tarball (Python-deps mode) OR
+    # source archive (libraryless mode), each accompanied by its Sigstore
+    # .bundle. Provenance is always present in both modes. The .bundle
+    # alongside each is what the customer's verifier consumes.
+    RELEASE_ASSETS=()
+    [[ -n "$SBOM_PATH"           ]] && RELEASE_ASSETS+=("$SBOM_PATH")
+    [[ -n "$EVIDENCE_PATH"       ]] && RELEASE_ASSETS+=("$EVIDENCE_PATH")
+    [[ -n "$SOURCE_ARCHIVE_PATH" ]] && RELEASE_ASSETS+=("$SOURCE_ARCHIVE_PATH")
+    [[ -n "$PROVENANCE_PATH"     ]] && RELEASE_ASSETS+=("$PROVENANCE_PATH")
     for bundle in "${SIGNED_BUNDLES[@]}"; do
         RELEASE_ASSETS+=("$bundle")
     done

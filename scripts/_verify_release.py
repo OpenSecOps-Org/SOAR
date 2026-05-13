@@ -31,12 +31,11 @@ EXPECTED_SIGNER_IDENTITY = "peter@peterbengtson.com"
 EXPECTED_SIGNER_ISSUER = "https://github.com/login/oauth"
 PUBLIC_ORG = "OpenSecOps-Org"
 
-# Until every OpenSecOps-Org repo ships signed releases (Phase 10), a
-# repo with no GitHub Release (or no .bundle assets) is reported with
-# a yellow "skipped — work in progress" banner and the caller proceeds.
-# When Phase 10 completes, flip to True and re-ship Installer; the
-# refresh mechanism distributes the change to every component.
-STRICT_VERIFICATION = False
+# Phase 10 closed on 2026-05-13: every repo in apps/foundation/repos.toml
+# and apps/soar/repos.toml ships signed releases. Strict mode is now the
+# steady-state: a release without signed bundles is a downgrade signal,
+# not a "not yet signed" state.
+STRICT_VERIFICATION = True
 
 
 # --- Colours (no-op when not a TTY; matches deploy.py's palette) ----------
@@ -84,6 +83,14 @@ def verify_release(repo_name, repo_dir=".", unsafe_untagged=False):
         return False
     tag = res.stdout.strip()
 
+    # 1a. Note whether the local checkout claims to be converted.
+    #     `.security-config.toml` at the repo root is the canonical
+    #     "this repo has formally adopted the supply-chain framework"
+    #     marker. A converted repo MUST have signed release bundles;
+    #     missing bundles for a converted repo is a downgrade signal,
+    #     not a "not yet signed" state.
+    repo_is_converted = os.path.exists(os.path.join(repo_dir, '.security-config.toml'))
+
     # 2. Look up the GitHub Release for that tag.
     api_url = f"https://api.github.com/repos/{PUBLIC_ORG}/{repo_name}/releases/tags/{tag}"
     try:
@@ -91,6 +98,13 @@ def verify_release(repo_name, repo_dir=".", unsafe_untagged=False):
             release = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         if e.code == 404:
+            if repo_is_converted:
+                _printc(RED,
+                    f"{repo_name} {tag}: this repo has `.security-config.toml` "
+                    f"(declares itself converted) but no GitHub Release exists "
+                    f"for the tag. This is a downgrade signal — refusing to "
+                    f"proceed.")
+                return False
             _printc(YELLOW,
                 f"{repo_name} {tag}: verification is skipped for now as the repo "
                 f"has not yet been signed. This is a work in progress; we will "
@@ -104,6 +118,13 @@ def verify_release(repo_name, repo_dir=".", unsafe_untagged=False):
     # 3. Find the .bundle assets.
     bundles = [a for a in release['assets'] if a['name'].endswith('.bundle')]
     if not bundles:
+        if repo_is_converted:
+            _printc(RED,
+                f"{repo_name} {tag}: release exists but has no signed bundles, "
+                f"and this repo has `.security-config.toml` (declares itself "
+                f"converted). Possible downgrade attack (bundles stripped from "
+                f"the release after signing) — refusing to proceed.")
+            return False
         _printc(YELLOW,
             f"{repo_name} {tag}: verification is skipped for now as the repo "
             f"has not yet been signed. This is a work in progress; we will "
