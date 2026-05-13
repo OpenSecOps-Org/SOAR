@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # compile-requirements.sh — maintainer-side generator (read-write).
 #
+# Usage:
+#   compile-requirements.sh [--upgrade] [--upgrade-package PKG]... [<root>]
+#
 # For every `requirements.in` under <root> (default `.`):
 #   1. Run `uv pip compile --generate-hashes <in> -o <txt>` to (re)generate
 #      the hashed lock file adjacent to the input.
@@ -11,12 +14,25 @@
 #   3. Generate a CycloneDX SBOM (`requirements.cdx.json`) adjacent to the
 #      lock, using `cyclonedx-py requirements`.
 #
-# `uv pip compile` is invoked with the existing committed `.txt` (when
-# present) as the seed via `--output-file`'s "preferences" behaviour: uv
-# reads the existing pins as resolution preferences, producing a stable
+# `uv pip compile` is normally invoked with the existing committed `.txt`
+# (when present) as the seed via `--output-file`'s "preferences" behaviour:
+# uv reads the existing pins as resolution preferences, producing a stable
 # equilibrium when the `.in` has not changed and new PyPI uploads have
-# appeared inside declared ranges. To re-resolve up to current latest,
-# pass `--upgrade`. (See `scan-updates.sh` for the read-only inverse.)
+# appeared inside declared ranges.
+#
+# Flags:
+#   --upgrade              Forward `--upgrade` to uv: ignore preferences and
+#                          re-resolve every package to its latest in-range
+#                          version. Use when bumping locks across the fleet
+#                          or any time the release-gate's reproducible mode
+#                          reports preference-induced drift.
+#   --upgrade-package PKG  Forward `--upgrade-package PKG` to uv: re-resolve
+#                          only PKG (and what its constraints transitively
+#                          force) while keeping every other package at its
+#                          current pin. Use for targeted CVE patches when
+#                          you want minimum blast radius. May be repeated.
+#
+# (See `scan-updates.sh` for the read-only inverse.)
 #
 # Exit codes:
 #   0  — every compile + SBOM step succeeded; pip-audit findings (if any)
@@ -43,14 +59,68 @@ unset _self _link
 # shellcheck source=_requirements_lib.sh
 source "$SCRIPT_DIR/_requirements_lib.sh"
 
-ROOT="${1:-.}"
+# --- Argument parsing -----------------------------------------------------
+# Supported forms:
+#   compile-requirements.sh
+#   compile-requirements.sh <root>
+#   compile-requirements.sh --upgrade [<root>]
+#   compile-requirements.sh --upgrade-package PKG [--upgrade-package PKG]... [<root>]
+#   compile-requirements.sh --upgrade-package=PKG ...
+#
+# --upgrade and --upgrade-package are accumulated into UV_UPGRADE_ARGS and
+# spliced into the `uv pip compile` invocation. Passing both --upgrade and
+# --upgrade-package is permitted (matches uv's own semantics: --upgrade
+# wins, --upgrade-package is redundant in that case).
+ROOT="."
+UV_UPGRADE_ARGS=()
+while (( $# > 0 )); do
+    case "$1" in
+        --upgrade)
+            UV_UPGRADE_ARGS+=(--upgrade)
+            shift
+            ;;
+        --upgrade-package)
+            if [[ $# -lt 2 || -z "${2:-}" || "${2:0:1}" == "-" ]]; then
+                req_lib_error "--upgrade-package requires a package name argument"
+                exit 2
+            fi
+            UV_UPGRADE_ARGS+=(--upgrade-package "$2")
+            shift 2
+            ;;
+        --upgrade-package=*)
+            UV_UPGRADE_ARGS+=(--upgrade-package "${1#--upgrade-package=}")
+            shift
+            ;;
+        -h|--help)
+            sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+            exit 0
+            ;;
+        --)
+            shift
+            ROOT="${1:-.}"
+            break
+            ;;
+        -*)
+            req_lib_error "unknown flag: $1"
+            exit 2
+            ;;
+        *)
+            ROOT="$1"
+            shift
+            ;;
+    esac
+done
 
 if ! command -v uv >/dev/null 2>&1; then
     req_lib_error "uv is not on PATH. Install via: curl -LsSf https://astral.sh/uv/install.sh | sh"
     exit 2
 fi
 
-req_lib_info "compile-requirements: scanning ${ROOT} for requirements.in files"
+if (( ${#UV_UPGRADE_ARGS[@]} > 0 )); then
+    req_lib_info "compile-requirements: scanning ${ROOT} for requirements.in files (uv args: ${UV_UPGRADE_ARGS[*]})"
+else
+    req_lib_info "compile-requirements: scanning ${ROOT} for requirements.in files"
+fi
 
 IN_FILES=()
 while IFS= read -r _f; do
@@ -80,7 +150,11 @@ for in_file in "${IN_FILES[@]}"; do
     #    canonical relative paths so the autogen-header command line is
     #    byte-identical regardless of where the maintainer ran the script
     #    from. (uv records the literal argv in the output header comment.)
+    #
+    #    UV_UPGRADE_ARGS is spliced in via the `${var[@]+...}` idiom so an
+    #    empty array doesn't trip `set -u` on older bash (macOS 3.2).
     if ! ( cd "$dir" && uv pip compile --generate-hashes --quiet \
+            ${UV_UPGRADE_ARGS[@]+"${UV_UPGRADE_ARGS[@]}"} \
             requirements.in -o requirements.txt ); then
         req_lib_error "  compile FAILED for ${in_file}"
         failures=$((failures + 1))

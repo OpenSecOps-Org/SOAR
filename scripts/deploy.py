@@ -190,6 +190,25 @@ def dereference(value, params):
 # 
 # ---------------------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------------------
+#
+# Release verification — Sigstore-signed artefacts published by `./publish`.
+# Shared with init.py (Installer-side eager check) via _verify_release.py,
+# distributed by refresh to every component repo.
+#
+# ---------------------------------------------------------------------------------------
+
+# Resolve the sibling _verify_release.py next to this script (works whether
+# deploy.py is invoked via the top-level `./deploy` symlink or directly).
+import importlib.util as _ilu
+_self = os.path.realpath(__file__)
+_vr_spec = _ilu.spec_from_file_location(
+    '_verify_release', os.path.join(os.path.dirname(_self), '_verify_release.py'))
+_vr = _ilu.module_from_spec(_vr_spec)
+_vr_spec.loader.exec_module(_vr)
+verify_release = _vr.verify_release
+
+
 def process_sam(sam, repo_name, params, dry_run, verbose):
     printc(LIGHT_BLUE, "")
     printc(LIGHT_BLUE, "")
@@ -217,9 +236,6 @@ def process_sam(sam, repo_name, params, dry_run, verbose):
     sam_parameter_overrides = parameters_to_sam_string(params, repo_name)
 
     try:
-        printc(LIGHT_BLUE, "Executing 'git pull'...")
-        subprocess.run(['git', 'pull'], check=True)
-
         printc(LIGHT_BLUE, "")
         printc(LIGHT_BLUE, "Executing 'sam build'...")
     
@@ -1150,17 +1166,28 @@ def handle_stack_set(repo_name, stack_name, template_str, params, capabilities, 
 # 
 # ---------------------------------------------------------------------------------------
 
-def deploy(dry_run, verbose):
+def deploy(dry_run, verbose, unsafe_untagged=False):
     # Check if 'config-deploy.toml' exists at the root of the repo
     if not os.path.exists('config-deploy.toml'):
         printc(RED, "Error: 'config-deploy.toml' is missing.")
         printc(YELLOW, "Please create 'config-deploy.toml'.")
         return
-    
+
     # Get the deployment configuration
     dpcf = load_toml('config-deploy.toml')
     opensecops_app = dpcf['part-of']
     repo_name = dpcf['repo-name']
+
+    # Pull latest and verify the release signature BEFORE doing anything that
+    # could deploy customer-affecting changes. This is the single point where
+    # the bytes we're about to deploy are bound to a signed, published
+    # GitHub Release. Every deployment path (SAM, CloudFormation, Scripts)
+    # goes through here.
+    printc(LIGHT_BLUE, f"Executing 'git pull' in {repo_name}...")
+    subprocess.run(['git', 'pull'], check=True)
+    if not verify_release(repo_name, unsafe_untagged=unsafe_untagged):
+        printc(RED, "Aborting deployment — release verification failed.")
+        return
 
     # Get the parameters (all of them, for all repos)
     params = get_all_parameters(opensecops_app)
@@ -1197,12 +1224,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dry-run', action='store_true', help='Perform a dry run of the deployments')
     parser.add_argument('--verbose', action='store_true', help='Verbose mode')
+    parser.add_argument('--unsafe-untagged', action='store_true',
+                        help='Allow deploying from a non-release HEAD (loud override; printed for audit)')
     args = parser.parse_args()
 
     if args.dry_run:
         printc(GREEN, "\nThis is a dry run. No changes will be made.")
 
-    deploy(args.dry_run, args.verbose)
+    deploy(args.dry_run, args.verbose, unsafe_untagged=args.unsafe_untagged)
 
 
 if __name__ == '__main__':
