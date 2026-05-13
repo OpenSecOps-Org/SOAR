@@ -11,6 +11,19 @@
         "Homepage": "https://github.com/boto/boto3",
         "Source": "https://github.com/boto/boto3"
       }
+    },
+    "urllib3": {
+      "author": "",
+      "author_email": "Andrey Petrov <andrey.petrov@shazow.net>",
+      "home_page": "",
+      "maintainer": "",
+      "maintainer_email": "Seth Michael Larson <sethmichaellarson@gmail.com>, Quentin Pradet <quentin@pradet.me>, Illia Volochii <illia.volochii@gmail.com>",
+      "project_urls": {
+        "Changelog": "https://github.com/urllib3/urllib3/blob/main/CHANGES.rst",
+        "Code": "https://github.com/urllib3/urllib3",
+        "Documentation": "https://urllib3.readthedocs.io",
+        "Issue tracker": "https://github.com/urllib3/urllib3/issues"
+      }
     }
   }
 }

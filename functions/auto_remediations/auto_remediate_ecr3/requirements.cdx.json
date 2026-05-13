@@ -152,18 +152,18 @@
     },
     {
       "bom-ref": "requirements-L32",
-      "description": "requirements line 32: urllib3==2.6.3     --hash=sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed     --hash=sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4",
+      "description": "requirements line 32: urllib3==2.7.0     --hash=sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c     --hash=sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897",
       "externalReferences": [
         {
           "comment": "implicit dist url",
           "hashes": [
             {
               "alg": "SHA-256",
-              "content": "1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed"
+              "content": "231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c"
             },
             {
               "alg": "SHA-256",
-              "content": "bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4"
+              "content": "9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897"
             }
           ],
           "type": "distribution",
@@ -171,9 +171,9 @@
         }
       ],
       "name": "urllib3",
-      "purl": "pkg:pypi/urllib3@2.6.3",
+      "purl": "pkg:pypi/urllib3@2.7.0",
       "type": "library",
-      "version": "2.6.3"
+      "version": "2.7.0"
     }
   ],
   "dependencies": [
@@ -304,7 +304,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:f581963d-bd3c-59e8-83e2-f876a6e619ba",
+  "serialNumber": "urn:uuid:37486565-91b5-514b-824f-6f8ae5710d0f",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
