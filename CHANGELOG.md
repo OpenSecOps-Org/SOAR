@@ -1,5 +1,10 @@
 # Change Log
 
+## v3.1.10
+    * Security: bump `soupsieve` 2.8.3 → 2.9.2 (transitive via `beautifulsoup4`), clearing `PYSEC-2026-3071` (CVE-2026-49476, unbounded memory allocation when compiling large comma-separated selector lists) and `PYSEC-2026-3072` (CVE-2026-49477, catastrophic regex backtracking on an unterminated quoted attribute value). Both are denial-of-service issues in the CSS selector parser. The affected lockfiles are the three that carry `beautifulsoup4`: `functions/ai/query_ai`, `functions/reports/postprocess_html` and `functions/reports/setup_to_send_to_account`.
+    * Locks recompiled fleet-wide with `--upgrade` so they stay bit-reproducible from `.in` + pinned `uv` version; a targeted `soupsieve`-only bump left the other pins behind their current in-range resolutions and the release gate's `--reproducible` mode reported drift. Other transitive deps moved as a side effect (`beautifulsoup4` 4.14.3 → 4.15.0, `certifi`, `charset-normalizer`, `humanize`, `idna`, `packaging`, `requests`, `typing-extensions`); `boto3` holds at the mandated 1.42.94. No code or behaviour change; all 612 tests pass.
+    * Neither advisory was exploitable in SOAR: both require an attacker-controlled CSS *selector* string reaching `soupsieve.compile()` / `.select()` / `.select_one()`, and SOAR calls none of those — the three functions use only the tree-search API (`find()`, `find_all()`, `new_tag()`). Patched regardless, as the release-gate policy is to carry no known CVE rather than to reason case-by-case about reachability.
+
 ## v3.1.9
     * `README.md` gains the OpenSSF Best Practices Passing-level badge (project entry [bestpractices.dev/projects/12827](https://www.bestpractices.dev/projects/12827)).
 

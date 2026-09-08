@@ -1166,7 +1166,7 @@ def handle_stack_set(repo_name, stack_name, template_str, params, capabilities, 
 # 
 # ---------------------------------------------------------------------------------------
 
-def deploy(dry_run, verbose, unsafe_untagged=False):
+def deploy(dry_run, verbose, no_verify=False):
     # Check if 'config-deploy.toml' exists at the root of the repo
     if not os.path.exists('config-deploy.toml'):
         printc(RED, "Error: 'config-deploy.toml' is missing.")
@@ -1185,7 +1185,7 @@ def deploy(dry_run, verbose, unsafe_untagged=False):
     # goes through here.
     printc(LIGHT_BLUE, f"Executing 'git pull' in {repo_name}...")
     subprocess.run(['git', 'pull'], check=True)
-    if not verify_release(repo_name, unsafe_untagged=unsafe_untagged):
+    if not verify_release(repo_name, no_verify=no_verify):
         printc(RED, "Aborting deployment — release verification failed.")
         return
 
@@ -1224,14 +1224,15 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dry-run', action='store_true', help='Perform a dry run of the deployments')
     parser.add_argument('--verbose', action='store_true', help='Verbose mode')
-    parser.add_argument('--unsafe-untagged', action='store_true',
-                        help='Allow deploying from a non-release HEAD (loud override; printed for audit)')
+    parser.add_argument('--no-verify', dest='no_verify', action='store_true',
+                        help='Skip release signature verification entirely (development only; '
+                             'loud override, printed for audit)')
     args = parser.parse_args()
 
     if args.dry_run:
         printc(GREEN, "\nThis is a dry run. No changes will be made.")
 
-    deploy(args.dry_run, args.verbose, unsafe_untagged=args.unsafe_untagged)
+    deploy(args.dry_run, args.verbose, no_verify=args.no_verify)
 
 
 if __name__ == '__main__':
