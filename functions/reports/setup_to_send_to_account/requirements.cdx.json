@@ -27,18 +27,18 @@
     },
     {
       "bom-ref": "requirements-L8",
-      "description": "requirements line 8: soupsieve==2.9.2     --hash=sha256:4a55d8cf158a9c2e587fa4922f1bbb91d68ac829e2d6f25403a85747c71daf74     --hash=sha256:8089a26fd974ca7a1f30276d3d8492ab266ab15af581642dfe8aa162e0c1c823",
+      "description": "requirements line 8: soupsieve==2.10     --hash=sha256:49e9380d7d2905463583bafe285e818c7366a9ed7b3aee221c1ac79c905d8bc0     --hash=sha256:8596eb8967d744174820280fa62b4542a2e955bfaccca73ed8a13c6eb8e9b502",
       "externalReferences": [
         {
           "comment": "implicit dist url",
           "hashes": [
             {
               "alg": "SHA-256",
-              "content": "4a55d8cf158a9c2e587fa4922f1bbb91d68ac829e2d6f25403a85747c71daf74"
+              "content": "49e9380d7d2905463583bafe285e818c7366a9ed7b3aee221c1ac79c905d8bc0"
             },
             {
               "alg": "SHA-256",
-              "content": "8089a26fd974ca7a1f30276d3d8492ab266ab15af581642dfe8aa162e0c1c823"
+              "content": "8596eb8967d744174820280fa62b4542a2e955bfaccca73ed8a13c6eb8e9b502"
             }
           ],
           "type": "distribution",
@@ -46,9 +46,9 @@
         }
       ],
       "name": "soupsieve",
-      "purl": "pkg:pypi/soupsieve@2.9.2",
+      "purl": "pkg:pypi/soupsieve@2.10",
       "type": "library",
-      "version": "2.9.2"
+      "version": "2.10"
     },
     {
       "bom-ref": "requirements-L12",
@@ -138,7 +138,7 @@
           ],
           "name": "cyclonedx-py",
           "type": "application",
-          "version": "7.3.1"
+          "version": "7.5.0"
         },
         {
           "description": "Python library for CycloneDX",
@@ -192,7 +192,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:d2887d3b-2aa6-515c-9574-5f226ca9ba50",
+  "serialNumber": "urn:uuid:eed16d79-30eb-5f13-9a66-7a4458c38adb",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",

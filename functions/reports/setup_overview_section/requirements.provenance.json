@@ -37,7 +37,8 @@
         "Changelog": "https://github.com/urllib3/urllib3/blob/main/CHANGES.rst",
         "Code": "https://github.com/urllib3/urllib3",
         "Documentation": "https://urllib3.readthedocs.io",
-        "Issue tracker": "https://github.com/urllib3/urllib3/issues"
+        "Issue tracker": "https://github.com/urllib3/urllib3/issues",
+        "Security policy": "https://urllib3.readthedocs.io/en/latest/security.html"
       }
     }
   }
