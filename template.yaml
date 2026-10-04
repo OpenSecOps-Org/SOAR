@@ -523,16 +523,35 @@ Parameters:
     Description: The recipient or recipients of the weekly AI-based security report.
     Default: ''
 
-  BedrockRegion:
-    Type: String
-    Default: us-east-1
-    Description: The AWS region where Bedrock is available
+  # The AI model settings have no defaults: every operator states them in their config.
+  # Recommended values are in the Installer's apps.example/soar/parameters.toml.
+  # Each deploy looks the models up in Bedrock and probes them (AIConfigResolverCustomResource).
 
-  BedrockModel:
+  AIModel:
     Type: String
-    Description: The Bedrock model to use
-    Default: anthropic.claude-3-5-sonnet-20240620-v1:0
-             
+    Description: Claude model ID on Bedrock, without a prefix (e.g. anthropic.claude-opus-5-5). Claude models only.
+
+  AIFallbackModel:
+    Type: String
+    Description: Claude model ID asked once when AIModel declines, or 'none' to disable the fallback.
+
+  AIRegion:
+    Type: String
+    Description: The AWS region SOAR calls Bedrock in.
+
+  AILocality:
+    Type: String
+    AllowedValues: ['regional', 'global']
+    Description: "'regional' keeps inference in AIRegion's geography; 'global' allows any region."
+
+  AIEffort:
+    Type: String
+    Description: How much the model thinks before answering (e.g. low, medium, high, xhigh, max); validated against the model at deploy.
+
+  AIMaxTokens:
+    Type: Number
+    Description: Maximum output tokens per AI call, thinking included; at most the models' limit.
+
 
   # Dashboard ------------------------------------------------------------------
 
@@ -1156,6 +1175,7 @@ Resources:
         ComputePenaltyScoreFunctionArn: !GetAtt ComputePenaltyScoreFunction.Arn
         SuppressLocallyFunctionArn: !GetAtt SuppressLocallyFunction.Arn
         QueryAIFunctionArn: !GetAtt QueryAIFunction.Arn
+        ExternalCallFailureSNSTopicArn: !Ref ExternalCallFailureSNSTopic  # AI failures are published from the state machine (D8)
         RememberTicketOpenedFunctionArn: !GetAtt RememberTicketOpenedFunction.Arn
         RememberTicketClosedFunctionArn: !GetAtt RememberTicketClosedFunction.Arn
         RememberAutoRemediationDoneFunctionArn: !GetAtt RememberAutoRemediationDoneFunction.Arn
@@ -1181,6 +1201,8 @@ Resources:
         IncidentsSMArn: !Ref SOARIncidents
 
       Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt ExternalCallFailureSNSTopic.TopicName
         - Version: 2012-10-17
           Statement:
             - Effect: Allow
@@ -1657,20 +1679,22 @@ Resources:
     Properties:
       CodeUri: functions/ai/query_ai/
       Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref AIPromptsTable
         - Statement:
-            - 
-              Sid: SSMParameterStore
+            -
+              Sid: ReadResolvedAIConfig
               Effect: Allow
               Action:
                 - ssm:GetParameter
-              Resource: '*'
-            - 
-              Sid: PublishToSNSTopic
+              Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${AIResolvedConfigParameter}'
+            -
+              Sid: PublishToFallbackTopic
               Effect: Allow
               Action:
                 - sns:Publish
-              Resource: !Ref ExternalCallFailureSNSTopic
-            - 
+              Resource: !Ref AIFallbackSNSTopic
+            -
               Sid: BedrockPermissions
               Effect: Allow
               Action:
@@ -1691,9 +1715,28 @@ Resources:
           AI_ANONYMIZE_HEX_STRINGS: !Ref AIAnonymizeHexStrings
           AI_REMOVE_ARNS: !Ref AIRemoveARNs
           AI_REMOVE_EMAIL_ADDRESSES: !Ref AIRemoveEmailAddresses
-          BEDROCK_REGION: !Ref BedrockRegion
-          BEDROCK_MODEL: !Ref BedrockModel
-          SNS_TOPIC_ARN: !Ref ExternalCallFailureSNSTopic
+          AI_CONFIG_PARAMETER: !Ref AIResolvedConfigParameter
+          AI_PROMPTS_TABLE: !Ref AIPromptsTable
+          FALLBACK_SNS_TOPIC_ARN: !Ref AIFallbackSNSTopic
+          # No error topic: QueryAI raises typed errors and the state machines publish them (D8).
+
+  # The AI config resolved at deploy by AIConfigResolverCustomResource (models, inference profiles,
+  # effort, max tokens). Created empty here; the resolver overwrites it on every AI-settings change.
+  AIResolvedConfigParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /soar/ai/resolved-config
+      Type: String
+      Value: '{}'
+      Description: OpenSecOps SOAR resolved AI config, written by the AI config resolver at deploy
+
+  # Published when the primary AI model declines and the fallback model answers. Not an error:
+  # errors go to ExternalCallFailureSNSTopic. Humans subscribe; SOAR creates no subscriptions.
+  AIFallbackSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: OpenSecOpsSOARAIFallbacks
+      DisplayName: OpenSecOps SOAR AI Fallbacks
 
 
   # External services such as Microsoft Sentinel must not create incidents or
@@ -2555,6 +2598,7 @@ Resources:
         OpenTicketFunctionArn: !GetAtt OpenTicketFunction.Arn
         SuppressLocallyFunctionArn: !GetAtt SuppressLocallyFunction.Arn
         QueryAIFunctionArn: !GetAtt QueryAIFunction.Arn
+        ExternalCallFailureSNSTopicArn: !Ref ExternalCallFailureSNSTopic  # AI failures are published from the state machine (D8)
         RememberIncidentOpenedFunctionArn: !GetAtt RememberIncidentOpenedFunction.Arn
         ComputePenaltyScoreFunctionArn: !GetAtt ComputePenaltyScoreFunction.Arn
         SaveToSentinelFunctionArn: !GetAtt SaveToSentinelFunction.Arn
@@ -2564,6 +2608,8 @@ Resources:
         AIPromptsTableName: !Ref AIPromptsTable
 
       Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt ExternalCallFailureSNSTopic.TopicName
         - LambdaInvokePolicy:
             FunctionName: !Ref CallDiskForensicsCollectionFunction
         - LambdaInvokePolicy:
@@ -2782,6 +2828,7 @@ Resources:
         StoreAccountSummaryFunctionArn: !GetAtt StoreAccountSummaryFunction.Arn
         SetupRecommendationsSectionFunctionArn: !GetAtt SetupRecommendationsSectionFunction.Arn
         QueryAIFunctionArn: !GetAtt QueryAIFunction.Arn
+        ExternalCallFailureSNSTopicArn: !Ref ExternalCallFailureSNSTopic  # AI failures are published from the state machine (D8)
         PostprocessHtmlFunctionArn: !GetAtt PostprocessHtmlFunction.Arn
         StitchTogetherSegmentsFunctionArn: !GetAtt StitchTogetherSegmentsFunction.Arn
         SendEmailFunctionArn: !GetAtt SendEmailFunction.Arn
@@ -2795,6 +2842,8 @@ Resources:
         AIReportTable: !Ref AIReportTable
 
       Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt ExternalCallFailureSNSTopic.TopicName
         - LambdaInvokePolicy:
             FunctionName: !Ref ClearTableFunction
         - LambdaInvokePolicy:
@@ -3446,9 +3495,67 @@ Resources:
     Type: AWS::CloudFormation::CustomResource
     Properties:
       ServiceToken: !GetAtt AIPromptsSyncerFunction.Arn
+      ServiceTimeout: 300  # Fail a non-responding custom resource after 5 min, not the default hour
       FunctionName: !Ref AIPromptsSyncerFunction
-      DummyProperty: 'sldfknkdfngiuwbefiwebf'  # Change this value whenever ai-prompts changes
-      
+      DummyProperty: 'kq7vx2m9ltr4wz8hc3nb6pfy1dsj5g'  # Change this value whenever ai-prompts changes
+
+
+  #-------------------------------------------------------------------------------
+  #
+  # Custom resource that resolves the AI config at deploy: looks up the Bedrock
+  # inference profiles for AIModel and AIFallbackModel, probes both models with
+  # SOAR's production request, and writes the result to AIResolvedConfigParameter.
+  # Any problem fails the deploy with a message that says what to fix.
+  #
+  #-------------------------------------------------------------------------------
+
+  AIConfigResolverFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ai/ai_config_resolver/
+      Handler: app.lambda_handler
+      Timeout: 240  # Must finish inside the custom resource's ServiceTimeout
+      Policies:
+        - Statement:
+            -
+              Sid: BedrockLookupAndProbe
+              Effect: Allow
+              Action:
+                - bedrock:ListInferenceProfiles
+                - bedrock:InvokeModel
+              Resource: '*'
+            -
+              Sid: MarketplaceFirstUse  # A model's first call in an account starts its Marketplace subscription
+              Effect: Allow
+              Action:
+                - aws-marketplace:Subscribe
+                - aws-marketplace:Unsubscribe
+                - aws-marketplace:ViewSubscriptions
+              Resource: '*'
+            -
+              Sid: WriteResolvedAIConfig
+              Effect: Allow
+              Action:
+                - ssm:PutParameter
+              Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${AIResolvedConfigParameter}'
+      Environment:
+        Variables:
+          CONFIG_PARAMETER: !Ref AIResolvedConfigParameter
+
+  AIConfigResolverCustomResource:
+    Type: AWS::CloudFormation::CustomResource
+    Properties:
+      ServiceToken: !GetAtt AIConfigResolverFunction.Arn
+      ServiceTimeout: 300  # Fail a non-responding custom resource after 5 min, not the default hour
+      # Any change to these re-runs the resolver
+      AIProvider: !Ref AIProvider
+      AIModel: !Ref AIModel
+      AIFallbackModel: !Ref AIFallbackModel
+      AIRegion: !Ref AIRegion
+      AILocality: !Ref AILocality
+      AIEffort: !Ref AIEffort
+      AIMaxTokens: !Ref AIMaxTokens
+
 
   #-------------------------------------------------------------------------------
   #
@@ -3486,6 +3593,7 @@ Resources:
     Type: AWS::CloudFormation::CustomResource
     Properties:
       ServiceToken: !GetAtt IssueTablesSetupFunction.Arn
+      ServiceTimeout: 300  # Fail a non-responding custom resource after 5 min, not the default hour
       FunctionName: !Ref IssueTablesSetupFunction
       
 

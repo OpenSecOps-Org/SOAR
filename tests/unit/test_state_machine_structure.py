@@ -179,6 +179,10 @@ def test_complete_state_machine_connectivity():
             'type': 'Task',
             'next': 'Send Ticketing Email'
         },
+        'Report AddAiDataForOpenedTickets Failure': {  # reached by the AI state's catch; see test_ai_state_machines.py
+            'type': 'Task',
+            'next': 'Send Ticketing Email'
+        },
         'Send Ticketing Email': {
             'type': 'Task',
             'next': 'Set to NOTIFIED + Ticket data'
@@ -204,6 +208,10 @@ def test_complete_state_machine_connectivity():
             'next': 'AddAiDataForAutoremediation'
         },
         'AddAiDataForAutoremediation': {
+            'type': 'Task',
+            'next': 'Send Remediation Email'
+        },
+        'Report AddAiDataForAutoremediation Failure': {  # reached by the AI state's catch; see test_ai_state_machines.py
             'type': 'Task',
             'next': 'Send Remediation Email'
         },
@@ -266,6 +274,10 @@ def test_complete_state_machine_connectivity():
             'next': 'AddAiDataForClosedTickets'
         },
         'AddAiDataForClosedTickets': {
+            'type': 'Task',
+            'next': 'Send Ticket Closed Email'
+        },
+        'Report AddAiDataForClosedTickets Failure': {  # reached by the AI state's catch; see test_ai_state_machines.py
             'type': 'Task',
             'next': 'Send Ticket Closed Email'
         },

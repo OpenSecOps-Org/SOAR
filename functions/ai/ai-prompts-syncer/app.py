@@ -10,7 +10,12 @@ logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource('dynamodb')
 
+# Keep the ID CloudFormation already holds; cfnresponse's default (the log stream name) changes
+# between invocations, which makes every update look like a replacement followed by a Delete.
+FIXED_PHYSICAL_ID = 'ai-prompts-syncer'
+
 def lambda_handler(event, context):
+    physical_id = event.get('PhysicalResourceId', FIXED_PHYSICAL_ID)
     try:
         logger.info('Received event: %s', event)
 
@@ -35,12 +40,13 @@ def lambda_handler(event, context):
                     table.put_item(Item=item)
 
         # Succeed for Create, Update, AND the no-op Delete
-        cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+        cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physicalResourceId=physical_id)
         # Add a log statement for successful completion
         logger.info('Function execution completed successfully')
 
     # If anything at all fails, just fail and return
     except Exception as e:
         logger.error('Error occurred: %s', str(e))
-        cfnresponse.send(event, context, cfnresponse.FAILED, 'Error occurred: {}'.format(str(e)))
+        cfnresponse.send(event, context, cfnresponse.FAILED, 'Error occurred: {}'.format(str(e)),
+                         physicalResourceId=physical_id)
 

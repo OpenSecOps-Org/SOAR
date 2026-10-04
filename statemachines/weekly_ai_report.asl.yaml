@@ -64,16 +64,52 @@ States:
   Create Overview Section:
     Type: Task
     Resource: '${QueryAIFunctionArn}'
-    TimeoutSeconds: 900
+    TimeoutSeconds: 930  # Above QueryAI's 900 s, so QueryAI reports its own timeout first
     Retry:
-        -
-            ErrorEquals:
-                - Lambda.TooManyRequestsException
-                - Lambda.ServiceException
-                - ThrottlingException
-            IntervalSeconds: 10
-            MaxAttempts: 25
-            BackoffRate: 1.5
+      -
+        ErrorEquals:
+          - AITransientError  # QueryAI never retries; transient Bedrock errors are retried here
+        IntervalSeconds: 10
+        MaxAttempts: 3
+        BackoffRate: 2
+        JitterStrategy: FULL
+      -
+        ErrorEquals:
+          - Lambda.TooManyRequestsException
+          - Lambda.ServiceException
+        IntervalSeconds: 10
+        MaxAttempts: 25
+        BackoffRate: 1.5
+    Catch:
+      -
+        ErrorEquals:
+          - States.ALL
+        ResultPath: $.error
+        Next: Report Create Overview Section Failure
+    Next: Postprocess Overview Section
+
+  Report Create Overview Section Failure:  # Publishes the AI failure once (D8); a publishing problem never blocks
+    Type: Task
+    Resource: arn:aws:states:::sns:publish
+    Parameters:
+      TopicArn: '${ExternalCallFailureSNSTopicArn}'
+      Subject: OpenSecOps SOAR AI failure
+      Message.$: "States.Format('The AI state Create Overview Section failed in execution {}. The report section is replaced by a notice. Error: {}. Cause: {}', $$.Execution.Id, $.error.Error, $.error.Cause)"
+    ResultPath: null
+    Catch:
+      -
+        ErrorEquals:
+          - States.ALL
+        ResultPath: null
+        Next: Create Overview Section Failure Notice
+    Next: Create Overview Section Failure Notice
+
+  Create Overview Section Failure Notice:
+    Type: Pass
+    Result:
+      html: '<p>This section could not be generated; the failure has been reported.</p>'
+      plaintext: 'This section could not be generated; the failure has been reported.'
+    ResultPath: $.messages.ai
     Next: Postprocess Overview Section
 
   Postprocess Overview Section:
@@ -124,19 +160,55 @@ States:
           Next: Create Account Segment
 
         Create Account Segment:
-            Type: Task
-            Resource: '${QueryAIFunctionArn}'
-            TimeoutSeconds: 900
-            Retry:
-                -
-                    ErrorEquals:
-                        - Lambda.TooManyRequestsException
-                        - Lambda.ServiceException
-                        - ThrottlingException
-                    IntervalSeconds: 10
-                    MaxAttempts: 25
-                    BackoffRate: 1.5
-            Next: Store Account Segment Summary
+          Type: Task
+          Resource: '${QueryAIFunctionArn}'
+          TimeoutSeconds: 930  # Above QueryAI's 900 s, so QueryAI reports its own timeout first
+          Retry:
+            -
+              ErrorEquals:
+                - AITransientError  # QueryAI never retries; transient Bedrock errors are retried here
+              IntervalSeconds: 10
+              MaxAttempts: 3
+              BackoffRate: 2
+              JitterStrategy: FULL
+            -
+              ErrorEquals:
+                - Lambda.TooManyRequestsException
+                - Lambda.ServiceException
+              IntervalSeconds: 10
+              MaxAttempts: 25
+              BackoffRate: 1.5
+          Catch:
+            -
+              ErrorEquals:
+                - States.ALL
+              ResultPath: $.error
+              Next: Report Create Account Segment Failure
+          Next: Store Account Segment Summary
+
+        Report Create Account Segment Failure:  # Publishes the AI failure once (D8); a publishing problem never blocks
+          Type: Task
+          Resource: arn:aws:states:::sns:publish
+          Parameters:
+            TopicArn: '${ExternalCallFailureSNSTopicArn}'
+            Subject: OpenSecOps SOAR AI failure
+            Message.$: "States.Format('The AI state Create Account Segment failed in execution {}. The report section is replaced by a notice. Error: {}. Cause: {}', $$.Execution.Id, $.error.Error, $.error.Cause)"
+          ResultPath: null
+          Catch:
+            -
+              ErrorEquals:
+                - States.ALL
+              ResultPath: null
+              Next: Create Account Segment Failure Notice
+          Next: Create Account Segment Failure Notice
+
+        Create Account Segment Failure Notice:
+          Type: Pass
+          Result:
+            html: '<p>This section could not be generated; the failure has been reported.</p>'
+            plaintext: 'This section could not be generated; the failure has been reported.'
+          ResultPath: $.messages.ai
+          Next: Store Account Segment Summary
 
         Store Account Segment Summary:
           Type: Task
@@ -235,16 +307,52 @@ States:
   Create Recommendations Section:
     Type: Task
     Resource: '${QueryAIFunctionArn}'
-    TimeoutSeconds: 900
+    TimeoutSeconds: 930  # Above QueryAI's 900 s, so QueryAI reports its own timeout first
     Retry:
       -
-          ErrorEquals:
-              - Lambda.TooManyRequestsException
-              - Lambda.ServiceException
-              - ThrottlingException
-          IntervalSeconds: 10
-          MaxAttempts: 25
-          BackoffRate: 1.5
+        ErrorEquals:
+          - AITransientError  # QueryAI never retries; transient Bedrock errors are retried here
+        IntervalSeconds: 10
+        MaxAttempts: 3
+        BackoffRate: 2
+        JitterStrategy: FULL
+      -
+        ErrorEquals:
+          - Lambda.TooManyRequestsException
+          - Lambda.ServiceException
+        IntervalSeconds: 10
+        MaxAttempts: 25
+        BackoffRate: 1.5
+    Catch:
+      -
+        ErrorEquals:
+          - States.ALL
+        ResultPath: $.error
+        Next: Report Create Recommendations Section Failure
+    Next: Postprocess Recommendations Section
+
+  Report Create Recommendations Section Failure:  # Publishes the AI failure once (D8); a publishing problem never blocks
+    Type: Task
+    Resource: arn:aws:states:::sns:publish
+    Parameters:
+      TopicArn: '${ExternalCallFailureSNSTopicArn}'
+      Subject: OpenSecOps SOAR AI failure
+      Message.$: "States.Format('The AI state Create Recommendations Section failed in execution {}. The report section is replaced by a notice. Error: {}. Cause: {}', $$.Execution.Id, $.error.Error, $.error.Cause)"
+    ResultPath: null
+    Catch:
+      -
+        ErrorEquals:
+          - States.ALL
+        ResultPath: null
+        Next: Create Recommendations Section Failure Notice
+    Next: Create Recommendations Section Failure Notice
+
+  Create Recommendations Section Failure Notice:
+    Type: Pass
+    Result:
+      html: '<p>This section could not be generated; the failure has been reported.</p>'
+      plaintext: 'This section could not be generated; the failure has been reported.'
+    ResultPath: $.messages.ai
     Next: Postprocess Recommendations Section
 
   Postprocess Recommendations Section:

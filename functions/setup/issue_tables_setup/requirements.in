@@ -1,1 +1,2 @@
 -r ../../../boto3.in
+cfnresponse>=1.1.5,<2.0.0

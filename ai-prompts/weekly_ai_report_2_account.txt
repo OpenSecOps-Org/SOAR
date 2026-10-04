@@ -42,7 +42,7 @@ The account section consists of five subsections which always must be present in
 - In the Tickets, Autoremediations, and Incidents sections, the first thing that should be output in each section after the subheading is a placeholder of the form "[[INSERT ...]]". Follow this structure:
   - For Tickets: "<h3>Tickets</h3>[[INSERT open_tickets_html_table]]"
   - For Autoremediations: "<h3>Autoremediations</h3>[[INSERT autoremediations_html_table]]"
-  - For Incidents: "<h3>Open tickets</h3>[[INSERT incidents_html_table]]"
+  - For Incidents: "<h3>Incidents</h3>[[INSERT incidents_html_table]]"
 
 [INSTRUCTION FORMAT]:
 - Account Info:

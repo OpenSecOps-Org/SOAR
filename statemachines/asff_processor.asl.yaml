@@ -443,22 +443,45 @@ States:
     AddAiDataForOpenedTickets:
         Type: Task
         Resource: '${QueryAIFunctionArn}'
-        TimeoutSeconds: 600
+        TimeoutSeconds: 930  # Above QueryAI's 900 s, so QueryAI reports its own timeout first
         Retry:
+            -
+                ErrorEquals:
+                    - AITransientError  # QueryAI never retries; transient Bedrock errors are retried here
+                IntervalSeconds: 10
+                MaxAttempts: 3
+                BackoffRate: 2
+                JitterStrategy: FULL
             -
                 ErrorEquals:
                     - Lambda.TooManyRequestsException
                     - Lambda.ServiceException
-                    - ThrottlingException
                 IntervalSeconds: 10
                 MaxAttempts: 25
                 BackoffRate: 1.5
         Catch:
-            -   
+            -
                 ErrorEquals:
-                    - States.Timeout
+                    - States.ALL
+                ResultPath: $.error
+                Next: Report AddAiDataForOpenedTickets Failure
+        Next: Send Ticketing Email
+
+    Report AddAiDataForOpenedTickets Failure:  # Publishes the AI failure once (D8); a publishing problem never blocks
+        Type: Task
+        Resource: arn:aws:states:::sns:publish
+        Parameters:
+            TopicArn: '${ExternalCallFailureSNSTopicArn}'
+            Subject: OpenSecOps SOAR AI failure
+            Message.$: "States.Format('The AI state AddAiDataForOpenedTickets failed in execution {}. The email is sent without the AI section. Error: {}. Cause: {}', $$.Execution.Id, $.error.Error, $.error.Cause)"
+        ResultPath: null
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
                 ResultPath: null
                 Next: Send Ticketing Email
+        Next: Send Ticketing Email
         Next: Send Ticketing Email
 
     Send Ticketing Email:
@@ -586,22 +609,45 @@ States:
     AddAiDataForAutoremediation:
         Type: Task
         Resource: '${QueryAIFunctionArn}'
-        TimeoutSeconds: 600
+        TimeoutSeconds: 930  # Above QueryAI's 900 s, so QueryAI reports its own timeout first
         Retry:
+            -
+                ErrorEquals:
+                    - AITransientError  # QueryAI never retries; transient Bedrock errors are retried here
+                IntervalSeconds: 10
+                MaxAttempts: 3
+                BackoffRate: 2
+                JitterStrategy: FULL
             -
                 ErrorEquals:
                     - Lambda.TooManyRequestsException
                     - Lambda.ServiceException
-                    - ThrottlingException
                 IntervalSeconds: 10
                 MaxAttempts: 25
                 BackoffRate: 1.5
         Catch:
-            -   
+            -
                 ErrorEquals:
-                    - States.Timeout
+                    - States.ALL
+                ResultPath: $.error
+                Next: Report AddAiDataForAutoremediation Failure
+        Next: Send Remediation Email
+
+    Report AddAiDataForAutoremediation Failure:  # Publishes the AI failure once (D8); a publishing problem never blocks
+        Type: Task
+        Resource: arn:aws:states:::sns:publish
+        Parameters:
+            TopicArn: '${ExternalCallFailureSNSTopicArn}'
+            Subject: OpenSecOps SOAR AI failure
+            Message.$: "States.Format('The AI state AddAiDataForAutoremediation failed in execution {}. The email is sent without the AI section. Error: {}. Cause: {}', $$.Execution.Id, $.error.Error, $.error.Cause)"
+        ResultPath: null
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
                 ResultPath: null
                 Next: Send Remediation Email
+        Next: Send Remediation Email
         Next: Send Remediation Email
 
     Send Remediation Email:
@@ -829,22 +875,45 @@ States:
     AddAiDataForClosedTickets:
         Type: Task
         Resource: '${QueryAIFunctionArn}'
-        TimeoutSeconds: 600
+        TimeoutSeconds: 930  # Above QueryAI's 900 s, so QueryAI reports its own timeout first
         Retry:
+            -
+                ErrorEquals:
+                    - AITransientError  # QueryAI never retries; transient Bedrock errors are retried here
+                IntervalSeconds: 10
+                MaxAttempts: 3
+                BackoffRate: 2
+                JitterStrategy: FULL
             -
                 ErrorEquals:
                     - Lambda.TooManyRequestsException
                     - Lambda.ServiceException
-                    - ThrottlingException
                 IntervalSeconds: 10
                 MaxAttempts: 25
                 BackoffRate: 1.5
         Catch:
-            -   
+            -
                 ErrorEquals:
-                    - States.Timeout
+                    - States.ALL
+                ResultPath: $.error
+                Next: Report AddAiDataForClosedTickets Failure
+        Next: Send Ticket Closed Email
+
+    Report AddAiDataForClosedTickets Failure:  # Publishes the AI failure once (D8); a publishing problem never blocks
+        Type: Task
+        Resource: arn:aws:states:::sns:publish
+        Parameters:
+            TopicArn: '${ExternalCallFailureSNSTopicArn}'
+            Subject: OpenSecOps SOAR AI failure
+            Message.$: "States.Format('The AI state AddAiDataForClosedTickets failed in execution {}. The email is sent without the AI section. Error: {}. Cause: {}', $$.Execution.Id, $.error.Error, $.error.Cause)"
+        ResultPath: null
+        Catch:
+            -
+                ErrorEquals:
+                    - States.ALL
                 ResultPath: null
                 Next: Send Ticket Closed Email
+        Next: Send Ticket Closed Email
         Next: Send Ticket Closed Email
 
     Send Ticket Closed Email:

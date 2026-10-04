@@ -1,141 +1,216 @@
+"""
+QueryAI: SOAR's one Lambda that calls Claude on Amazon Bedrock.
+
+Each call reads the resolved AI config (written at deploy by the AI config resolver) from SSM and the
+`system` prompt from the prompts table, sends SOAR's Converse request (D2) to the primary model, and asks
+the fallback model once if the primary declines. A fallback that answers is published to the fallback
+topic, which is not an error topic.
+
+QueryAI never retries and publishes no errors (D8). It raises typed errors and the state machine that
+invoked it retries AITransientError and publishes every failure to the error topic once.
+"""
+
+import json
+import logging
 import os
 import re
+
 import boto3
-import json
 import html2text
-import logging
 from bs4 import BeautifulSoup
+from botocore.config import Config
+from botocore.exceptions import ClientError, ConnectTimeoutError, ReadTimeoutError
 
-
-# Set the logging level to INFO
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Get environment variables
 AI_PROVIDER = os.environ['AI_PROVIDER']
 AI_IAC_SNIPPETS = os.environ['AI_IAC_SNIPPETS']
 AI_ANONYMIZE_ACCOUNT_NUMBERS = os.environ['AI_ANONYMIZE_ACCOUNT_NUMBERS']
 AI_ANONYMIZE_HEX_STRINGS = os.environ['AI_ANONYMIZE_HEX_STRINGS']
 AI_REMOVE_ARNS = os.environ['AI_REMOVE_ARNS']
 AI_REMOVE_EMAIL_ADDRESSES = os.environ['AI_REMOVE_EMAIL_ADDRESSES']
+AI_CONFIG_PARAMETER = os.environ['AI_CONFIG_PARAMETER']
+AI_PROMPTS_TABLE = os.environ['AI_PROMPTS_TABLE']
+FALLBACK_SNS_TOPIC_ARN = os.environ['FALLBACK_SNS_TOPIC_ARN']
 
-BEDROCK_REGION = os.environ['BEDROCK_REGION']
-BEDROCK_MODEL = os.environ['BEDROCK_MODEL']
-
-SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
-
-# Initialize the SNS client
-sns_client = boto3.client('sns')
-
-if AI_PROVIDER == 'BEDROCK':
-    bedrock_client = boto3.client('bedrock-runtime', region_name=BEDROCK_REGION)
+TRANSIENT_ERRORS = {'ThrottlingException', 'ServiceUnavailableException', 'InternalServerException',
+                    'ModelTimeoutException', 'ModelNotReadyException'}
+READ_TIMEOUT_MARGIN_S = 30
 
 
-# Define the lambda_handler function
-def lambda_handler(data, _context):
-    # Return immediately if AI isn't to be used
+class AITransientError(Exception):
+    """A transient Bedrock error or timeout. The state machine retries it."""
+
+
+class AIResponseDeclined(Exception):
+    """The model declined (no text, or content_filtered) and the fallback did not answer either."""
+
+
+class AIRequestError(Exception):
+    """Bedrock rejected the request (validation, access, missing resource). Not retried."""
+
+
+def lambda_handler(data, context):
     if AI_PROVIDER == 'NONE':
         return data
-    
-    # Should we post-process the html?
-    no_html_post_processing = data.get('no_html_post_processing')
 
-    # Get the system_text and instructions from the input data
-    system_text = data.get('system')
-    instructions = data.get('instructions')
+    config = read_config()
+    system_text = build_system_text(data, read_system_prompt())
+    user_text = build_user_text(data)
 
-    # If instructions are not provided, get them from nested_instructions
-    if not instructions:
-        nested_instructions = data.get('nested_instructions')
-        if nested_instructions:
-            instructions = nested_instructions['instructions']
+    remaining_s = context.get_remaining_time_in_millis() / 1000
+    runtime = boto3.client('bedrock-runtime', region_name=config['region'], config=Config(
+        read_timeout=max(10, int(remaining_s - READ_TIMEOUT_MARGIN_S)), connect_timeout=10,
+        retries={'total_max_attempts': 1, 'mode': 'standard'}))
 
-    # If system_text is not provided, set a default value
-    if not system_text:
-        system_text = "You are a helpful security assistant offering detailed expert advice and answers on AWS security controls and incidents.\n\n"
-        system_text += "Context: Severity levels are INFORMATIONAL, requiring no attention; LOW, requiring attention when convenient; MEDIUM, requiring attention within the current sprint; HIGH, requiring attention within a few hours; and CRITICAL, a show-stopper requiring immediate attention.\n\n"
-        system_text += 'The output is HTML. Output your results as HTML inside a <div style="font-family: Verdana, sans-serif; font-size:16px;"> ... </div>.\n\n'
-        system_text += "Clearly header your output using as few words as possible. For instance, 'Analysis' is better than 'Detailed Expert Analysis of the Security Issue' or 'Detailed Expert Analysis'.\n\n"
-        system_text += instructions
+    html = query(runtime, config, system_text, user_text, data)
 
-    # Insert the desired IaC snippet languages
-    system_text = system_text.replace('[[IAC_SNIPPETS]]', AI_IAC_SNIPPETS)
-
-    # Get the user_text from the input data or anonymize the email body
-    user_text = data.get('user') or anonymise(data['messages']['email']['body'].split("====================")[0])
-
-    html = call_bedrock_api(BEDROCK_MODEL, system_text, user_text)
-
-    # Post-processing galore
-    if not no_html_post_processing:
+    if not data.get('no_html_post_processing'):
         html = format_tables_inline(html)
         html = format_pre_sections(html)
 
-    # Add the plaintext and html messages to the data
-    if not data.get('messages'):
-        data['messages'] = {}
-
-    if not data['messages'].get('ai'):
-        data['messages']['ai'] = {}
-
-    data['messages']['ai'] = {
-        'plaintext': html2text.html2text(html),
-        'html': html
-    }
-
+    data.setdefault('messages', {})
+    data['messages']['ai'] = {'plaintext': html2text.html2text(html), 'html': html}
     return data
 
 
-# Call the Bedrock API
-def call_bedrock_api(model, system_text, user_text):
-    """
-    Call the Bedrock API with the specified model (right now only the Anthropic format is supported).
-    """
-    messages = [{"role": "user", "content": [{"type": "text", "text": f"{system_text}\n\n{user_text}"}]}]
-    logger.info(f"Bedrock API input: {messages}")
+# ---------------------------------------------------------------------------
+# Inputs: config, system text (D11), user text
+# ---------------------------------------------------------------------------
 
+def read_config():
+    """The resolved AI config; read on every call, so a deploy takes effect at once."""
+    value = boto3.client('ssm').get_parameter(Name=AI_CONFIG_PARAMETER)['Parameter']['Value']
+    return json.loads(value)
+
+
+def read_system_prompt():
+    """ai-prompts/system.txt as synced to the prompts table: it goes first in every call (D11)."""
+    item = boto3.client('dynamodb').get_item(TableName=AI_PROMPTS_TABLE, Key={'id': {'S': 'system'}})
+    return item['Item']['instructions']['S']
+
+
+def build_system_text(data, system_prompt):
+    """system.txt, then the call's own prompts: the weekly report's `system`, or the finding's instructions."""
+    own = data.get('system') or data.get('instructions') or (data.get('nested_instructions') or {}).get('instructions', '')
+    return f'{system_prompt.rstrip()}\n\n{own}'.replace('[[IAC_SNIPPETS]]', AI_IAC_SNIPPETS)
+
+
+def build_user_text(data):
+    return data.get('user') or anonymise(data['messages']['email']['body'].split('====================')[0])
+
+
+# ---------------------------------------------------------------------------
+# The Bedrock call, declines and the fallback (§3.3)
+# ---------------------------------------------------------------------------
+
+def request_body(profile_id, config, system_text, user_text):
+    """SOAR's one Converse request for every supported model (D2)."""
+    return {
+        'modelId': profile_id,
+        'system': [{'text': system_text}],
+        'messages': [{'role': 'user', 'content': [{'text': user_text}]}],
+        'inferenceConfig': {'maxTokens': config['maxTokens']},
+        'additionalModelRequestFields': {
+            'thinking': {'type': 'adaptive'},
+            'output_config': {'effort': config['effort']},
+        },
+        'additionalModelResponseFieldPaths': ['/stop_details'],
+    }
+
+
+def extract_text(response):
+    """Every text block, in order; reasoning blocks are ignored. Never content[0]."""
+    blocks = response.get('output', {}).get('message', {}).get('content', [])
+    return ''.join(b['text'] for b in blocks if 'text' in b)
+
+
+def stop_details(response):
+    return (response.get('additionalModelResponseFields') or {}).get('stop_details') or {}
+
+
+def converse(runtime, model, body):
+    """One Bedrock call, no retries. Errors become typed exceptions for the state machine."""
     try:
-        # Prepare the request body
-        body = json.dumps({
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 8192,
-            "messages": messages,
-            "temperature": 0.3,
-            # "top_p": 0.7,
-            "top_k": 250
-        })
+        response = runtime.converse(**body)
+    except ClientError as error:
+        code = error.response.get('Error', {}).get('Code', '')
+        message = error.response.get('Error', {}).get('Message', '')
+        if code in TRANSIENT_ERRORS:
+            raise AITransientError(f'{model["modelId"]} ({model["profileId"]}): {code}: {message}') from error
+        raise AIRequestError(f'{model["modelId"]} ({model["profileId"]}): {code}: {message}') from error
+    except (ReadTimeoutError, ConnectTimeoutError) as error:
+        raise AITransientError(f'{model["modelId"]} ({model["profileId"]}): {type(error).__name__}: {error}') from error
 
-        # Call the Bedrock API
-        response = bedrock_client.invoke_model(
-            modelId=model,
-            contentType='application/json',
-            accept='application/json',
-            body=body
-        )
-        
-        # Parse the response
-        response_body = json.loads(response['body'].read())
-        logger.info(f"Bedrock API response: {response_body}")
-        completion = response_body['content'][0]['text']
-        logger.info(f"Completion: {completion}")
-        return completion
-
-    except Exception as e:
-        logger.error(f"Error calling Bedrock API: {str(e)}")
-        send_sns_notification(f"Bedrock API Error: {str(e)}")
-        raise
+    logger.info('%s: stopReason %s, usage %s, latencyMs %s, stop_details %s', model['profileId'],
+                response.get('stopReason'), response.get('usage'), response.get('metrics', {}).get('latencyMs'),
+                stop_details(response) or None)
+    return response
 
 
-# Helper function to send an SNS notification
-def send_sns_notification(message):
-    sns_client.publish(
-        TopicArn=SNS_TOPIC_ARN,
-        Message=message,
-        Subject="GenAI Call Error"
-    )
+def answer_of(response):
+    """The answer text, or '' for a decline. Partial text of a content_filtered response is discarded."""
+    if response.get('stopReason') == 'content_filtered':
+        return ''
+    return extract_text(response)
 
 
-# Helper function to anonymize input
+def query(runtime, config, system_text, user_text, data):
+    primary, fallback = config['primary'], config.get('fallback')
+
+    response = converse(runtime, primary, request_body(primary['profileId'], config, system_text, user_text))
+    text = answer_of(response)
+    if not text and fallback:
+        declined = response
+        logger.warning('%s declined (stopReason %s, stop_details %s); asking %s', primary['modelId'],
+                       declined.get('stopReason'), stop_details(declined) or None, fallback['modelId'])
+        response = converse(runtime, fallback, request_body(fallback['profileId'], config, system_text, user_text))
+        text = answer_of(response)
+        if text:
+            publish_fallback(data, primary, fallback, declined)
+
+    if not text:
+        last = fallback if fallback else primary
+        raise AIResponseDeclined(
+            f'{primary["modelId"]} declined' + (f' and {fallback["modelId"]} declined too' if fallback else ', no fallback')
+            + f' (last stopReason {response.get("stopReason")!r}, stop_details {stop_details(response) or None}, '
+            f'model {last["modelId"]})')
+
+    if response.get('stopReason') == 'max_tokens':
+        logger.warning('Output reached maxTokens (%s); keeping the truncated text', config['maxTokens'])
+    return text
+
+
+def call_site(data):
+    """What the analysis was for: the email subject (TEAM FIX:, AUTOFIXED:, CLOSED:, INCIDENT:) or the weekly report."""
+    subject = ((data.get('messages') or {}).get('email') or {}).get('subject')
+    return subject or 'weekly report section'
+
+
+def publish_fallback(data, primary, fallback, declined):
+    """A fallback that answered: worth tracking, not an error. A publishing problem must not lose the answer."""
+    finding = data.get('finding') or {}
+    details = stop_details(declined)
+    message = '\n'.join([
+        'The primary AI model declined and the fallback model answered.',
+        f'Call site: {call_site(data)}',
+        f'Finding: {finding.get("Title", "n/a")} ({finding.get("Id", "n/a")})',
+        f'Primary model: {primary["modelId"]} ({primary["profileId"]})',
+        f'Primary stopReason: {declined.get("stopReason")}',
+        f'Classifier category: {details.get("category", "n/a")}',
+        f'Fallback model: {fallback["modelId"]} ({fallback["profileId"]})',
+    ])
+    try:
+        boto3.client('sns').publish(TopicArn=FALLBACK_SNS_TOPIC_ARN, Subject='SOAR AI fallback used', Message=message)
+    except Exception:  # noqa: BLE001 - informational only
+        logger.exception('Could not publish to the fallback topic')
+
+
+# ---------------------------------------------------------------------------
+# Input anonymisation and HTML post-processing (unchanged)
+# ---------------------------------------------------------------------------
+
 def anonymise(input):
     if AI_ANONYMIZE_ACCOUNT_NUMBERS == 'Yes':
         aws_account_number_pattern = r"\b\d{12}\b"
@@ -161,60 +236,31 @@ def anonymise(input):
 
 # Add inline styling to all tables, as email clients are dodgy with HEAD style and classes
 def format_tables_inline(html):
-    logger.info(html)
-
-    # Create a BeautifulSoup object to parse the HTML
     soup = BeautifulSoup(html, 'html.parser')
 
-    # Replace inline styling for table elements
     for table in soup.find_all('table'):
         table['style'] = 'border: 1px solid black; border-collapse: collapse; padding: 4px; background-color: #EEEEEE; font-size: 14px;'
 
-    # Replace inline styling for th elements
     for th in soup.find_all('th'):
         th['style'] = 'background-color: grey; color: white; border: 1px solid black; border-collapse: collapse; padding: 4px;'
 
-    # Add or replace inline styling in td elements
     for td in soup.find_all('td'):
         if 'style' in td.attrs:
             td['style'] += '; border: 1px solid black; border-collapse: collapse; padding: 4px;'
         else:
             td['style'] = 'border: 1px solid black; border-collapse: collapse; padding: 4px;'
 
-        # Check if the contents of the <td> tag contain "OVERDUE"
         if 'OVERDUE' in td.text:
             td['style'] += '; background-color: red;'
 
-        # Check if the contents of the <td> tag contain severity levels
         if td.text in ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"]:
-            severity = td.text
-
-            # Set the background color based on the severity level
-            if severity == "CRITICAL":
-                bgcolour = "FF00FF"  # violet
-            elif severity == "HIGH":
-                bgcolour = "FF0000"  # red
-            elif severity == "MEDIUM":
-                bgcolour = "FF8000"  # orange
-            elif severity == "LOW":
-                bgcolour = "FFFF00"  # yellow
-            elif severity == "INFORMATIONAL":
-                bgcolour = "E0E0E0"  # light gray
-
+            bgcolour = {"CRITICAL": "FF00FF", "HIGH": "FF0000", "MEDIUM": "FF8000",
+                        "LOW": "FFFF00", "INFORMATIONAL": "E0E0E0"}[td.text]
             td['style'] += f'; background-color: #{bgcolour};'
 
-
-    # Return the modified HTML
-    html = str(soup)
-    logger.info(html)
-    return html
+    return str(soup)
 
 
 def format_pre_sections(html):
-    # Define the style to be inserted
     style = 'style="background-color: #030204; padding: 12px; color: #f8f9d2;"'
-
-    # Use a regular expression to search and replace all <pre> tags with the modified version
-    updated_html = re.sub(r'<pre>', f'<pre {style}>', html)
-
-    return updated_html
+    return re.sub(r'<pre>', f'<pre {style}>', html)
