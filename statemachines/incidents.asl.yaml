@@ -43,11 +43,11 @@ States:
             -
                 ErrorEquals:
                     - States.Timeout
+                    - DynamoDB.AmazonDynamoDBException  # also on-demand throttling: ThrottlingException has no class of its own
                     - DynamoDB.SdkClientException
                     - DynamoDB.InternalServerErrorException
                     - DynamoDB.ProvisionedThroughputExceededException
-                    - DynamoDB.ThrottlingException
-                    - DynamoDB.RequestLimitExceeded
+                    - DynamoDB.RequestLimitExceededException
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
@@ -467,11 +467,11 @@ States:
             -
                 ErrorEquals:
                     - States.Timeout
+                    - DynamoDB.AmazonDynamoDBException  # also on-demand throttling: ThrottlingException has no class of its own
                     - DynamoDB.SdkClientException
                     - DynamoDB.InternalServerErrorException
                     - DynamoDB.ProvisionedThroughputExceededException
-                    - DynamoDB.ThrottlingException
-                    - DynamoDB.RequestLimitExceeded
+                    - DynamoDB.RequestLimitExceededException
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
@@ -570,11 +570,11 @@ States:
             -
                 ErrorEquals:
                     - States.Timeout
+                    - DynamoDB.AmazonDynamoDBException  # also on-demand throttling: ThrottlingException has no class of its own
                     - DynamoDB.SdkClientException
                     - DynamoDB.InternalServerErrorException
                     - DynamoDB.ProvisionedThroughputExceededException
-                    - DynamoDB.ThrottlingException
-                    - DynamoDB.RequestLimitExceeded
+                    - DynamoDB.RequestLimitExceededException
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3

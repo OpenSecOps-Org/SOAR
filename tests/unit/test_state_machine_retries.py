@@ -27,8 +27,17 @@ LAMBDA_SERVICE_ERRORS = {'Lambda.ServiceException', 'Lambda.AWSLambdaException',
 TICKETING_FUNCTIONS = {'OpenTicketFunction', 'CloseTicketFunction', 'SaveToSentinelFunction'}
 LAMBDA_RULE = {'IntervalSeconds': 5, 'MaxAttempts': 20, 'BackoffRate': 2, 'MaxDelaySeconds': 300,
                'JitterStrategy': 'FULL'}
-DYNAMODB_THROTTLING = {'DynamoDB.ProvisionedThroughputExceededException', 'DynamoDB.ThrottlingException',
-                       'DynamoDB.RequestLimitExceeded'}
+# What Step Functions reports for an optimized DynamoDB task: 'DynamoDB.' + the AWS SDK for Java v1 exception
+# class for the error code, or the base class AmazonDynamoDBException for a code without one (established
+# with TestState in October 2026: ValidationException -> DynamoDB.AmazonDynamoDBException,
+# ConditionalCheckFailedException -> DynamoDB.ConditionalCheckFailedException). The v1 SDK has no
+# ThrottlingException class, which is what on-demand tables (all of SOAR's) throttle with, so throttling can
+# only be retried under the base name; that also retries permanent DynamoDB errors until the rule gives up.
+DYNAMODB_TRANSIENT = {'DynamoDB.ProvisionedThroughputExceededException',   # provisioned tables
+                      'DynamoDB.RequestLimitExceededException',           # account throughput limit
+                      'DynamoDB.AmazonDynamoDBException',                 # on-demand ThrottlingException
+                      'DynamoDB.InternalServerErrorException'}            # HTTP 500
+NEVER_EMITTED = {'DynamoDB.ThrottlingException', 'DynamoDB.RequestLimitExceeded'}
 NEVER_RETRIED = ['SecurityHubUpdateRejected', 'TicketingRequestError', 'KeyError', 'ClientError',
                  'Sandbox.Timedout', 'Lambda.Unknown', 'States.TaskFailed']
 
@@ -77,8 +86,7 @@ RETRYING = [s for s in STATES if s[2].get('Retry')]
 LAMBDA_STATES = [(sm, name, state, FUNCTIONS[state['Resource']]) for sm, name, state in STATES
                  if state.get('Type') == 'Task' and state.get('Resource') in FUNCTIONS
                  and FUNCTIONS[state['Resource']] != 'QueryAIFunction']
-DYNAMODB_STATES = [s for s in STATES if str(s[2].get('Resource', '')).startswith('arn:aws:states:::dynamodb:')
-                   and s[2].get('Retry')]
+DYNAMODB_STATES = [s for s in STATES if str(s[2].get('Resource', '')).startswith('arn:aws:states:::dynamodb:')]
 
 
 def ids(cases):
@@ -172,8 +180,9 @@ class TestLambdaState:
 
 @pytest.mark.parametrize('sm, name, state', DYNAMODB_STATES, ids=ids(DYNAMODB_STATES))
 def test_dynamodb_integrations_retry_dynamodb_throttling(sm, name, state):
-    errors = {e for retrier in state['Retry'] for e in retrier['ErrorEquals']}
-    assert DYNAMODB_THROTTLING <= errors
+    errors = {e for retrier in state.get('Retry', []) for e in retrier['ErrorEquals']}
+    assert DYNAMODB_TRANSIENT <= errors
+    assert not NEVER_EMITTED & errors, 'names Step Functions never reports'
     assert not {e for e in errors if e.startswith('Lambda.')}, 'Lambda errors never occur in a DynamoDB task'
 
 

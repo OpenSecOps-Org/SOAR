@@ -144,11 +144,25 @@ States:
     Parameters:
       TableName.$: $.AIReportTable
       Item:
-        id: 
+        id:
           S: "overview"
         html:
           S.$: "$.messages.report.html"
     ResultPath: null
+    Retry:
+      -
+        ErrorEquals:
+          - States.Timeout
+          - DynamoDB.AmazonDynamoDBException  # also on-demand throttling: ThrottlingException has no class of its own
+          - DynamoDB.SdkClientException
+          - DynamoDB.InternalServerErrorException
+          - DynamoDB.ProvisionedThroughputExceededException
+          - DynamoDB.RequestLimitExceededException
+        IntervalSeconds: 3
+        MaxAttempts: 10
+        BackoffRate: 3
+        MaxDelaySeconds: 300
+        JitterStrategy: FULL
     Next: Account Segments
 
   Account Segments:
@@ -284,11 +298,25 @@ States:
           Parameters:
             TableName.$: $.AIReportTable
             Item:
-              id: 
+              id:
                 S.$: "$.account"
               html:
                 S.$: "$.messages.report.html"
           ResultPath: null
+          Retry:
+            -
+              ErrorEquals:
+                - States.Timeout
+                - DynamoDB.AmazonDynamoDBException  # also on-demand throttling: ThrottlingException has no class of its own
+                - DynamoDB.SdkClientException
+                - DynamoDB.InternalServerErrorException
+                - DynamoDB.ProvisionedThroughputExceededException
+                - DynamoDB.RequestLimitExceededException
+              IntervalSeconds: 3
+              MaxAttempts: 10
+              BackoffRate: 3
+              MaxDelaySeconds: 300
+              JitterStrategy: FULL
           Next: Send to Individual Account?
 
         Send to Individual Account?:
@@ -444,11 +472,25 @@ States:
     Parameters:
       TableName.$: $.AIReportTable
       Item:
-        id: 
+        id:
           S: "recommendations"
         html:
           S.$: "$.messages.report.html"
     ResultPath: null
+    Retry:
+      -
+        ErrorEquals:
+          - States.Timeout
+          - DynamoDB.AmazonDynamoDBException  # also on-demand throttling: ThrottlingException has no class of its own
+          - DynamoDB.SdkClientException
+          - DynamoDB.InternalServerErrorException
+          - DynamoDB.ProvisionedThroughputExceededException
+          - DynamoDB.RequestLimitExceededException
+        IntervalSeconds: 3
+        MaxAttempts: 10
+        BackoffRate: 3
+        MaxDelaySeconds: 300
+        JitterStrategy: FULL
     Next: Stitch Together Segments
 
   Stitch Together Segments:

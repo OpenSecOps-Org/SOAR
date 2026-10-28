@@ -135,6 +135,26 @@ class TestTransientAwsErrors:
         assert transient_aws_errors(lambda_handler).__name__ == 'lambda_handler'
 
 
+def test_the_aws_part_is_the_shared_aws_errors_module():
+    """Distributed by Installer/refresh; SOAR re-exports it, so both names are the very same classes."""
+    import aws_errors
+    import aws_utils.errors
+    for name in ('AWSTransientError', 'is_transient', 'is_transient_status', 'transient_aws_errors'):
+        assert getattr(aws_utils.errors, name) is getattr(aws_errors, name)
+
+
+def test_every_function_has_the_aws_errors_layer():
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        pass
+    Loader.add_multi_constructor('!', lambda loader, suffix, node: {f'!{suffix}': loader.construct_scalar(node)
+                                 if isinstance(node, yaml.ScalarNode) else None})
+    template = yaml.load(open(os.path.join(os.path.dirname(__file__), '..', '..', 'template.yaml')), Loader=Loader)
+    assert {'!Ref': 'AwsErrorsLayer'} in template['Globals']['Function']['Layers']
+    assert template['Resources']['AwsErrorsLayer']['Properties']['ContentUri'] == 'functions/layers/aws_errors/'
+
+
 def unprocessed(code, message='msg'):
     return {'ErrorCode': code, 'ErrorMessage': message,
             'FindingIdentifier': {'Id': 'finding-1', 'ProductArn': 'arn:aws:securityhub:::product/aws/inspector'}}

@@ -81,8 +81,10 @@ named error rather than fail the execution.
 
 #### Named Errors
 - **AWSTransientError**: an AWS call was throttled, failed on the AWS side (5xx) or could not connect. Every
-  Lambda a state machine invokes decorates its handler with `transient_aws_errors` (shared layer,
-  `aws_utils/errors.py`), which raises it with the original error as its cause. Other errors keep their name.
+  Lambda a state machine invokes decorates its handler with `transient_aws_errors`, which raises it with the
+  original error as its cause. Other errors keep their name. The module is `aws_errors.py`, distributed by
+  the Installer to every component with state machines and packaged in `AwsErrorsLayer`; SOAR re-exports it
+  from `aws_utils/errors.py` together with its ticketing errors.
 - **TicketingTransientError**: Jira or ServiceNow was rate limited (429), failed on its side (5xx) or could
   not be reached.
 - **TicketingRequestError**: Jira or ServiceNow refused to create or close a ticket for another reason. Not
@@ -97,6 +99,12 @@ named error rather than fail the execution.
   20 attempts.
 - **AI states**: AITransientError and AWSTransientError: 10 seconds, doubling, at most 300 seconds apart,
   full jitter, 8 attempts, so an email waits at most about 20 minutes for the AI text.
+- **Direct DynamoDB steps** (`arn:aws:states:::dynamodb:*`): Step Functions names their errors `DynamoDB.`
+  plus the AWS SDK for Java v1 exception class, or `DynamoDB.AmazonDynamoDBException` for an error code
+  without a class of its own. The rules retry `ProvisionedThroughputExceededException`,
+  `RequestLimitExceededException`, `InternalServerErrorException` and `AmazonDynamoDBException`; the last is
+  how on-demand throttling (`ThrottlingException`, which has no v1 class) is reported, so it also retries
+  permanent DynamoDB errors until the rule gives up.
 - **Every retrier** has `JitterStrategy: FULL` and `MaxDelaySeconds: 300`, so concurrent executions do not
   retry in lockstep and backoff does not grow without bound.
 - **No wildcard retries**: no retrier matches `States.TaskFailed` or `States.ALL`; an error that is not
