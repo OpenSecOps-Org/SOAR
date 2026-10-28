@@ -20,6 +20,7 @@ import html2text
 from bs4 import BeautifulSoup
 from botocore.config import Config
 from botocore.exceptions import ClientError, ConnectTimeoutError, ReadTimeoutError
+from aws_utils.errors import transient_aws_errors
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -51,6 +52,7 @@ class AIRequestError(Exception):
     """Bedrock rejected the request (validation, access, missing resource). Not retried."""
 
 
+@transient_aws_errors
 def lambda_handler(data, context):
     if AI_PROVIDER == 'NONE':
         return data

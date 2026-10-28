@@ -2,6 +2,7 @@ import os
 import boto3
 from botocore.exceptions import ClientError
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
 # Get the table name from environment variables
 TABLE_NAME = os.environ['TABLE_NAME']
@@ -10,6 +11,7 @@ TABLE_NAME = os.environ['TABLE_NAME']
 dynamodb_client = boto3.client('dynamodb')
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     # Extract the account ID from the _data parameter
     account_id = data.get('account_id')

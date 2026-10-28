@@ -6,6 +6,10 @@ from pathlib import Path
 # Add the root directory of the project to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+# Every Lambda imports the shared layer (aws_utils), as it does in AWS
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'functions', 'layers', 'aws_utils',
+                                                'python', 'lib', 'python3.12', 'site-packages')))
+
 
 def pytest_configure():
     """Load environment variables from .env.test before running tests."""

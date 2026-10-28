@@ -7,13 +7,17 @@ States:
         ResultPath: "$.overdue_tickets"
         Retry:
             - ErrorEquals:
+                  - AWSTransientError
                   - States.Timeout
                   - Lambda.ServiceException
                   - Lambda.AWSLambdaException
                   - Lambda.SdkClientException
-              IntervalSeconds: 3
-              MaxAttempts: 10
-              BackoffRate: 3
+                  - Lambda.TooManyRequestsException
+              IntervalSeconds: 5
+              MaxAttempts: 20
+              BackoffRate: 2
+              MaxDelaySeconds: 300
+              JitterStrategy: FULL
         Next: Process Overdue Tickets
 
     Process Overdue Tickets:
@@ -30,13 +34,17 @@ States:
                     ResultPath: "$.send_reminder"
                     Retry:
                         - ErrorEquals:
+                              - AWSTransientError
                               - States.Timeout
                               - Lambda.ServiceException
                               - Lambda.AWSLambdaException
                               - Lambda.SdkClientException
-                          IntervalSeconds: 3
-                          MaxAttempts: 10
-                          BackoffRate: 3
+                              - Lambda.TooManyRequestsException
+                          IntervalSeconds: 5
+                          MaxAttempts: 20
+                          BackoffRate: 2
+                          MaxDelaySeconds: 300
+                          JitterStrategy: FULL
                     Next: Send Reminder?
 
                 Send Reminder?:
@@ -53,13 +61,17 @@ States:
                     Resource: "${FormatTicketOverdueMessageFunctionArn}"
                     Retry:
                         - ErrorEquals:
+                              - AWSTransientError
                               - States.Timeout
                               - Lambda.ServiceException
                               - Lambda.AWSLambdaException
                               - Lambda.SdkClientException
-                          IntervalSeconds: 3
-                          MaxAttempts: 10
-                          BackoffRate: 3
+                              - Lambda.TooManyRequestsException
+                          IntervalSeconds: 5
+                          MaxAttempts: 20
+                          BackoffRate: 2
+                          MaxDelaySeconds: 300
+                          JitterStrategy: FULL
                     Next: Send Email
 
                 Send Email:
@@ -75,13 +87,17 @@ States:
                     Retry:
                         -
                             ErrorEquals:
+                                - AWSTransientError
                                 - States.Timeout
                                 - Lambda.ServiceException
                                 - Lambda.AWSLambdaException
                                 - Lambda.SdkClientException
-                            IntervalSeconds: 3
-                            MaxAttempts: 10
-                            BackoffRate: 3
+                                - Lambda.TooManyRequestsException
+                            IntervalSeconds: 5
+                            MaxAttempts: 20
+                            BackoffRate: 2
+                            MaxDelaySeconds: 300
+                            JitterStrategy: FULL
                     Next: Record Reminder Sent
 
                 Record Reminder Sent:
@@ -91,13 +107,17 @@ States:
                     Retry:
                         -
                             ErrorEquals:
+                                - AWSTransientError
                                 - States.Timeout
                                 - Lambda.ServiceException
                                 - Lambda.AWSLambdaException
                                 - Lambda.SdkClientException
-                            IntervalSeconds: 3
-                            MaxAttempts: 10
-                            BackoffRate: 3
+                                - Lambda.TooManyRequestsException
+                            IntervalSeconds: 5
+                            MaxAttempts: 20
+                            BackoffRate: 2
+                            MaxDelaySeconds: 300
+                            JitterStrategy: FULL
                     End: true
 
                 Don't Send Reminder:

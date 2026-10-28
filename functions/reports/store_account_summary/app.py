@@ -3,6 +3,7 @@ import boto3
 import logging
 import html2text
 import re
+from aws_utils.errors import transient_aws_errors
 
 
 # Set the logging level to INFO
@@ -18,6 +19,7 @@ openai_report = dynamodb.Table(AI_REPORT_TABLE)
 
 
 # Lambda handler
+@transient_aws_errors
 def lambda_handler(data, _context):
     logger.info(data)
 

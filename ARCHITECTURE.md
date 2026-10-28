@@ -75,19 +75,32 @@ All functions operate on a standardized data structure established by the ASFF P
 
 ### 3. Error Handling and Retry Patterns
 
-The system implements consistent error handling across all state machines:
+Lambdas do not retry; the state machines do, and they retry only errors they can name. A burst of findings
+(a scan) throttles the AWS APIs and the ticketing system, so throttling must reach the state machine as a
+named error rather than fail the execution.
 
-#### Standard Retry Configuration
-- **Interval**: 3 seconds
-- **Backoff Rate**: 3.0 (exponential backoff)
-- **Max Attempts**: 10-100 (varies by function criticality)
+#### Named Errors
+- **AWSTransientError**: an AWS call was throttled, failed on the AWS side (5xx) or could not connect. Every
+  Lambda a state machine invokes decorates its handler with `transient_aws_errors` (shared layer,
+  `aws_utils/errors.py`), which raises it with the original error as its cause. Other errors keep their name.
+- **TicketingTransientError**: Jira or ServiceNow was rate limited (429), failed on its side (5xx) or could
+  not be reached.
+- **TicketingRequestError**: Jira or ServiceNow refused to create or close a ticket for another reason. Not
+  retried; no ticket ID is made up.
+- **SecurityHubUpdateRejected**: Security Hub refused a `BatchUpdateFindings` update for a reason a retry
+  will not change. Not retried. `ConcurrentUpdateError` and `InternalFailure` are raised as
+  AWSTransientError; a finding that no longer exists (`FindingNotFound`) is logged and skipped.
 
-#### Error Type Handling
-- **Lambda.ServiceException**: Standard retry with exponential backoff
-- **Lambda.AWSLambdaException**: Extended retry for AWS service issues
-- **DynamoDB.ProvisionedThroughputExceededException**: Specialized retry for database throttling
-- **States.TaskFailed**: Catch-all for general task failures
-- **States.ALL**: Comprehensive catch-all for any unhandled exceptions
+#### Retry Configuration
+- **Lambda states**: one rule for AWSTransientError (plus TicketingTransientError for the ticketing
+  Lambdas) and the Lambda service errors: 5 seconds, doubling, at most 300 seconds apart, full jitter,
+  20 attempts.
+- **AI states**: AITransientError and AWSTransientError: 10 seconds, doubling, at most 300 seconds apart,
+  full jitter, 8 attempts, so an email waits at most about 20 minutes for the AI text.
+- **Every retrier** has `JitterStrategy: FULL` and `MaxDelaySeconds: 300`, so concurrent executions do not
+  retry in lockstep and backoff does not grow without bound.
+- **No wildcard retries**: no retrier matches `States.TaskFailed` or `States.ALL`; an error that is not
+  named is not retried. `States.ALL` is used only in Catch rules.
 
 #### Fallback-to-Ticketing Error Handling (v2.2.1+)
 - **Comprehensive Coverage**: All 30+ autoremediation functions protected by state machine catch-all error handling

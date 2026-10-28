@@ -23,6 +23,8 @@ import botocore
 import boto3
 from dateutil import parser
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
+@transient_aws_errors
 def lambda_handler(data, _context):
     """
     Main Lambda handler for EC2.22 auto-remediation.

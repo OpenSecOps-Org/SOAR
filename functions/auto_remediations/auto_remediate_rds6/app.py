@@ -35,10 +35,12 @@ from rds_remediation.utils import (
     modify_db_resource,
     handle_not_found_error
 )
+from aws_utils.errors import transient_aws_errors
 
 CROSS_ACCOUNT_ROLE = os.environ['CROSS_ACCOUNT_ROLE']
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
 

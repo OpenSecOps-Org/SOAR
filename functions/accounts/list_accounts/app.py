@@ -2,6 +2,7 @@ import os
 import boto3
 import logging
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
 SECURITY_ACCOUNT_ID = os.environ['SECURITY_ACCOUNT_ID']
 
@@ -10,6 +11,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+@transient_aws_errors
 def lambda_handler(_data, _context):
     # Create a SecurityHub client in the delegated security admin account
     securityhub_client = get_client('securityhub', SECURITY_ACCOUNT_ID)

@@ -38,7 +38,9 @@ import os
 import boto3
 import botocore
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
 

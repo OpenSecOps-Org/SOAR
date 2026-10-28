@@ -53,8 +53,10 @@ The above means, "suppress the finding in all DEV environments and also througho
 '''
 
 import re
+from aws_utils.errors import transient_aws_errors
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
 

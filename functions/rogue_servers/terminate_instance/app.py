@@ -1,8 +1,10 @@
 import os
 import boto3
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
 # Lambda function handler
+@transient_aws_errors
 def lambda_handler(data, _context):
     # Print the input data
     print(data)

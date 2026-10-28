@@ -53,6 +53,7 @@ import json
 import boto3
 import botocore
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
 ELB_ACCOUNTS = {
     'eu-north-1': '897822967062',
@@ -118,6 +119,7 @@ def extract_load_balancer_name(resource_details, lb_arn, max_length=50):
     return False, None, None, error_msg
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
 

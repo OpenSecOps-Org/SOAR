@@ -2,8 +2,9 @@
 Error handling of the AI states in the state machines (ticket D8, §3.4, Phase 4), level 1: offline.
 
 Every AI state (a Task on QueryAI) must:
-- retry AITransientError with backoff and jitter (QueryAI never retries itself), and the Lambda service
-  errors as before; nothing else is retried;
+- retry AITransientError and AWSTransientError with backoff and jitter, 8 times at most 300 s apart, so a
+  ticket's email waits at most about 20 minutes for the AI (QueryAI never retries itself), and the Lambda
+  service errors as before; nothing else is retried;
 - catch everything else at once (States.ALL, ResultPath $.error) and go to its publish task;
 - publish the error once to the failure topic, from a task that has its own catch, then continue to
   where the AI state would have gone (weekly report: via a Pass state that puts a notice in the section);
@@ -38,6 +39,7 @@ CASES = [(sm, state, cont) for sm, states in AI_STATES.items() for state, cont i
 IDS = [f'{sm}:{state}' for sm, state, _ in CASES]
 
 TRANSIENT = 'AITransientError'
+TRANSIENT_ERRORS = [TRANSIENT, 'AWSTransientError']
 LAMBDA_SERVICE_ERRORS = ['Lambda.TooManyRequestsException', 'Lambda.ServiceException']
 IMMEDIATE_ERRORS = ['AIResponseDeclined', 'AIRequestError', 'States.Timeout', 'KeyError', 'Sandbox.Timedout',
                     'Lambda.Unknown', 'States.TaskFailed']
@@ -110,23 +112,25 @@ class TestAIState:
     def test_times_out_after_the_lambda(self, sm, ai_state, continuation):
         assert DEFINITIONS[sm][ai_state]['TimeoutSeconds'] >= 930
 
-    @pytest.mark.parametrize('attempt', [0, 1, 2])
-    def test_transient_error_is_restarted_with_backoff(self, sm, ai_state, continuation, attempt):
-        action, retrier = outcome(DEFINITIONS[sm][ai_state], TRANSIENT, attempt)
+    @pytest.mark.parametrize('error', TRANSIENT_ERRORS)
+    @pytest.mark.parametrize('attempt', [0, 1, 7])
+    def test_transient_error_is_restarted_with_backoff(self, sm, ai_state, continuation, error, attempt):
+        action, retrier = outcome(DEFINITIONS[sm][ai_state], error, attempt)
         assert action == 'retry'
-        assert retrier['ErrorEquals'] == [TRANSIENT]
-        assert (retrier['IntervalSeconds'], retrier['MaxAttempts'], retrier['BackoffRate'], retrier['JitterStrategy']) \
-            == (10, 3, 2, 'FULL')
+        assert retrier['ErrorEquals'] == TRANSIENT_ERRORS
+        assert (retrier['IntervalSeconds'], retrier['MaxAttempts'], retrier['BackoffRate'],
+                retrier['MaxDelaySeconds'], retrier['JitterStrategy']) == (10, 8, 2, 300, 'FULL')
 
-    def test_transient_error_is_caught_when_restarts_are_exhausted(self, sm, ai_state, continuation):
-        action, catcher = outcome(DEFINITIONS[sm][ai_state], TRANSIENT, attempt=3)
+    @pytest.mark.parametrize('error', TRANSIENT_ERRORS)
+    def test_transient_error_is_caught_when_restarts_are_exhausted(self, sm, ai_state, continuation, error):
+        action, catcher = outcome(DEFINITIONS[sm][ai_state], error, attempt=8)
         assert action == 'catch' and catcher['Next'] == f'Report {ai_state} Failure'
 
     @pytest.mark.parametrize('error', LAMBDA_SERVICE_ERRORS)
     def test_lambda_service_errors_are_restarted_then_caught(self, sm, ai_state, continuation, error):
         state = DEFINITIONS[sm][ai_state]
         action, retrier = outcome(state, error, attempt=0)
-        assert action == 'retry' and TRANSIENT not in retrier['ErrorEquals']
+        assert action == 'retry' and not set(TRANSIENT_ERRORS) & set(retrier['ErrorEquals'])
         action, catcher = outcome(state, error, attempt=retrier['MaxAttempts'])
         assert action == 'catch' and catcher['Next'] == f'Report {ai_state} Failure'
 
@@ -142,7 +146,7 @@ class TestAIState:
 
     def test_nothing_else_is_retried(self, sm, ai_state, continuation):
         retried = {e for r in DEFINITIONS[sm][ai_state]['Retry'] for e in r['ErrorEquals']}
-        assert retried == {TRANSIENT, *LAMBDA_SERVICE_ERRORS}
+        assert retried == {*TRANSIENT_ERRORS, *LAMBDA_SERVICE_ERRORS}
 
 
 # ---------------------------------------------------------------------------

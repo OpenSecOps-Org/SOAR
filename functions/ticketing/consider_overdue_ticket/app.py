@@ -1,6 +1,10 @@
+from aws_utils.errors import transient_aws_errors
+
+
 
 
 # Lambda handler
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
 

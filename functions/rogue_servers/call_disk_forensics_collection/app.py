@@ -2,6 +2,7 @@
 import os
 import boto3
 import json
+from aws_utils.errors import transient_aws_errors
 
 
 # Get the ARN template
@@ -12,6 +13,7 @@ client = boto3.client('lambda')
 
 
 # Defining the lambda_handler function
+@transient_aws_errors
 def lambda_handler(finding, _context):
     # Printing the input finding
     print(finding)

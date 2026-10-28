@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import base64
 import logging
+from aws_utils.errors import transient_aws_errors
 
 
 # Configure logging
@@ -38,6 +39,7 @@ CREDS = [WORKSPACE_ID, SHARED_KEY, LOG_TYPE]
 
 
 # Define the lambda_handler function
+@transient_aws_errors
 def lambda_handler(data, _context):
     # The incident domain defaults to INFRA. Can be INFRA or APP.
     incident_domain = data['finding']['ProductFields'].get('IncidentDomain', 'INFRA')

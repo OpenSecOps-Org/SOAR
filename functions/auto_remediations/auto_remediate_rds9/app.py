@@ -41,6 +41,7 @@ from rds_remediation.utils import (
     modify_db_resource,
     handle_not_found_error
 )
+from aws_utils.errors import transient_aws_errors
 
 # Control-specific constants
 ENGINE_LOG_TYPES = {
@@ -75,6 +76,7 @@ ENGINE_PARAMETERS = {
     ]
 }
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
 

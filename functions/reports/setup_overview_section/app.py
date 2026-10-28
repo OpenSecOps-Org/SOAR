@@ -9,6 +9,7 @@ import humanize
 from collections import defaultdict
 import json
 import decimal
+from aws_utils.errors import transient_aws_errors
 
 
 def dict_list_to_csv(records):
@@ -84,6 +85,7 @@ ai_prompts = dynamodb.Table(AI_PROMPTS_TABLE)
 
 
 # Lambda handler
+@transient_aws_errors
 def lambda_handler(data, _context):
     system = retrieve_db_item(ai_prompts, 'weekly_ai_report_0_common')['instructions'] + "\n"
     system += retrieve_db_item(ai_prompts, 'weekly_ai_report_1_overview')['instructions']

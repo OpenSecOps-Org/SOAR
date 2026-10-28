@@ -1,6 +1,7 @@
 import os
 import boto3
 from datetime import datetime, timezone, timedelta
+from aws_utils.errors import transient_aws_errors
 
 
 # Get environment variables
@@ -19,6 +20,7 @@ h2 = '<h2 style="background-color: #d9c8e3; width: 100%; height: 50px; line-heig
 
 
 # Lambda handler
+@transient_aws_errors
 def lambda_handler(data, _context):
 
     # Current UTC datetime

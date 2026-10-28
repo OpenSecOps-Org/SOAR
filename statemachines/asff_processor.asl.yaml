@@ -30,14 +30,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
-                    - States.TaskFailed
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Branch on Decision
 
     Branch on Decision:
@@ -78,14 +81,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
-                    - States.TaskFailed
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next:  New Account?
 
     New Account?:
@@ -117,12 +123,14 @@ States:
                 - DynamoDB.AmazonDynamoDBException
                 - DynamoDB.InternalServerErrorException
                 - DynamoDB.SdkClientException
-                - Lambda.ServiceException
-                - Lambda.AWSLambdaException
-                - Lambda.SdkClientException
+                - DynamoDB.ProvisionedThroughputExceededException
+                - DynamoDB.ThrottlingException
+                - DynamoDB.RequestLimitExceeded
               IntervalSeconds: 3
               MaxAttempts: 100
               BackoffRate: 3
+              MaxDelaySeconds: 300
+              JitterStrategy: FULL
         Next: Is the Control Enabled In This Account?
 
     Is the Control Enabled In This Account?:
@@ -148,12 +156,14 @@ States:
                     - States.Timeout
                     - DynamoDB.AmazonDynamoDBException
                     - DynamoDB.SdkClientException
-                    - Lambda.ServiceException
-                    - Lambda.AWSLambdaException
-                    - Lambda.SdkClientException
+                    - DynamoDB.ProvisionedThroughputExceededException
+                    - DynamoDB.ThrottlingException
+                    - DynamoDB.RequestLimitExceeded
                 IntervalSeconds: 3
                 MaxAttempts: 100
                 BackoffRate: 3
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Check whether to suppress control locally
 
     Check whether to suppress control locally:
@@ -169,13 +179,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Check local control suppression result
 
     Check local control suppression result:
@@ -194,13 +208,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Get Remediatable SecHub Controls Table Entry
 
     Get Remediatable SecHub Controls Table Entry:
@@ -218,12 +236,14 @@ States:
                     - States.Timeout
                     - DynamoDB.AmazonDynamoDBException
                     - DynamoDB.SdkClientException
-                    - Lambda.ServiceException
-                    - Lambda.AWSLambdaException
-                    - Lambda.SdkClientException
+                    - DynamoDB.ProvisionedThroughputExceededException
+                    - DynamoDB.ThrottlingException
+                    - DynamoDB.RequestLimitExceeded
                 IntervalSeconds: 3
                 MaxAttempts: 100
                 BackoffRate: 3
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Is the autoremediation enabled?
 
     Is the autoremediation enabled?:
@@ -250,12 +270,14 @@ States:
                     - States.Timeout
                     - DynamoDB.AmazonDynamoDBException
                     - DynamoDB.SdkClientException
-                    - Lambda.ServiceException
-                    - Lambda.AWSLambdaException
-                    - Lambda.SdkClientException
+                    - DynamoDB.ProvisionedThroughputExceededException
+                    - DynamoDB.ThrottlingException
+                    - DynamoDB.RequestLimitExceeded
                 IntervalSeconds: 3
                 MaxAttempts: 100
                 BackoffRate: 3
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Check whether to suppress control auto-remediation locally
 
     Check whether to suppress control auto-remediation locally:
@@ -271,13 +293,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Check local control auto-remediation suppression result
 
     Check local control auto-remediation suppression result:
@@ -317,6 +343,8 @@ States:
             -
                 ErrorEquals:
                     - StepFunctions.ExecutionLimitExceeded
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         OutputPath: $.Output
         Next: Reconsider later?
 
@@ -365,13 +393,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Open TEAMFIX Ticket
 
     Open TEAMFIX Ticket:
@@ -381,13 +413,18 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
+                    - TicketingTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Remember Ticket Opened
 
     Remember Ticket Opened:
@@ -409,12 +446,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
-                    - DynamoDB.SdkClientException
-                    - DynamoDB.InternalServerErrorException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: AddAiInstructionsForOpenedTickets
 
     AddAiInstructionsForOpenedTickets:
@@ -432,12 +474,16 @@ States:
             -
                 ErrorEquals:
                     - States.Timeout
-                    - Lambda.ServiceException
                     - DynamoDB.SdkClientException
                     - DynamoDB.InternalServerErrorException
+                    - DynamoDB.ProvisionedThroughputExceededException
+                    - DynamoDB.ThrottlingException
+                    - DynamoDB.RequestLimitExceeded
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: AddAiDataForOpenedTickets
 
     AddAiDataForOpenedTickets:
@@ -448,9 +494,11 @@ States:
             -
                 ErrorEquals:
                     - AITransientError  # QueryAI never retries; transient Bedrock errors are retried here
+                    - AWSTransientError
                 IntervalSeconds: 10
-                MaxAttempts: 3
+                MaxAttempts: 8
                 BackoffRate: 2
+                MaxDelaySeconds: 300
                 JitterStrategy: FULL
             -
                 ErrorEquals:
@@ -459,6 +507,8 @@ States:
                 IntervalSeconds: 10
                 MaxAttempts: 25
                 BackoffRate: 1.5
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Catch:
             -
                 ErrorEquals:
@@ -499,13 +549,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Set to NOTIFIED + Ticket data
 
     Set to NOTIFIED + Ticket data:
@@ -515,14 +569,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
                     - Lambda.TooManyRequestsException
-                IntervalSeconds: 3
-                MaxAttempts: 25
-                BackoffRate: 3
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         End: True
 
     Format Remediation Message:
@@ -531,13 +588,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Open AUTOFIXED Ticket
 
     Open AUTOFIXED Ticket:
@@ -547,13 +608,18 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
+                    - TicketingTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Remember AutoRemediation Done
 
     Remember AutoRemediation Done:
@@ -575,12 +641,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
-                    - DynamoDB.SdkClientException
-                    - DynamoDB.InternalServerErrorException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: AddAiInstructionsForAutoremediations
 
     AddAiInstructionsForAutoremediations:
@@ -598,12 +669,16 @@ States:
             -
                 ErrorEquals:
                     - States.Timeout
-                    - Lambda.ServiceException
                     - DynamoDB.SdkClientException
                     - DynamoDB.InternalServerErrorException
+                    - DynamoDB.ProvisionedThroughputExceededException
+                    - DynamoDB.ThrottlingException
+                    - DynamoDB.RequestLimitExceeded
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: AddAiDataForAutoremediation
 
     AddAiDataForAutoremediation:
@@ -614,9 +689,11 @@ States:
             -
                 ErrorEquals:
                     - AITransientError  # QueryAI never retries; transient Bedrock errors are retried here
+                    - AWSTransientError
                 IntervalSeconds: 10
-                MaxAttempts: 3
+                MaxAttempts: 8
                 BackoffRate: 2
+                MaxDelaySeconds: 300
                 JitterStrategy: FULL
             -
                 ErrorEquals:
@@ -625,6 +702,8 @@ States:
                 IntervalSeconds: 10
                 MaxAttempts: 25
                 BackoffRate: 1.5
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Catch:
             -
                 ErrorEquals:
@@ -664,13 +743,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Set to RESOLVED
 
     Set to RESOLVED:
@@ -680,14 +763,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
                     - Lambda.TooManyRequestsException
-                IntervalSeconds: 3
-                MaxAttempts: 25
-                BackoffRate: 3
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         End: True
 
 
@@ -699,14 +785,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
-                    - States.TaskFailed
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: AWS Health Reclassifier
 
     AWS Health Reclassifier:
@@ -715,14 +804,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
-                    - States.TaskFailed
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Should Reconsider Later After Health?
 
     Should Reconsider Later After Health?:
@@ -740,14 +832,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
-                    - States.TaskFailed
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Should Suppress Finding After Account Reassignment?
 
     Should Suppress Finding After Account Reassignment?:
@@ -777,6 +872,8 @@ States:
             -
                 ErrorEquals:
                     - StepFunctions.ExecutionLimitExceeded
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         OutputPath: $.Output
         End: true
 
@@ -789,14 +886,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
-                    - States.TaskFailed
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Format Ticket Closed Message
 
     Format Ticket Closed Message:
@@ -805,13 +905,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Close Ticket
 
     Close Ticket:
@@ -823,13 +927,18 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
+                    - TicketingTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Remember Ticket Closed
 
     Remember Ticket Closed:
@@ -841,12 +950,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
-                    - DynamoDB.SdkClientException
-                    - DynamoDB.InternalServerErrorException
-                IntervalSeconds: 3
-                MaxAttempts: 100
-                BackoffRate: 3
+                    - Lambda.ServiceException
+                    - Lambda.AWSLambdaException
+                    - Lambda.SdkClientException
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: AddAiInstructionsForClosedTickets
 
     AddAiInstructionsForClosedTickets:
@@ -864,12 +978,16 @@ States:
             -
                 ErrorEquals:
                     - States.Timeout
-                    - Lambda.ServiceException
                     - DynamoDB.SdkClientException
                     - DynamoDB.InternalServerErrorException
+                    - DynamoDB.ProvisionedThroughputExceededException
+                    - DynamoDB.ThrottlingException
+                    - DynamoDB.RequestLimitExceeded
                 IntervalSeconds: 3
                 MaxAttempts: 10
                 BackoffRate: 3
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: AddAiDataForClosedTickets
 
     AddAiDataForClosedTickets:
@@ -880,9 +998,11 @@ States:
             -
                 ErrorEquals:
                     - AITransientError  # QueryAI never retries; transient Bedrock errors are retried here
+                    - AWSTransientError
                 IntervalSeconds: 10
-                MaxAttempts: 3
+                MaxAttempts: 8
                 BackoffRate: 2
+                MaxDelaySeconds: 300
                 JitterStrategy: FULL
             -
                 ErrorEquals:
@@ -891,6 +1011,8 @@ States:
                 IntervalSeconds: 10
                 MaxAttempts: 25
                 BackoffRate: 1.5
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Catch:
             -
                 ErrorEquals:
@@ -930,13 +1052,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         Next: Remove ticket data
 
     Remove ticket data:
@@ -946,13 +1072,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
-                IntervalSeconds: 3
-                MaxAttempts: 10
-                BackoffRate: 3
+                    - Lambda.TooManyRequestsException
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         End: true
 
     Do Nothing:
@@ -964,14 +1094,17 @@ States:
         Retry:
             -
                 ErrorEquals:
+                    - AWSTransientError
                     - States.Timeout
                     - Lambda.ServiceException
                     - Lambda.AWSLambdaException
                     - Lambda.SdkClientException
                     - Lambda.TooManyRequestsException
-                IntervalSeconds: 10
-                MaxAttempts: 1000
-                BackoffRate: 3
+                IntervalSeconds: 5
+                MaxAttempts: 20
+                BackoffRate: 2
+                MaxDelaySeconds: 300
+                JitterStrategy: FULL
         End: true
 
     Nonexistent Decision:

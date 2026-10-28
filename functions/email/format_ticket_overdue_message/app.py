@@ -1,8 +1,10 @@
 import os
+from aws_utils.errors import transient_aws_errors
 
 PRODUCT_NAME = os.environ['PRODUCT_NAME']
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
 

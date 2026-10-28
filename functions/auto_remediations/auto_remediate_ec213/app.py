@@ -19,11 +19,13 @@ import os
 import botocore
 import boto3
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
 # SSH port number for security rule evaluation
 PORT = 22
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     """
     Main Lambda handler for EC2.13 auto-remediation.

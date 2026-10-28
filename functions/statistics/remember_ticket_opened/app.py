@@ -1,6 +1,7 @@
 import os
 import boto3
 from datetime import datetime, timezone
+from aws_utils.errors import transient_aws_errors
 
 
 TICKETS_TABLE_NAME = os.environ['TICKETS_TABLE_NAME']
@@ -9,6 +10,7 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TICKETS_TABLE_NAME)
 
 
+@transient_aws_errors
 def lambda_handler(event, _context):
     print(event)
 

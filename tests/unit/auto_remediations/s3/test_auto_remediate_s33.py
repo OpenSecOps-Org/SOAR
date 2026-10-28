@@ -50,6 +50,7 @@ os.environ['CROSS_ACCOUNT_ROLE'] = 'arn:aws:iam::123456789012:role/TestRole'
 # Import the lambda handler and internal functions
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'functions', 'auto_remediations', 'auto_remediate_s33'))
 from functions.auto_remediations.auto_remediate_s33.app import lambda_handler, has_tag
+from aws_utils.errors import AWSTransientError
 
 
 class TestInternalFunctions:
@@ -271,8 +272,8 @@ class TestS33CriticalErrorHandlingGaps:
 
     @mock_aws
     @patch('functions.auto_remediations.auto_remediate_s33.app.get_client')
-    def test_s33_throttling_unhandled_exception(self, mock_get_client):
-        """Test that throttling errors cause unhandled exception (CRITICAL GAP)"""
+    def test_s33_throttling_is_retried_by_the_state_machine(self, mock_get_client):
+        """Throttling leaves the Lambda as AWSTransientError, which the state machine retries"""
         # Setup mock S3 client
         mock_s3_client = MagicMock()
         mock_get_client.return_value = mock_s3_client
@@ -285,13 +286,12 @@ class TestS33CriticalErrorHandlingGaps:
         # Prepare test data
         asff_data = prepare_s3_test_data(get_s33_basic_finding, tags=[])
         
-        # Should raise unhandled exception due to missing error handling
-        with pytest.raises(botocore.exceptions.ClientError) as exc_info:
+        with pytest.raises(AWSTransientError) as exc_info:
             lambda_handler(asff_data, None)
-        
-        # Verify it's the same throttling error
-        assert exc_info.value == throttling_error
-        assert exc_info.value.response['Error']['Code'] == 'Throttling'
+
+        # Verify it carries the original throttling error
+        assert exc_info.value.__cause__ is throttling_error
+        assert exc_info.value.__cause__.response['Error']['Code'] == 'Throttling'
 
     @mock_aws
     @patch('functions.auto_remediations.auto_remediate_s33.app.get_client')

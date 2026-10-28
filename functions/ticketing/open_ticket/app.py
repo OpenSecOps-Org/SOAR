@@ -1,10 +1,13 @@
 import os
 import uuid
+from contextlib import contextmanager
 import boto3
 from jira import JIRA
 from jira import JIRAError
 import requests
 from requests.auth import HTTPBasicAuth
+from aws_utils.errors import (TicketingRequestError, TicketingTransientError, is_transient_status,
+                              transient_aws_errors)
 
 # Get the TICKETING_SYSTEM environment variable
 TICKETING_SYSTEM = os.environ['TICKETING_SYSTEM']
@@ -50,7 +53,38 @@ SERVICE_NOW_BASIC_AUTH_PASSWORD = client.get_parameter(Name=SERVICE_NOW_BASIC_AU
 SERVICE_NOW_CREDS = [SERVICE_NOW_URL, SERVICE_NOW_BASIC_AUTH_USERNAME, SERVICE_NOW_BASIC_AUTH_PASSWORD]
 
 
+# Ticketing errors as named errors for the state machine: a rate limit (429), a failure on the ticketing
+# system's side (5xx) or an unreachable system is retried; any other refusal fails the execution.
+@contextmanager
+def ticketing_errors(what):
+    try:
+        yield
+    except JIRAError as err:
+        if is_transient_status(err.status_code):
+            raise TicketingTransientError(f"{what}: {err}") from err
+        raise TicketingRequestError(f"{what}: {err}") from err
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+        raise TicketingTransientError(f"{what}: {err}") from err
+
+
+def check_response(response, what):
+    if is_transient_status(response.status_code):
+        raise TicketingTransientError(f"{what}: HTTP {response.status_code}: {response.text}")
+    if not 200 <= response.status_code <= 299:
+        raise TicketingRequestError(f"{what}: HTTP {response.status_code}: {response.text}")
+
+
+# A copy of the ticket for the SOC is made after the team's ticket exists. Its failure must not fail the
+# Lambda: the retry would create the team's ticket a second time.
+def soc_copy(create, *args):
+    try:
+        create(*args)
+    except (TicketingTransientError, TicketingRequestError) as err:
+        print(f"ERROR: Could not create the SOC copy of the ticket: {err}")
+
+
 # Define the lambda_handler function
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
 
@@ -86,7 +120,7 @@ def lambda_handler(data, _context):
         if 'REPLACE_ME' not in JIRA_CREDS:
             ticket_id = use_jira(data, project_id)
             if also_to_soc:
-                use_jira(data, SOC)
+                soc_copy(use_jira, data, SOC)
         else:
             print("JIRA credentials not set up. Simulating Ticket ID.")
             ticket_id = str(uuid.uuid4())  # Simulate
@@ -95,7 +129,7 @@ def lambda_handler(data, _context):
         if 'REPLACE_ME' not in SERVICE_NOW_CREDS:
             ticket_id = use_service_now(data, project_id, ticket_to_soc)
             if also_to_soc:
-                use_service_now(data, SOC, True)
+                soc_copy(use_service_now, data, SOC, True)
         else:
             print("ServiceNow credentials not set up. Simulating Ticket ID.")
             ticket_id = str(uuid.uuid4())  # Simulate
@@ -122,8 +156,9 @@ def use_jira(data, project_id):
     print(f"Creating JIRA ticket for project {project_id}...")
 
     # Create a JIRA object with the provided credentials
-    jira = JIRA(basic_auth=(JIRA_BASIC_AUTH_USERNAME, JIRA_BASIC_AUTH_TOKEN), 
-                options={'server': JIRA_SERVER_URL})
+    with ticketing_errors("Could not connect to JIRA"):
+        jira = JIRA(basic_auth=(JIRA_BASIC_AUTH_USERNAME, JIRA_BASIC_AUTH_TOKEN),
+                    options={'server': JIRA_SERVER_URL})
 
     # Check if the project_id is a valid JIRA project
     if nonexistent_jira_project(jira, project_id):
@@ -148,8 +183,8 @@ def use_jira(data, project_id):
     messages = data['messages']
     texts = messages.get('email', False)
 
-    try:
-        # Create a new JIRA issue
+    # Create a new JIRA issue
+    with ticketing_errors(f"Could not create new issue for project {project_id}"):
         issue = jira.create_issue(
             project=project_id,
             issuetype={'name': JIRA_ISSUE_TYPE},
@@ -157,14 +192,12 @@ def use_jira(data, project_id):
             description=texts['body'],
             priority={'name': prio}
         )
-    except JIRAError as err:
-        print(
-            f"ERROR: Could not create new issue for project {project_id}: {err}.")
-        return f"create-ticket-failed-{str(uuid.uuid4())}"  # Simulate
 
     # Get the key of the created issue
     ticket_id = issue.key
     print(f"Created JIRA ticket {ticket_id}")
+
+    # The ticket exists from here on: errors are only logged, as a retry would create it again
 
     # Transition the issue to its initial state
     transition_to_initial_jira_state(jira, issue, ticket_id)
@@ -172,7 +205,7 @@ def use_jira(data, project_id):
     try:
         # Add a comment to the issue
         jira.add_comment(issue, 'Opened by automation.')
-    except JIRAError as err:
+    except (JIRAError, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
         print(f"ERROR: Could not comment on {ticket_id}: {err}")
 
     return ticket_id
@@ -181,8 +214,9 @@ def use_jira(data, project_id):
 # Define the nonexistent_jira_project function
 def nonexistent_jira_project(jira, project_key):
     try:
-        jira.project(project_key)
-    except JIRAError as err:
+        with ticketing_errors(f"Could not check JIRA project {project_key}"):
+            jira.project(project_key)
+    except TicketingRequestError as err:
         print(f"ERROR: JIRA error at initial check for nonexistence: {err}")
         return True
     return False
@@ -193,7 +227,7 @@ def transition_to_initial_jira_state(jira, issue, ticket_id):
     for state in JIRA_INITIAL_STATES.split(','):
         try:
             jira.transition_issue(issue, state)
-        except JIRAError as err:
+        except (JIRAError, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
             print(f"ERROR: Could not transition issue {ticket_id} to '{state}': {err}.")
             continue
         print(f"Ticket {ticket_id} transitioned to state '{state}'.")
@@ -239,10 +273,13 @@ def use_service_now(data, project_id, ticket_to_soc):
     }
 
     # Send a POST request to create a ServiceNow ticket
-    response = requests.post(
-        f"{SERVICE_NOW_URL}/api/now/import/{SERVICE_NOW_TABLE}",
-        json=body,
-        auth=auth)
+    what = f"Could not create ServiceNow ticket for {project_id}"
+    with ticketing_errors(what):
+        response = requests.post(
+            f"{SERVICE_NOW_URL}/api/now/import/{SERVICE_NOW_TABLE}",
+            json=body,
+            auth=auth)
+    check_response(response, what)
 
     # Get the JSON response from the request
     json = response.json()

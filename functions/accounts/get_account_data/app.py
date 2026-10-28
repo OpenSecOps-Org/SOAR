@@ -29,6 +29,7 @@ import json
 import boto3
 from botocore.config import Config
 from dateutil import parser
+from aws_utils.errors import transient_aws_errors
 
 # SOAR Configuration
 PRODUCT_NAME = os.environ['PRODUCT_NAME']
@@ -73,6 +74,7 @@ client = boto3.client('organizations', config=config)
 dynamodb = boto3.client('dynamodb')
 
 
+@transient_aws_errors
 def lambda_handler(account_id, _context):
     """
     Main Lambda handler for retrieving account data with caching.

@@ -3,6 +3,7 @@ import boto3
 import json
 import logging
 import decimal
+from aws_utils.errors import transient_aws_errors
 
 # Set the logging level to INFO
 logger = logging.getLogger()
@@ -19,6 +20,7 @@ ai_report = dynamodb.Table(AI_REPORT_TABLE)
 
 
 # Lambda handler
+@transient_aws_errors
 def lambda_handler(data, _context):
     logger.info(data)
 

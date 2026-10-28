@@ -23,10 +23,12 @@ import random
 
 import boto3
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
 logger = logging.getLogger(__name__)
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     """
     Main Lambda handler for EC2.6 auto-remediation.

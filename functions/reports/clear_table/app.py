@@ -1,5 +1,6 @@
 import os
 import boto3
+from aws_utils.errors import transient_aws_errors
 
 # Get environment variables
 AI_REPORT_TABLE = os.environ['AI_REPORT_TABLE']
@@ -29,6 +30,7 @@ def scan_with_paging(table):
 
 
 # Lambda handler
+@transient_aws_errors
 def lambda_handler(_data, _context):
     # scan all items in the table
     items = scan_with_paging(openai_report)

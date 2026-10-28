@@ -98,19 +98,21 @@ class TestAIState:
         r = run_state(sfn, sm, ai_state, {'result': json.dumps({**INPUT, 'messages': {'ai': {'html': '<div>ok</div>'}}})})
         assert r['status'] == 'SUCCEEDED' and r['nextState'] == continuation
 
-    @pytest.mark.parametrize('attempt', [0, 1, 2])
-    def test_transient_error_is_restarted_with_backoff(self, sfn, sm, ai_state, continuation, attempt):
-        r = run_state(sfn, sm, ai_state, error('AITransientError', 'ThrottlingException: slow down'), attempt)
+    @pytest.mark.parametrize('name', ['AITransientError', 'AWSTransientError'])
+    @pytest.mark.parametrize('attempt', [0, 1, 7])
+    def test_transient_error_is_restarted_with_backoff(self, sfn, sm, ai_state, continuation, name, attempt):
+        r = run_state(sfn, sm, ai_state, error(name, 'ThrottlingException: slow down'), attempt)
         assert r['status'] == 'RETRIABLE'
         details = r['inspectionData']['errorDetails']
         assert details['retryIndex'] == 0
-        assert 0 <= details['retryBackoffIntervalSeconds'] <= 10 * 2 ** attempt
+        assert 0 <= details['retryBackoffIntervalSeconds'] <= min(10 * 2 ** attempt, 300)
 
-    def test_transient_error_is_caught_when_restarts_are_exhausted(self, sfn, sm, ai_state, continuation):
-        r = run_state(sfn, sm, ai_state, error('AITransientError', 'ThrottlingException: slow down'), 3)
+    @pytest.mark.parametrize('name', ['AITransientError', 'AWSTransientError'])
+    def test_transient_error_is_caught_when_restarts_are_exhausted(self, sfn, sm, ai_state, continuation, name):
+        r = run_state(sfn, sm, ai_state, error(name, 'ThrottlingException: slow down'), 8)
         assert r['status'] == 'CAUGHT_ERROR' and r['nextState'] == f'Report {ai_state} Failure'
         output = json.loads(r['output'])
-        assert output['error'] == {'Error': 'AITransientError', 'Cause': 'ThrottlingException: slow down'}
+        assert output['error'] == {'Error': name, 'Cause': 'ThrottlingException: slow down'}
         assert output['messages']['ai'] == INPUT['messages']['ai']
 
     @pytest.mark.parametrize('name', ['Lambda.TooManyRequestsException', 'Lambda.ServiceException'])

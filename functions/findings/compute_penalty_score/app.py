@@ -27,6 +27,7 @@ Integration: SOAR workflow step for findings processing and reporting
 """
 
 import os
+from aws_utils.errors import transient_aws_errors
 
 # Default environment classifications for penalty score calculation
 DEFAULT_DEV_ENVS = "DEV, DEVELOPMENT, DEVINT, DI"
@@ -54,6 +55,7 @@ def env_var_to_set(env_var, default):
     return result_set
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     """
     Main Lambda handler for computing penalty scores for Security Hub findings.

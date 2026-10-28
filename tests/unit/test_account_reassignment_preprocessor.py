@@ -7,6 +7,8 @@ import sys
 aws_utils_path = os.path.join(os.path.dirname(__file__), '..', '..', 'functions', 'layers', 'aws_utils', 'python', 'lib', 'python3.12', 'site-packages')
 sys.path.insert(0, aws_utils_path)
 
+import botocore.exceptions
+from aws_utils.errors import AWSTransientError
 from functions.findings.account_reassignment_preprocessor.app import lambda_handler, must_recreate_in_other_account, recreate_asff_finding
 from tests.fixtures.preprocessing_test_data import get_guardduty_finding_no_correction, get_access_analyzer_finding_needs_correction_1, get_finding_not_in_security_adm_account
 
@@ -412,14 +414,49 @@ class TestAccountReassignmentPreprocessor:
         """Test that recreate_asff_finding returns False when get_client raises exception."""
         # Given: Mock get_client that raises exception
         mock_get_client.side_effect = Exception("Cross-account access failed")
-        
+
         # And: Test data
         test_data = get_access_analyzer_finding_needs_correction_1()
         target_account = '222222222222'
-        
+
         # When: Calling recreate_asff_finding
         result = recreate_asff_finding(target_account, test_data)
-        
+
         # Then: Should return False for failure
         assert result is False
+
+    @pytest.mark.parametrize('code, status', [('TooManyRequestsException', 429), ('LimitExceededException', 429),
+                                              ('ThrottlingException', 400), ('InternalException', 500)])
+    @patch('functions.findings.account_reassignment_preprocessor.app.get_client')
+    def test_throttling_is_retried_by_the_state_machine(self, mock_get_client, code, status):
+        """A throttled BatchImportFindings must not silently leave the finding in the wrong account."""
+        # Given: BatchImportFindings is throttled, as in a burst of findings
+        mock_client = MagicMock()
+        mock_client.batch_import_findings.side_effect = botocore.exceptions.ClientError(
+            {'Error': {'Code': code}, 'ResponseMetadata': {'HTTPStatusCode': status}}, 'BatchImportFindings')
+        mock_get_client.return_value = mock_client
+
+        # Then: the Lambda leaves with AWSTransientError, which the state machine retries
+        with pytest.raises(AWSTransientError):
+            lambda_handler(get_access_analyzer_finding_needs_correction_1(), None)
+
+    @patch('functions.findings.account_reassignment_preprocessor.app.get_client')
+    def test_throttled_role_assumption_is_retried_by_the_state_machine(self, mock_get_client):
+        mock_get_client.side_effect = botocore.exceptions.ClientError(
+            {'Error': {'Code': 'Throttling'}, 'ResponseMetadata': {'HTTPStatusCode': 400}}, 'AssumeRole')
+
+        with pytest.raises(AWSTransientError):
+            lambda_handler(get_access_analyzer_finding_needs_correction_1(), None)
+
+    @patch('functions.findings.account_reassignment_preprocessor.app.get_client')
+    def test_other_aws_errors_still_leave_the_finding_where_it_is(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.batch_import_findings.side_effect = botocore.exceptions.ClientError(
+            {'Error': {'Code': 'AccessDeniedException'}, 'ResponseMetadata': {'HTTPStatusCode': 403}},
+            'BatchImportFindings')
+        mock_get_client.return_value = mock_client
+
+        result = lambda_handler(get_access_analyzer_finding_needs_correction_1(), None)
+
+        assert not result['actions'].get('suppress_finding')
 

@@ -15,13 +15,15 @@ maintaining service-specific lists.
 
 import os
 import json
-import botocore
 from aws_utils.clients import get_client
+from aws_utils.errors import is_transient, transient_aws_errors
+from aws_utils.security_hub import check_batch_update
 
 PRODUCT_NAME = os.environ['PRODUCT_NAME']
 RECLASSIFY_ENABLED = os.environ.get('RECLASSIFY_AWS_HEALTH_INCIDENTS', 'No')
 
 
+@transient_aws_errors
 def lambda_handler(data, context):
     """
     Main handler for AWS Health reclassifier.
@@ -58,6 +60,8 @@ def lambda_handler(data, context):
             print(f"SUCCESS: Security Hub updated, setting actions.reconsider_later = True")
             
         except Exception as e:
+            if is_transient(e):
+                raise  # throttling or a concurrent update: the state machine retries it
             print(f"ERROR: Failed to update Security Hub: {e}")
             print(f"DECISION: Continuing with original severity due to error")
             # Continue processing with original severity on error (no flag set)
@@ -186,7 +190,7 @@ def update_security_hub_severity(finding):
         finding (dict): Security Hub finding to update
         
     Raises:
-        Exception: If Security Hub update fails
+        AWSTransientError, SecurityHubUpdateRejected or the AWS error: if Security Hub update fails
     """
     finding_id = finding['Id']
     product_arn = finding['ProductArn']
@@ -198,33 +202,24 @@ def update_security_hub_severity(finding):
     # Get cross-account Security Hub client
     client = get_client('securityhub', account_id)
     
-    try:
-        response = client.batch_update_findings(
-            FindingIdentifiers=[
-                {
-                    'Id': finding_id,
-                    'ProductArn': product_arn
-                }
-            ],
-            Severity={
-                'Label': 'INFORMATIONAL',
-                'Normalized': 1  # INFORMATIONAL severity level
-            },
-            Note={
-                'Text': f'Severity reclassified from {current_severity} to INFORMATIONAL by {PRODUCT_NAME} AWS Health Reclassifier',
-                'UpdatedBy': f'{PRODUCT_NAME}'
+    response = client.batch_update_findings(
+        FindingIdentifiers=[
+            {
+                'Id': finding_id,
+                'ProductArn': product_arn
             }
-        )
-        
-        print(f"Security Hub API response: {response}")
-        
-        if response.get('UnprocessedFindings'):
-            raise Exception(f"Unprocessed findings: {response['UnprocessedFindings']}")
-            
+        ],
+        Severity={
+            'Label': 'INFORMATIONAL',
+            'Normalized': 1  # INFORMATIONAL severity level
+        },
+        Note={
+            'Text': f'Severity reclassified from {current_severity} to INFORMATIONAL by {PRODUCT_NAME} AWS Health Reclassifier',
+            'UpdatedBy': f'{PRODUCT_NAME}'
+        }
+    )
+
+    print(f"Security Hub API response: {response}")
+
+    if check_batch_update(response):
         print(f"Successfully updated severity to INFORMATIONAL")
-        
-    except botocore.exceptions.ClientError as e:
-        if 'TooManyRequestsException' in str(e):
-            raise Exception('TooManyRequestsException - Security Hub throttling')
-        else:
-            raise Exception(f'Security Hub API error: {e}')

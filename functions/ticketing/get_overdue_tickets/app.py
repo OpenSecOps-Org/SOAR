@@ -5,6 +5,7 @@ from dateutil import parser
 import humanize
 import datetime as dt
 from unidecode import unidecode
+from aws_utils.errors import transient_aws_errors
 
 
 # Get environment variables
@@ -57,6 +58,7 @@ cloudwatch_client = boto3.client('cloudwatch')
 
 
 # Lambda handler
+@transient_aws_errors
 def lambda_handler(_data, _context):
     # Four weeks ago in ISO format
     four_weeks_ago = datetime.now(timezone.utc) - timedelta(weeks=4)

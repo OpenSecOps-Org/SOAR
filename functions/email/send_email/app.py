@@ -6,6 +6,7 @@ from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
 import html2text
 import logging
+from aws_utils.errors import transient_aws_errors
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +48,7 @@ def load_logo_image():
 LOGO_IMAGE, LOGO_HTML = load_logo_image()
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     global EMAIL_CC  # This tells Python to use the global variable
 

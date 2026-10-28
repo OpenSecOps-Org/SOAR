@@ -31,6 +31,8 @@ os.environ['PRODUCT_NAME'] = 'OpenSecOps SOAR'
 os.environ['RECLASSIFY_AWS_HEALTH_INCIDENTS'] = 'No'
 
 from tests.fixtures.asff_data import create_asff_test_data
+from aws_utils.errors import AWSTransientError
+from aws_utils.security_hub import SecurityHubUpdateRejected
 
 
 class TestAWSHealthReclassifier:
@@ -298,6 +300,78 @@ class TestAWSHealthReclassifier:
             mock_get_client.assert_called_once_with('securityhub', aws_health_operational_finding['AwsAccountId'])
             mock_client.batch_update_findings.assert_called_once()
 
+    def test_rejected_update_continues_processing(self, mock_env_enabled, aws_health_operational_finding):
+        """A rejected update is not retried: processing continues with the original severity"""
+
+        with patch('functions.findings.aws_health_reclassifier.app.get_client') as mock_get_client:
+            from functions.findings.aws_health_reclassifier.app import lambda_handler
+
+            mock_client = MagicMock()
+            mock_client.batch_update_findings.return_value = {
+                'ProcessedFindings': [],
+                'UnprocessedFindings': [{'ErrorCode': 'InvalidInput', 'FindingIdentifier': {'Id': 'test-finding-id'}}]
+            }
+            mock_get_client.return_value = mock_client
+
+            result = lambda_handler(create_asff_test_data(aws_health_operational_finding), None)
+
+            assert result['actions']['reconsider_later'] is False
+
+    def test_finding_that_no_longer_exists_needs_nothing_more(self, mock_env_enabled, aws_health_operational_finding):
+        """A finding Security Hub no longer has is not processed further"""
+
+        with patch('functions.findings.aws_health_reclassifier.app.get_client') as mock_get_client:
+            from functions.findings.aws_health_reclassifier.app import lambda_handler
+
+            mock_client = MagicMock()
+            mock_client.batch_update_findings.return_value = {
+                'ProcessedFindings': [],
+                'UnprocessedFindings': [{'ErrorCode': 'FindingNotFound', 'FindingIdentifier': {'Id': 'test-finding-id'}}]
+            }
+            mock_get_client.return_value = mock_client
+
+            result = lambda_handler(create_asff_test_data(aws_health_operational_finding), None)
+
+            assert result['actions']['reconsider_later'] is True
+
+    @pytest.mark.parametrize('error', [
+        botocore.exceptions.ClientError(
+            error_response={'Error': {'Code': 'TooManyRequestsException'}, 'ResponseMetadata': {'HTTPStatusCode': 429}},
+            operation_name='BatchUpdateFindings'),
+        botocore.exceptions.ClientError(
+            error_response={'Error': {'Code': 'LimitExceededException'}, 'ResponseMetadata': {'HTTPStatusCode': 429}},
+            operation_name='BatchUpdateFindings')])
+    def test_security_hub_throttling_is_retried_by_the_state_machine(self, mock_env_enabled,
+                                                                    aws_health_operational_finding, error):
+        """Throttling must not silently keep the original severity: it leaves as AWSTransientError"""
+
+        with patch('functions.findings.aws_health_reclassifier.app.get_client') as mock_get_client:
+            from functions.findings.aws_health_reclassifier.app import lambda_handler
+
+            mock_client = MagicMock()
+            mock_client.batch_update_findings.side_effect = error
+            mock_get_client.return_value = mock_client
+
+            with pytest.raises(AWSTransientError):
+                lambda_handler(create_asff_test_data(aws_health_operational_finding), None)
+
+    def test_concurrent_update_is_retried_by_the_state_machine(self, mock_env_enabled, aws_health_operational_finding):
+        """Security Hub's ConcurrentUpdateError (a scan still importing the finding) is retried"""
+
+        with patch('functions.findings.aws_health_reclassifier.app.get_client') as mock_get_client:
+            from functions.findings.aws_health_reclassifier.app import lambda_handler
+
+            mock_client = MagicMock()
+            mock_client.batch_update_findings.return_value = {
+                'ProcessedFindings': [],
+                'UnprocessedFindings': [{'ErrorCode': 'ConcurrentUpdateError',
+                                         'FindingIdentifier': {'Id': 'test-finding-id'}}]
+            }
+            mock_get_client.return_value = mock_client
+
+            with pytest.raises(AWSTransientError):
+                lambda_handler(create_asff_test_data(aws_health_operational_finding), None)
+
 
 class TestAWSHealthNotificationDetection:
     """Test AWS Health notification pattern detection logic"""
@@ -529,39 +603,11 @@ class TestSecurityHubIntegration:
                 'Severity': {'Label': 'HIGH', 'Normalized': 70}
             }
             
-            # Should raise exception for unprocessed findings
-            with pytest.raises(Exception) as exc_info:
+            # A rejected update raises its own named error
+            with pytest.raises(SecurityHubUpdateRejected) as exc_info:
                 update_security_hub_severity(finding)
-            
-            assert 'Unprocessed findings' in str(exc_info.value)
 
-    def test_security_hub_throttling_error(self, mock_env_enabled):
-        """Test handling of Security Hub throttling"""
-        
-        with patch('functions.findings.aws_health_reclassifier.app.get_client') as mock_get_client:
-            from functions.findings.aws_health_reclassifier.app import update_security_hub_severity
-            
-            # Mock Security Hub client with throttling error
-            mock_client = MagicMock()
-            throttling_error = botocore.exceptions.ClientError(
-                error_response={'Error': {'Code': 'TooManyRequestsException'}},
-                operation_name='BatchUpdateFindings'
-            )
-            mock_client.batch_update_findings.side_effect = throttling_error
-            mock_get_client.return_value = mock_client
-            
-            finding = {
-                'Id': 'test-finding-id',
-                'ProductArn': 'arn:aws:securityhub:us-east-1::product/aws/health',
-                'AwsAccountId': '123456789012',
-                'Severity': {'Label': 'HIGH', 'Normalized': 70}
-            }
-            
-            # Should raise specific exception for throttling
-            with pytest.raises(Exception) as exc_info:
-                update_security_hub_severity(finding)
-            
-            assert 'TooManyRequestsException' in str(exc_info.value)
+            assert 'InvalidInput' in str(exc_info.value)
 
     def test_security_hub_generic_error(self, mock_env_enabled):
         """Test handling of generic Security Hub errors"""
@@ -585,11 +631,11 @@ class TestSecurityHubIntegration:
                 'Severity': {'Label': 'HIGH', 'Normalized': 70}
             }
             
-            # Should raise exception with API error details
-            with pytest.raises(Exception) as exc_info:
+            # A non-transient AWS error keeps its own name
+            with pytest.raises(botocore.exceptions.ClientError) as exc_info:
                 update_security_hub_severity(finding)
-            
-            assert 'Security Hub API error' in str(exc_info.value)
+
+            assert exc_info.value is generic_error
 
 
 class TestRealWorldScenarios:

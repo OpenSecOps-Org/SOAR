@@ -2,6 +2,7 @@ import os
 import boto3
 from datetime import datetime, timezone, timedelta
 import logging
+from aws_utils.errors import transient_aws_errors
 
 # Set up logging
 logger = logging.getLogger()
@@ -14,6 +15,7 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(AUTOREMEDIATIONS_TABLE_NAME)
 
 
+@transient_aws_errors
 def lambda_handler(event, _context):
     logger.info(event)
     

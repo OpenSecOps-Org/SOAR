@@ -1,10 +1,13 @@
 # Import necessary libraries
 import os
+from contextlib import contextmanager
 import boto3
 from jira import JIRA
 from jira import JIRAError
 import requests
 from requests.auth import HTTPBasicAuth
+from aws_utils.errors import (TicketingRequestError, TicketingTransientError, is_transient_status,
+                              transient_aws_errors)
 
 # Get environment variables
 TICKETING_SYSTEM = os.environ['TICKETING_SYSTEM']
@@ -37,7 +40,29 @@ SERVICE_NOW_BASIC_AUTH_PASSWORD = client.get_parameter(Name=SERVICE_NOW_BASIC_AU
 SERVICE_NOW_CREDS = [SERVICE_NOW_URL, SERVICE_NOW_BASIC_AUTH_USERNAME, SERVICE_NOW_BASIC_AUTH_PASSWORD]
 
 
+# Ticketing errors as named errors for the state machine: a rate limit (429), a failure on the ticketing
+# system's side (5xx) or an unreachable system is retried; any other refusal fails the execution.
+@contextmanager
+def ticketing_errors(what):
+    try:
+        yield
+    except JIRAError as err:
+        if is_transient_status(err.status_code):
+            raise TicketingTransientError(f"{what}: {err}") from err
+        raise TicketingRequestError(f"{what}: {err}") from err
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+        raise TicketingTransientError(f"{what}: {err}") from err
+
+
+def check_response(response, what):
+    if is_transient_status(response.status_code):
+        raise TicketingTransientError(f"{what}: HTTP {response.status_code}: {response.text}")
+    if not 200 <= response.status_code <= 299:
+        raise TicketingRequestError(f"{what}: HTTP {response.status_code}: {response.text}")
+
+
 # Define the main lambda handler function
+@transient_aws_errors
 def lambda_handler(data, _context):
     # Print the input data
     print(data)
@@ -75,16 +100,20 @@ def use_jira(data):
     print(f"Closing JIRA ticket {ticket_id}...")
 
     # Create a JIRA object with the authentication details
-    jira = JIRA(basic_auth=(JIRA_BASIC_AUTH_USERNAME, JIRA_BASIC_AUTH_TOKEN), 
-                options={'server': JIRA_SERVER_URL})
+    with ticketing_errors("Could not connect to JIRA"):
+        jira = JIRA(basic_auth=(JIRA_BASIC_AUTH_USERNAME, JIRA_BASIC_AUTH_TOKEN),
+                    options={'server': JIRA_SERVER_URL})
 
     # Initialize the issue variable
     issue = None
 
     try:
         # Get the JIRA issue using the ticket ID
-        issue = jira.issue(ticket_id)
-    except JIRAError as err:
+        with ticketing_errors(f"Could not get issue {ticket_id}"):
+            issue = jira.issue(ticket_id)
+    except TicketingRequestError as err:
+        if err.__cause__.status_code != 404:
+            raise
         # If the issue cannot be found, print an error message and return False
         print(f"ERROR: Could not find issue {ticket_id}: {err}")
         return False
@@ -92,18 +121,20 @@ def use_jira(data):
     try:
         # Transition the issue to the final state
         jira.transition_issue(issue, JIRA_FINAL_STATE)
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
+        raise TicketingTransientError(f"Could not transition issue {ticket_id}: {err}") from err
     except JIRAError as err:
-        # If the transition fails, print an error message and delete the issue
+        if is_transient_status(err.status_code):
+            raise TicketingTransientError(f"Could not transition issue {ticket_id}: {err}") from err
+        # Typically the team has already closed the issue by hand: leave it alone
         print(
-            f"ERROR: Could not transition issue {ticket_id} to '{JIRA_FINAL_STATE}': {err}.")
-        print("Deleting the issue...")
-        issue.delete()
+            f"ERROR: Could not transition issue {ticket_id} to '{JIRA_FINAL_STATE}', leaving it as it is: {err}.")
         return False
 
     try:
         # Add a comment to the issue indicating it was closed by automation
         jira.add_comment(issue, 'Closed by automation.')
-    except JIRAError as err:
+    except (JIRAError, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as err:
         # If adding the comment fails, print an error message
         print(f"ERROR: Could not comment on {ticket_id}: {err}")
 
@@ -134,14 +165,14 @@ def use_service_now(data):
 
     auth = HTTPBasicAuth(SERVICE_NOW_BASIC_AUTH_USERNAME, SERVICE_NOW_BASIC_AUTH_PASSWORD)
 
-    try:
-        # Send a GET request to the ticket URL with authentication
+    # Send a GET request to the ticket URL with authentication
+    with ticketing_errors(f"Could not get ServiceNow ticket {ticket_id}"):
         response = requests.get(ticket_url, auth=auth)
-        response.raise_for_status()
-    except requests.exceptions.HTTPError:
+    if response.status_code == 404:
         # If the ticket cannot be found, print an error message and return False
         print("Ticket can't be found, doing nothing.")
         return False
+    check_response(response, f"Could not get ServiceNow ticket {ticket_id}")
 
     # Parse the response JSON
     json = response.json()
@@ -153,10 +184,12 @@ def use_service_now(data):
     body['u_state'] = SERVICE_NOW_FINAL_STATE
 
     # Send a POST request to import the updated ticket to ServiceNow
-    response = requests.post(
-        f"{SERVICE_NOW_URL}/api/now/import/{SERVICE_NOW_TABLE}",
-        json=body,
-        auth=auth)
+    with ticketing_errors(f"Could not close ServiceNow ticket {ticket_id}"):
+        response = requests.post(
+            f"{SERVICE_NOW_URL}/api/now/import/{SERVICE_NOW_TABLE}",
+            json=body,
+            auth=auth)
+    check_response(response, f"Could not close ServiceNow ticket {ticket_id}")
 
     # Parse the response JSON
     json = response.json()

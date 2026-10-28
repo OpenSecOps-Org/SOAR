@@ -1,4 +1,5 @@
 import os
+from aws_utils.errors import transient_aws_errors
 
 GUARD_DUTY_EC2_TERMINATION_SEVERITIES = os.environ['GUARD_DUTY_EC2_TERMINATION_SEVERITIES'].split(
     ',')
@@ -23,6 +24,7 @@ SOC_TICKET_SEVERITIES = os.environ['SOC_TICKET_SEVERITIES'].split(',')
 IGNORE_PRODUCTS = os.environ['IGNORE_PRODUCTS'].split(',')
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
     finding = data['finding']

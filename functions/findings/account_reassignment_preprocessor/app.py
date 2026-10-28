@@ -2,10 +2,12 @@ import os
 import boto3
 from datetime import datetime, timezone
 from aws_utils.clients import get_client
+from aws_utils.errors import is_transient, transient_aws_errors
 
 SECURITY_ADM_ACCOUNT = os.environ.get('SECURITY_ADM_ACCOUNT', '111111111111')
 
 
+@transient_aws_errors
 def lambda_handler(data, context):
     """
     Account Reassignment Preprocessor - Phase 1 Decision Logic Implementation.
@@ -188,5 +190,7 @@ def recreate_asff_finding(account_id, data):
         return True
         
     except Exception as e:
+        if is_transient(e):
+            raise  # throttling: the state machine retries it
         print(f"Error recreating finding in account {account_id}: {e}")
         return False

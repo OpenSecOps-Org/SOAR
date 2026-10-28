@@ -27,10 +27,12 @@ Integration: Part of SOAR notification pipeline for Security Hub findings
 
 import yaml
 import os
+from aws_utils.errors import transient_aws_errors
 
 PRODUCT_NAME = os.environ['PRODUCT_NAME']
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     """
     Main Lambda handler for formatting Security Hub findings as email messages.

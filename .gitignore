@@ -139,6 +139,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+# Lambda layer sources live under python/lib/ and must be committed
+!functions/layers/*/python/lib/
 lib64/
 parts/
 sdist/

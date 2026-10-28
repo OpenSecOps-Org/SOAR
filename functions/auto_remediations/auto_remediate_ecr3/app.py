@@ -54,6 +54,7 @@ import boto3
 import json
 from botocore.exceptions import ClientError
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
 # Define the lifecycle policy as a JSON string
 LIFECYCLE_POLICY_TEXT = json.dumps(
@@ -76,6 +77,7 @@ LIFECYCLE_POLICY_TEXT = json.dumps(
 )
 
 
+@transient_aws_errors
 def lambda_handler(data, _context):
     # Print the input data
     print(data)

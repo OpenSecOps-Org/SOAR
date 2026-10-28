@@ -1,5 +1,6 @@
 import os
 import boto3
+from aws_utils.errors import transient_aws_errors
 
 TICKETS_TABLE = os.environ['TICKETS_TABLE']
 
@@ -8,6 +9,7 @@ tickets = dynamodb.Table(TICKETS_TABLE)
 
 
 # Lambda handler
+@transient_aws_errors
 def lambda_handler(data, _context):
     print(data)
     add_to_ticket(data, "Yes")

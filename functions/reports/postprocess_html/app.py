@@ -1,12 +1,14 @@
 import logging
 from bs4 import BeautifulSoup, NavigableString, Tag
 import re
+from aws_utils.errors import transient_aws_errors
 
 # Set the logging level to INFO
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+@transient_aws_errors
 def lambda_handler(data, context):
     # Extract HTML and substitutions
     html = data['messages']['ai']['html']

@@ -1,11 +1,13 @@
 import logging
 from bs4 import BeautifulSoup
+from aws_utils.errors import transient_aws_errors
 
 # Set the logging level to INFO
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
+@transient_aws_errors
 def lambda_handler(data, context):
     account = data['account']
     account_data = data['bb']['account_map'][account]

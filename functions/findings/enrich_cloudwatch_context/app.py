@@ -22,11 +22,13 @@ from typing import Dict, List, Any
 
 # Import aws_utils for cross-account client creation
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
 # Initialize DynamoDB client at module level for reuse across invocations
 dynamodb_client = boto3.client('dynamodb')
 
 
+@transient_aws_errors
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Main Lambda handler for CloudWatch context enrichment.

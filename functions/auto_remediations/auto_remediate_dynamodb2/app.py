@@ -58,11 +58,13 @@ import os
 import botocore
 import boto3
 from aws_utils.clients import get_client
+from aws_utils.errors import transient_aws_errors
 
 # Get the DYNAMODB_NO_PIT_RECOVERY_TAG environment variable
 DYNAMODB_NO_PIT_RECOVERY_TAG = os.environ['DYNAMODB_NO_PIT_RECOVERY_TAG']
 
 # Lambda handler function
+@transient_aws_errors
 def lambda_handler(data, _context):
     # Print the input data
     print(data)
