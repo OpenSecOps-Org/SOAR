@@ -160,14 +160,40 @@ html_post = '''
 '''
 
 
+# A code block runs to its </pre>, or to the end of the text when the output was cut off by the token limit
+CODE_BLOCK = re.compile(r'<pre\b[^>]*>.*?(?:</pre>|\Z)', re.S | re.I)
+HTML_BLOCK = re.compile(r'<(?:h[1-6]|div|p|ul|ol|li|blockquote|table)\b', re.I)
+
+
 def clean_ai_html(ai_html):
-    """Convert markdown formatting to HTML in AI-generated content that may be mixed HTML/markdown."""
+    """Prepare the AI text of a ticket, autoremediation or incident for the email.
+
+    Code blocks (<pre>) are never changed. Stray markdown **bold** becomes <strong>. Only output that is not
+    HTML, as older models wrote it, gets its blank lines and dash lists converted: in HTML they are layout and
+    punctuation, and in code they are the code.
+    """
     if not ai_html:
         return ai_html
-    
+
+    code_blocks = []
+
+    def set_aside(match):
+        code_blocks.append(match.group(0))
+        return f'<pre>CODE_BLOCK_{len(code_blocks) - 1}</pre>'
+
+    ai_html = CODE_BLOCK.sub(set_aside, ai_html)
+
     # Convert **text** to <strong>text</strong> (non-greedy matching)
     ai_html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', ai_html)
-    
+
+    if not HTML_BLOCK.search(ai_html):
+        ai_html = markdown_layout_to_html(ai_html)
+
+    return re.sub(r'<pre>CODE_BLOCK_(\d+)</pre>', lambda match: code_blocks[int(match.group(1))], ai_html)
+
+
+def markdown_layout_to_html(ai_html):
+    """Blank lines to <br><br> and dash lines to lists, for output written as text rather than HTML."""
     # Convert double newlines to <br><br> for paragraph breaks, but avoid around HTML block elements
     # First, protect block elements by temporarily replacing newlines around them
     block_elements = r'(</?(?:h[1-6]|div|p|ul|ol|li|pre|blockquote|table|tr|td|th)[^>]*>)'
@@ -296,7 +322,9 @@ def body_to_html(body, _ai_plaintext, ai_html):
 
     if ai_html:
         ai_html = clean_ai_html(ai_html)  # Convert markdown to HTML
-        html += f" <tr><td colspan='2' style='font-size:16px; padding-bottom:8px'>{ai_html}</td></tr>\n"
+        # Long unbroken words (finding types, ARNs) wrap instead of widening the email
+        html += (" <tr><td colspan='2' style='font-size:16px; padding-bottom:8px; overflow-wrap: anywhere; "
+                 f"word-break: break-word'>{ai_html}</td></tr>\n")
     else:
         for line in freeform[2:]:
             html += f"      <tr><td colspan='2' style='font-size:16px; padding-bottom:8px'>{line}</td></tr>\n"

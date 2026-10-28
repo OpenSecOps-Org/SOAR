@@ -98,7 +98,7 @@ class TestWorkflowFunction:
 # Quick start
 cd SOAR/
 cp .env.test.example .env.test
-pip install pytest pytest-xdist pytest-cov "moto[all]" boto3 python-dotenv
+pip install pytest pytest-xdist pytest-cov "moto[all]" boto3 python-dotenv beautifulsoup4 html2text
 
 # Run tests
 pytest tests/unit/                           # All unit tests

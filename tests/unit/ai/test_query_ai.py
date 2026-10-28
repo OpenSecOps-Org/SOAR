@@ -9,7 +9,6 @@ anything to the error topic and without retrying. All AWS calls are mocked.
 
 import importlib.util
 import json
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -44,31 +43,7 @@ ENV = {
 # Loading and fakes
 # ---------------------------------------------------------------------------
 
-def _install_stubs(monkeypatch):
-    """Lambda-only dependencies that are not installed in the test environment."""
-    if 'html2text' not in sys.modules:
-        html2text = type(sys)('html2text')
-        html2text.html2text = lambda html: f'plain:{html}'
-        monkeypatch.setitem(sys.modules, 'html2text', html2text)
-    if 'bs4' not in sys.modules:
-        bs4 = type(sys)('bs4')
-
-        class Soup:
-            def __init__(self, html, parser):
-                self._html = html
-
-            def find_all(self, _tag):
-                return []
-
-            def __str__(self):
-                return self._html
-
-        bs4.BeautifulSoup = Soup
-        monkeypatch.setitem(sys.modules, 'bs4', bs4)
-
-
 def load(monkeypatch, **env):
-    _install_stubs(monkeypatch)
     for key, value in {**ENV, **env}.items():
         monkeypatch.setenv(key, value)
     spec = importlib.util.spec_from_file_location('query_ai_app', APP)
@@ -225,7 +200,7 @@ class TestResponse:
     def test_reasoning_plus_text_gives_only_the_text(self, app):
         result = run(app, finding_data(no_html_post_processing='True'), Clients(answer('<div>only this</div>')))
         assert result['messages']['ai']['html'] == '<div>only this</div>'
-        assert result['messages']['ai']['plaintext'] == 'plain:<div>only this</div>'
+        assert result['messages']['ai']['plaintext'] == 'only this\n\n'
 
     def test_several_text_blocks_are_concatenated_in_order(self, app):
         response = answer('<div>one</div>')
@@ -236,6 +211,23 @@ class TestResponse:
     def test_max_tokens_keeps_the_text(self, app):
         result = run(app, finding_data(no_html_post_processing='True'), Clients(answer('<div>cut</div>', stop='max_tokens')))
         assert result['messages']['ai']['html'] == '<div>cut</div>'
+
+    def test_tables_and_code_blocks_are_styled_for_ticket_and_incident_emails(self, app):
+        html = '<p>Rules:</p><table><tr><th>Port</th></tr><tr><td>HIGH</td></tr></table><pre>- Effect: Allow\n\n</pre>'
+        result = run(app, finding_data(), Clients(answer(html)))['messages']['ai']['html']
+        assert '<table style="border: 1px solid black' in result
+        assert 'background-color: #FF0000' in result
+        assert '<pre style="background-color: #030204; padding: 12px; color: #f8f9d2;">- Effect: Allow\n\n</pre>' in result
+
+    def test_weekly_sections_are_left_for_postprocess_html(self, app):
+        html = '<table><tr><td>HIGH</td></tr></table><pre>x</pre>'
+        result = run(app, finding_data(no_html_post_processing='True'), Clients(answer(html)))
+        assert result['messages']['ai']['html'] == html
+
+    def test_plaintext_is_the_html_as_text(self, app):
+        result = run(app, finding_data(no_html_post_processing='True'),
+                     Clients(answer('<h3>Summary</h3><p>Two <strong>HIGH</strong> findings.</p>')))
+        assert result['messages']['ai']['plaintext'] == '### Summary\n\nTwo **HIGH** findings.\n\n'
 
     def test_other_data_is_preserved(self, app):
         data = finding_data()

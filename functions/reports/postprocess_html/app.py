@@ -102,18 +102,49 @@ def format_tables_inline(html):
     return html
 
 
+INLINE_TAGS = {'a', 'abbr', 'b', 'br', 'code', 'em', 'i', 'mark', 'small', 'span', 'strong', 'sub', 'sup', 'u'}
+TEXT_CONTAINERS = {'li', 'div', 'blockquote'}  # and the top level
+
+
 def wrap_unwrapped_text(html_content):
     soup = BeautifulSoup(html_content, 'html.parser')
-    
-    # Check all navigable strings (text)
-    for content in soup.find_all(text=True):
-        if isinstance(content, NavigableString) and content.strip() and not content.parent.name in ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'td', 'th']:
-            # If it's a NavigableString, and not just whitespace, and its parent is not one of the common text tags
-            new_tag = soup.new_tag("p")
-            new_tag.string = content.strip()
-            content.replace_with(new_tag)
+
+    # A table placeholder written inside a paragraph puts the table inside the paragraph
+    for paragraph in soup.find_all('p'):
+        if paragraph.find('table'):
+            paragraph.unwrap()
+
+    # Text not in a paragraph, heading or cell gets one paragraph per run of text and inline tags, so that
+    # "There were <strong>2 tickets</strong> this week." stays one paragraph
+    for container in [soup] + soup.find_all(TEXT_CONTAINERS):
+        run = []
+        for child in list(container.children):
+            if isinstance(child, NavigableString) or (isinstance(child, Tag) and child.name in INLINE_TAGS):
+                run.append(child)
+            else:
+                wrap_run(soup, run)
+                run = []
+        wrap_run(soup, run)
 
     return str(soup)
+
+
+def wrap_run(soup, run):
+    # Whitespace around the run stays outside the paragraph
+    while run and isinstance(run[0], NavigableString) and not run[0].strip():
+        run.pop(0)
+    while run and isinstance(run[-1], NavigableString) and not run[-1].strip():
+        run.pop()
+    if not any(not isinstance(node, NavigableString) or node.strip() for node in run):
+        return
+    paragraph = soup.new_tag('p')
+    run[0].insert_before(paragraph)
+    for node in run:
+        paragraph.append(node.extract())
+    if isinstance(paragraph.contents[0], NavigableString):
+        paragraph.contents[0].replace_with(paragraph.contents[0].lstrip())
+    if isinstance(paragraph.contents[-1], NavigableString):
+        paragraph.contents[-1].replace_with(paragraph.contents[-1].rstrip())
 
 
 def format_pre_sections(html):

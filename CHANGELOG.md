@@ -1,5 +1,10 @@
 # Change Log
 
+## v4.2.1
+    * Fix: the weekly report put every bold word or phrase on a line of its own, and a table placeholder written inside a paragraph put the table inside the paragraph. This was also the case in earlier versions; it shows every week with Claude Opus 5.5, which uses bold far more than earlier models. Bold now stays inline, and tables are never inside paragraphs.
+    * Fix: in ticket, autoremediation and incident emails, the conversion meant for markdown in the AI text changed the code snippets: YAML list items (`- Effect: Allow`) became bullets, dashes became `•`, and blank lines became line breaks. Code blocks are now left exactly as written, and AI text written as HTML only has stray markdown bold converted. The AI text also wraps long words, such as finding types and ARNs, instead of widening the email.
+    * Tests: offline tests for every step that converts the AI text to or from HTML, for the emails and for the weekly report, including end-to-end tests from model output to the HTML that is sent.
+
 ## v4.2.0
     * Fix: the direct DynamoDB steps of the state machines retried two error names Step Functions never reports, so DynamoDB throttling there was not retried. Step Functions names these errors `DynamoDB.` plus the AWS SDK for Java v1 exception class, and falls back to `DynamoDB.AmazonDynamoDBException` for an error code without a class of its own (established by running such steps against DynamoDB with Step Functions TestState). `DynamoDB.RequestLimitExceeded` is now `DynamoDB.RequestLimitExceededException`. `DynamoDB.ThrottlingException` is removed: on-demand tables, which SOAR uses, throttle with `ThrottlingException`, which has no v1 class and is therefore reported as `DynamoDB.AmazonDynamoDBException`. Every direct DynamoDB step now retries that name, which also retries permanent DynamoDB errors until the rule gives up, and `DynamoDB.InternalServerErrorException`.
     * The weekly report's three steps that store report segments in DynamoDB had no retry; they now have the same rule.
