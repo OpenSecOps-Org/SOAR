@@ -27,18 +27,18 @@
     },
     {
       "bom-ref": "requirements-L8",
-      "description": "requirements line 8: soupsieve==2.10     --hash=sha256:49e9380d7d2905463583bafe285e818c7366a9ed7b3aee221c1ac79c905d8bc0     --hash=sha256:8596eb8967d744174820280fa62b4542a2e955bfaccca73ed8a13c6eb8e9b502",
+      "description": "requirements line 8: soupsieve==3.0.4     --hash=sha256:8412826614f9c632227067d0985aeb9f584bd15efc852955430e097a9fe7afbf     --hash=sha256:924fab84ae21604c19e175e1f39815eb6fa83ba23836e09e9de180925e5bc4c0",
       "externalReferences": [
         {
           "comment": "implicit dist url",
           "hashes": [
             {
               "alg": "SHA-256",
-              "content": "49e9380d7d2905463583bafe285e818c7366a9ed7b3aee221c1ac79c905d8bc0"
+              "content": "8412826614f9c632227067d0985aeb9f584bd15efc852955430e097a9fe7afbf"
             },
             {
               "alg": "SHA-256",
-              "content": "8596eb8967d744174820280fa62b4542a2e955bfaccca73ed8a13c6eb8e9b502"
+              "content": "924fab84ae21604c19e175e1f39815eb6fa83ba23836e09e9de180925e5bc4c0"
             }
           ],
           "type": "distribution",
@@ -46,9 +46,9 @@
         }
       ],
       "name": "soupsieve",
-      "purl": "pkg:pypi/soupsieve@2.10",
+      "purl": "pkg:pypi/soupsieve@3.0.4",
       "type": "library",
-      "version": "2.10"
+      "version": "3.0.4"
     },
     {
       "bom-ref": "requirements-L12",
@@ -192,7 +192,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:eed16d79-30eb-5f13-9a66-7a4458c38adb",
+  "serialNumber": "urn:uuid:00e52c9f-c7b6-5750-ac91-875628bbdc5e",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",
