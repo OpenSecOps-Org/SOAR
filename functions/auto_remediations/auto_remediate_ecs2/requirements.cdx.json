@@ -250,7 +250,7 @@
           ],
           "name": "cyclonedx-py",
           "type": "application",
-          "version": "7.5.0"
+          "version": "8.0.1"
         },
         {
           "description": "Python library for CycloneDX",
@@ -304,7 +304,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:bb62f551-51f2-500d-b1dc-105bb70e1ae6",
+  "serialNumber": "urn:uuid:e7e5878c-6d42-55ea-9723-cce03b930498",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",

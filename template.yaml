@@ -840,26 +840,39 @@ Resources:
       BillingMode: PAY_PER_REQUEST
 
       AttributeDefinitions:
-        - 
+        -
           AttributeName: id
           AttributeType: S
-        - 
+        -
           AttributeName: opened_at
           AttributeType: S
-        - 
+        -
           AttributeName: dummy
+          AttributeType: S
+        -
+          AttributeName: GeneratorId
           AttributeType: S
 
       KeySchema:
-        - 
+        -
           AttributeName: id
           KeyType: HASH
-          
+
       GlobalSecondaryIndexes:
-        - 
+        -
           IndexName: dummy-opened_at-index
           KeySchema:
             - AttributeName: dummy
+              KeyType: HASH
+            - AttributeName: opened_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        -
+          # Earlier incidents of the same alarm, for CloudWatch context enrichment
+          IndexName: GeneratorId-opened_at-index
+          KeySchema:
+            - AttributeName: GeneratorId
               KeyType: HASH
             - AttributeName: opened_at
               KeyType: RANGE

@@ -882,18 +882,18 @@
     },
     {
       "bom-ref": "requirements-L212",
-      "description": "requirements line 212: oauthlib==4.0.0     --hash=sha256:624c28c13a0a59cabf9747dfa52af63be3e512a7f2714df16e91b5b3a145e6cd     --hash=sha256:efb274799819440f95b4ab3b818869f1ce9ae26c5beacba0201d1a1b76b54f86",
+      "description": "requirements line 212: oauthlib==4.0.1     --hash=sha256:3d73febdb6faa00f277c81fb04be7b7586fb96fc3b7f0b9c772dada69a25ede7     --hash=sha256:498a298876e996301950a5b053d12c31628bb7b895db03666430c69ce182eb61",
       "externalReferences": [
         {
           "comment": "implicit dist url",
           "hashes": [
             {
               "alg": "SHA-256",
-              "content": "624c28c13a0a59cabf9747dfa52af63be3e512a7f2714df16e91b5b3a145e6cd"
+              "content": "3d73febdb6faa00f277c81fb04be7b7586fb96fc3b7f0b9c772dada69a25ede7"
             },
             {
               "alg": "SHA-256",
-              "content": "efb274799819440f95b4ab3b818869f1ce9ae26c5beacba0201d1a1b76b54f86"
+              "content": "498a298876e996301950a5b053d12c31628bb7b895db03666430c69ce182eb61"
             }
           ],
           "type": "distribution",
@@ -901,9 +901,9 @@
         }
       ],
       "name": "oauthlib",
-      "purl": "pkg:pypi/oauthlib@4.0.0",
+      "purl": "pkg:pypi/oauthlib@4.0.1",
       "type": "library",
-      "version": "4.0.0"
+      "version": "4.0.1"
     },
     {
       "bom-ref": "requirements-L216",
@@ -1238,7 +1238,7 @@
           ],
           "name": "cyclonedx-py",
           "type": "application",
-          "version": "7.5.0"
+          "version": "8.0.1"
         },
         {
           "description": "Python library for CycloneDX",
@@ -1292,7 +1292,7 @@
       ]
     }
   },
-  "serialNumber": "urn:uuid:2cf39d61-4eb5-5120-a502-88ae17dceccb",
+  "serialNumber": "urn:uuid:13d5e0fa-8280-5c5d-8c70-0281a91412c8",
   "version": 1,
   "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
   "bomFormat": "CycloneDX",

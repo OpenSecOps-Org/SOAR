@@ -13,11 +13,11 @@
       }
     },
     "python-dateutil": {
-      "author": "Gustavo Niemeyer",
-      "author_email": "gustavo@niemeyer.net",
-      "home_page": "https://github.com/dateutil/dateutil",
-      "maintainer": "Paul Ganssle",
-      "maintainer_email": "dateutil@python.org",
+      "author": "",
+      "author_email": "Gustavo Niemeyer <gustavo@niemeyer.net>",
+      "home_page": "",
+      "maintainer": "",
+      "maintainer_email": "Paul Ganssle <dateutil@python.org>",
       "project_urls": {
         "Documentation": "https://dateutil.readthedocs.io/en/stable/",
         "Homepage": "https://github.com/dateutil/dateutil",

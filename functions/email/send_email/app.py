@@ -1,6 +1,7 @@
 import os
 import boto3
 import re
+from html import escape
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 from email.mime.text import MIMEText
@@ -261,7 +262,34 @@ def markdown_layout_to_html(ai_html):
     return result
 
 
+FIRST_FIELD = 'Resource ARN: '
+
+
+def split_description(body):
+    """
+    The finding description, found by its position in the layout the finding formatters write:
+    a heading line, the title, the description, then the fields, starting with "Resource ARN: ".
+
+    The description is free text from AWS services and resource names, so its content cannot tell
+    it apart from the fields: it may itself contain ": ". Its position can.
+
+    Returns:
+        (body without the description lines, description lines). A body without that layout,
+        such as the overdue-ticket email, is returned unchanged with no description lines.
+    """
+    lines = body.split('\n')
+    title = next((i for i in range(1, len(lines)) if lines[i].strip()), None)
+    if title is None:
+        return body, []
+    first_field = next((i for i in range(title + 1, len(lines)) if lines[i].startswith(FIRST_FIELD)), None)
+    if first_field is None:
+        return body, []
+    description = [line for line in lines[title + 1:first_field] if line.strip()]
+    return '\n'.join(lines[:title + 1] + [''] + lines[first_field:]), description
+
+
 def body_to_html(body, _ai_plaintext, ai_html):
+    body, description = split_description(body)
     body = body.replace("\n\n\n", "\n")
     body = body.replace("\n\n", "\n")
     body = re.sub("={10,}", '<hr>', body)
@@ -319,6 +347,11 @@ def body_to_html(body, _ai_plaintext, ai_html):
 
     html += f"          <tr><td colspan='2'><h1>{freeform[0]}</h1></td></tr>\n"
     html += f"          <tr><td colspan='2'><h2>{freeform[1]}</h2></td></tr>\n"
+
+    # The finding's own description, always, above the AI text. Escaped: it is text from outside.
+    for line in description:
+        html += ("      <tr><td colspan='2' style='font-size:16px; padding-bottom:8px; overflow-wrap: anywhere; "
+                 f"word-break: break-word'>{escape(line)}</td></tr>\n")
 
     if ai_html:
         ai_html = clean_ai_html(ai_html)  # Convert markdown to HTML

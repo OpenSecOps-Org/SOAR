@@ -190,10 +190,53 @@ class TestPlainTextBody:
         assert 'This control checks whether security groups allow unrestricted SSH.' in html
         assert 'ACTIONS REQUIRED ON YOUR PART: Restrict port 22 to known addresses.' in html
 
-    def test_the_ai_text_takes_the_place_of_the_description_and_actions(self, app):
+    def test_the_ai_text_takes_the_place_of_the_actions(self, app):
         html = app.body_to_html(TICKET_BODY, '', '<h3>Summary</h3><p>Port 22 is open to the internet.</p>')
         assert '<h3>Summary</h3><p>Port 22 is open to the internet.</p>' in html
-        assert 'This control checks' not in html and 'ACTIONS REQUIRED' not in html
+        assert 'ACTIONS REQUIRED' not in html
+
+    def test_the_description_is_shown_above_the_ai_text(self, app):
+        html = app.body_to_html(TICKET_BODY, '', '<h3>Summary</h3><p>Port 22 is open to the internet.</p>')
+        texts = [row.text for row in rows(html)]
+        description = texts.index('This control checks whether security groups allow unrestricted SSH.')
+        ai = next(i for i, text in enumerate(texts) if 'Port 22 is open to the internet.' in text)
+        assert 2 < description < ai
+
+    def test_a_description_containing_a_colon_is_text_not_a_label_row(self, app):
+        body = TICKET_BODY.replace('This control checks whether security groups allow unrestricted SSH.',
+                                   'EC2 instance i-0123 is querying a domain name: example.com.')
+        for ai_html in ('', '<p>Analysis.</p>'):
+            html = app.body_to_html(body, '', ai_html)
+            assert 'EC2 instance i-0123 is querying a domain name: example.com.' in [row.text for row in rows(html)]
+            assert '<b>EC2 instance i-0123 is querying a domain name</b>' not in html
+
+    def test_every_paragraph_of_the_description_is_shown_in_order(self, app):
+        """An alarm finding's Description: the alarm description, then the reason the alarm fired"""
+        body = TICKET_BODY.replace(
+            'This control checks whether security groups allow unrestricted SSH.',
+            'The InstancePortReport state machine failed.\n\n'
+            'Alarm state reason: Threshold Crossed: 1 datapoint [1.0] was >= the threshold (1.0).')
+        html = app.body_to_html(body, '', '<p>Analysis.</p>')
+        texts = [row.text for row in rows(html)]
+        first = texts.index('The InstancePortReport state machine failed.')
+        reason = texts.index('Alarm state reason: Threshold Crossed: 1 datapoint [1.0] was >= the threshold (1.0).')
+        assert first < reason
+        assert '<b>Alarm state reason</b>' not in html
+
+    def test_the_description_is_html_escaped(self, app):
+        body = TICKET_BODY.replace('This control checks whether security groups allow unrestricted SSH.',
+                                   'Bucket <script>alert(1)</script> & co is public.')
+        html = app.body_to_html(body, '', '<p>Analysis.</p>')
+        assert '<script>' not in html
+        assert 'Bucket &lt;script&gt;alert(1)&lt;/script&gt; &amp; co is public.' in html
+
+    def test_a_body_without_the_finding_layout_is_rendered_as_before(self, app):
+        """The overdue-ticket email has no description and no Resource ARN line"""
+        body = ('OVERDUE TEAM FIX in account example-account\n\nA ticket is overdue to be fixed.\n\n'
+                'Title: EC2.13: Security groups should not allow ingress\nAge: 40 days\n\n/ OpenSecOps SOAR\n')
+        html = app.body_to_html(body, '', '')
+        assert rows(html)[2].h2.text == 'A ticket is overdue to be fixed.'
+        assert "<b>Title</b></td><td style='font-size:14px;'>EC2.13: Security groups should not allow ingress" in html
 
     def test_the_finding_data_after_the_separator_is_shown_in_grey(self, app):
         html = app.body_to_html(TICKET_BODY, '', '')

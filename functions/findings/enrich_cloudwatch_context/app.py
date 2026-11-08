@@ -15,6 +15,7 @@ Configuration Dependencies:
 - Change both parameters together to maintain compatibility
 """
 
+import json
 import os
 import boto3
 from datetime import datetime, timedelta, timezone
@@ -276,7 +277,9 @@ def enrich_stepfunctions_context(finding: Dict[str, Any], service_context: Dict[
             try:
                 # Get execution details and history
                 execution_details = stepfunctions_client.describe_execution(executionArn=execution_arn)
-                execution_history = stepfunctions_client.get_execution_history(executionArn=execution_arn)
+                # Newest first: the failure is at the end of the history, so a long history cannot hide it
+                execution_history = stepfunctions_client.get_execution_history(
+                    executionArn=execution_arn, reverseOrder=True, maxResults=1000)
                 
                 # Extract failure details from execution history
                 failure_details = extract_execution_failure_details(execution_history)
@@ -374,14 +377,12 @@ def analyze_incident_patterns(finding: Dict[str, Any]) -> Dict[str, Any]:
         Pattern analysis including frequency, trends, and classification
     """
     try:
-        # Extract alarm type from finding title for pattern matching
-        alarm_title = finding.get('Title', '')
-        # Remove severity suffix to get base alarm type for pattern matching
-        alarm_type = '-'.join(alarm_title.split('-')[:-1]) if '-' in alarm_title else alarm_title
-        
-        # Query historical incidents for this alarm type
+        # Earlier incidents of the same alarm: for alarm findings, GeneratorId is the alarm name,
+        # and Remember Incident Opened records it with each incident
+        generator_id = finding.get('GeneratorId') or finding.get('Title', '')
+
         retention_days = int(os.environ.get('INCIDENT_EXPIRATION_DAYS', '365'))
-        historical_incidents = query_dynamodb_incidents(alarm_type, retention_days)
+        historical_incidents = query_dynamodb_incidents(generator_id, retention_days)
         
         # Classify the incident pattern based on historical data
         pattern_classification = classify_incident_pattern(historical_incidents)
@@ -390,7 +391,7 @@ def analyze_incident_patterns(finding: Dict[str, Any]) -> Dict[str, Any]:
             'historical_incidents': historical_incidents,
             'pattern_classification': pattern_classification,
             'analysis_timestamp': datetime.now(timezone.utc).isoformat(),
-            'alarm_type_analyzed': alarm_type,
+            'generator_id_analyzed': generator_id,
             'retention_period_days': retention_days
         }
         
@@ -476,143 +477,108 @@ def calculate_incident_time_window(incident_time: str) -> Dict[str, Any]:
     }
 
 
-def query_dynamodb_incidents(alarm_type: str, retention_days: int) -> List[Dict[str, Any]]:
+INCIDENTS_BY_GENERATOR_INDEX = 'GeneratorId-opened_at-index'
+
+
+def query_dynamodb_incidents(generator_id: str, retention_days: int) -> List[Dict[str, Any]]:
     """
-    Query DynamoDB incidents table for historical pattern analysis.
-    
+    Earlier incidents with this GeneratorId within the retention period, newest first.
+
+    Uses the attributes Remember Incident Opened records: GeneratorId (the alarm name, for alarm
+    findings) and opened_at (ISO 8601 UTC). A failing query raises, so the caller reports the
+    analysis as failed instead of as "no history".
+
     Args:
-        alarm_type: Type of alarm for pattern matching
+        generator_id: GeneratorId of the finding
         retention_days: Days to look back for incidents
-        
-    Returns:
-        List of similar incidents within retention period
-    """
-    try:
-        # Get table name from environment
-        incidents_table_name = os.environ.get('INCIDENTS_TABLE_NAME', 'soar-incidents')
-        
-        # Use module-level DynamoDB client (runs in current region)
-        
-        # Calculate time range for query
-        end_time = int(datetime.now(timezone.utc).timestamp())
-        start_time = end_time - (retention_days * 24 * 60 * 60)  # retention_days ago
-        
-        # Query DynamoDB using GSI for alarm_type
-        response = dynamodb_client.query(
-            TableName=incidents_table_name,
-            IndexName='alarm-type-timestamp-index',
-            KeyConditionExpression='alarm_type = :alarm_type AND #ts BETWEEN :start_time AND :end_time',
-            ExpressionAttributeNames={
-                '#ts': 'timestamp'
-            },
-            ExpressionAttributeValues={
-                ':alarm_type': {'S': alarm_type},
-                ':start_time': {'N': str(start_time)},
-                ':end_time': {'N': str(end_time)}
-            },
-            ScanIndexForward=False,  # Most recent first
-            Limit=50  # Reasonable limit for pattern analysis
-        )
-        
-        # Convert DynamoDB items to standard format
-        incidents = []
-        for item in response.get('Items', []):
-            incident = {
-                'incident_id': item.get('incident_id', {}).get('S', ''),
-                'alarm_type': item.get('alarm_type', {}).get('S', ''),
-                'timestamp': int(item.get('timestamp', {}).get('N', '0')),
-                'severity': item.get('severity', {}).get('S', 'UNKNOWN'),
-                'resolution_time_minutes': int(item.get('resolution_time_minutes', {}).get('N', '0')),
-                'auto_resolved': item.get('auto_resolved', {}).get('BOOL', False)
-            }
-            incidents.append(incident)
-        
-        return incidents
-        
-    except Exception as e:
-        print(f"Failed to query DynamoDB incidents: {str(e)}")
-        return []
 
-
-def classify_incident_pattern(incidents: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    Classify incident pattern based on frequency and trends.
-    
-    Args:
-        incidents: List of historical incidents
-        
     Returns:
-        Pattern classification and trend analysis
+        Incidents as {incident_id, opened_at, severity, ticket_id}, at most 50
     """
-    if not incidents:
-        return {
-            'pattern_type': 'no_history',
-            'frequency_score': 0,
-            'auto_resolution_rate': 0.0,
-            'avg_resolution_time_minutes': 0,
-            'trend': 'unknown',
-            'recommendation': 'establish_baseline'
+    incidents_table_name = os.environ.get('INCIDENTS_TABLE_NAME', 'soar-incidents')
+
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(days=retention_days)
+
+    response = dynamodb_client.query(
+        TableName=incidents_table_name,
+        IndexName=INCIDENTS_BY_GENERATOR_INDEX,
+        KeyConditionExpression='GeneratorId = :generator_id AND opened_at BETWEEN :start AND :end',
+        ExpressionAttributeValues={
+            ':generator_id': {'S': generator_id},
+            ':start': {'S': start.isoformat()},
+            ':end': {'S': end.isoformat()}
+        },
+        ScanIndexForward=False,  # Most recent first
+        Limit=50  # Reasonable limit for pattern analysis
+    )
+
+    return [
+        {
+            'incident_id': item.get('id', {}).get('S', ''),
+            'opened_at': item.get('opened_at', {}).get('S', ''),
+            'severity': item.get('severity_label', {}).get('S', 'UNKNOWN'),
+            'ticket_id': item.get('ticket_id', {}).get('S', ''),
         }
-    
-    # Calculate frequency score (number of incidents)
-    frequency_score = len(incidents)
-    
-    # Calculate auto-resolution rate
-    auto_resolved_count = sum(1 for incident in incidents if incident.get('auto_resolved', False))
-    auto_resolution_rate = auto_resolved_count / len(incidents) if incidents else 0.0
-    
-    # Calculate average resolution time
-    resolution_times = [incident.get('resolution_time_minutes', 0) for incident in incidents]
-    avg_resolution_time = sum(resolution_times) / len(resolution_times) if resolution_times else 0
-    avg_resolution_time = round(avg_resolution_time, 2)
-    
-    # Determine trend based on resolution time variance
-    if len(resolution_times) > 1:
-        # Calculate variance to determine trend stability
-        mean_time = avg_resolution_time
-        variance = sum((x - mean_time) ** 2 for x in resolution_times) / len(resolution_times)
-        std_dev = variance ** 0.5
-        
-        # If standard deviation is small relative to mean, trend is stable
-        coefficient_of_variation = std_dev / mean_time if mean_time > 0 else 0
-        if coefficient_of_variation < 0.3:
-            trend = 'stable'
-        elif coefficient_of_variation < 0.6:
-            trend = 'variable'
-        else:
-            trend = 'unstable'
-    else:
-        trend = 'unknown'
-    
-    # Classify pattern type based on frequency and characteristics
-    if frequency_score == 1:
+        for item in response.get('Items', [])
+    ]
+
+
+OCCURRENCE_WINDOWS_DAYS = (7, 30, 90, 365)
+
+
+def classify_incident_pattern(incidents: List[Dict[str, Any]], now: datetime = None) -> Dict[str, Any]:
+    """
+    How often, and when, earlier incidents of the same alarm occurred.
+
+    Reports only what the incidents table records, which is when each incident was opened.
+    Nothing records how or when incidents were resolved, so there are no resolution times,
+    auto-resolution rates, trends or recommendations.
+
+    pattern_type by the number of earlier incidents: 0 no_history, 1 isolated_occurrence,
+    2 infrequent_recurring, 3-6 moderate_recurring, 7 or more frequent_recurring.
+    The query returns at most 50 incidents, so the counts stop at 50.
+
+    Args:
+        incidents: Earlier incidents, each with an ISO 8601 opened_at
+        now: Reference time for the occurrence windows (default: the current time)
+
+    Returns:
+        pattern_type, total_incidents_analyzed, occurrences per window, first and last occurrence
+    """
+    now = now or datetime.now(timezone.utc)
+    count = len(incidents)
+
+    if count == 0:
+        pattern_type = 'no_history'
+    elif count == 1:
         pattern_type = 'isolated_occurrence'
-        recommendation = 'investigate_thoroughly'
-    elif frequency_score >= 7:  # High frequency (7+ incidents in retention period)
-        pattern_type = 'frequent_recurring'
-        if auto_resolution_rate >= 0.8:
-            recommendation = 'monitor_for_root_cause'
-        else:
-            recommendation = 'improve_automation'
-    elif frequency_score >= 3:  # Medium frequency
-        pattern_type = 'moderate_recurring'
-        if auto_resolution_rate >= 0.5:
-            recommendation = 'optimize_response_time'
-        else:
-            recommendation = 'enhance_automation'
-    else:  # Low frequency (2-3 incidents)
+    elif count == 2:
         pattern_type = 'infrequent_recurring'
-        recommendation = 'document_resolution_steps'
-    
+    elif count < 7:
+        pattern_type = 'moderate_recurring'
+    else:
+        pattern_type = 'frequent_recurring'
+
+    opened = []
+    for incident in incidents:
+        try:
+            opened_at = datetime.fromisoformat(incident.get('opened_at', ''))
+        except (TypeError, ValueError):
+            continue  # an unreadable date still counts in the total, but in no window
+        if opened_at.tzinfo is None:
+            opened_at = opened_at.replace(tzinfo=timezone.utc)
+        opened.append(opened_at)
+
     return {
         'pattern_type': pattern_type,
-        'frequency_score': frequency_score,
-        'auto_resolution_rate': auto_resolution_rate,
-        'avg_resolution_time_minutes': avg_resolution_time,
-        'trend': trend,
-        'recommendation': recommendation,
-        'total_incidents_analyzed': len(incidents),
-        'analysis_period_days': 30  # Based on retention period
+        'total_incidents_analyzed': count,
+        'occurrences': {
+            f'last_{days}_days': sum(1 for t in opened if t >= now - timedelta(days=days))
+            for days in OCCURRENCE_WINDOWS_DAYS
+        },
+        'first_occurrence': min(opened).isoformat() if opened else None,
+        'last_occurrence': max(opened).isoformat() if opened else None,
     }
 
 
@@ -633,23 +599,92 @@ def extract_execution_failure_details(execution_history: Dict[str, Any]) -> Dict
         'failure_step': 'Unknown'
     }
     
-    events = execution_history.get('events', [])
+    # Oldest first, whatever order the history was read in
+    events = sorted(execution_history.get('events', []), key=lambda e: e.get('id', 0))
+    by_id = {event.get('id'): event for event in events}
+
+    # The last failure of a state is the one that ended the execution (earlier ones were retried or caught)
+    state_failure = None
+    execution_failure = None
     for event in events:
-        event_type = event.get('type', '')
-        
-        if event_type == 'TaskFailed':
-            task_failed = event.get('taskFailedEventDetails', {})
-            failure_details['error_type'] = task_failed.get('error', 'TaskFailed')
-            failure_details['error_cause'] = task_failed.get('cause', 'Unknown cause')
-            failure_details['failed_lambda_arn'] = task_failed.get('resource', '')
-            failure_details['failure_step'] = task_failed.get('resourceType', 'Unknown')
-            
-        elif event_type == 'ExecutionFailed':
-            exec_failed = event.get('executionFailedEventDetails', {})
-            failure_details['error_type'] = exec_failed.get('error', 'ExecutionFailed')
-            failure_details['error_cause'] = exec_failed.get('cause', 'Unknown cause')
-    
+        if event.get('type') in STATE_FAILURE_DETAILS:
+            state_failure = event
+        elif event.get('type') in EXECUTION_FAILURE_DETAILS:
+            execution_failure = event
+
+    failure = state_failure or execution_failure
+    if failure is None:
+        return failure_details
+
+    details = failure.get({**STATE_FAILURE_DETAILS, **EXECUTION_FAILURE_DETAILS}[failure['type']], {})
+    failure_details['error_type'] = details.get('error') or failure['type']
+    failure_details['error_cause'] = details.get('cause') or 'Unknown cause'
+
+    if state_failure is not None:
+        scheduled, state_name = _origin_of_failure(state_failure, by_id)
+        failure_details['failed_lambda_arn'] = _failed_lambda(state_failure, scheduled)
+        if state_name:
+            failure_details['failure_step'] = state_name
+
     return failure_details
+
+
+# Failure events of a state, and the field holding their error and cause (Step Functions API model).
+# A Lambda state written as `Resource: <function ARN>` records LambdaFunction* events; service
+# integrations, including `arn:aws:states:::lambda:invoke`, record Task* events.
+STATE_FAILURE_DETAILS = {
+    'LambdaFunctionFailed': 'lambdaFunctionFailedEventDetails',
+    'LambdaFunctionTimedOut': 'lambdaFunctionTimedOutEventDetails',
+    'LambdaFunctionStartFailed': 'lambdaFunctionStartFailedEventDetails',
+    'LambdaFunctionScheduleFailed': 'lambdaFunctionScheduleFailedEventDetails',
+    'TaskFailed': 'taskFailedEventDetails',
+    'TaskTimedOut': 'taskTimedOutEventDetails',
+    'TaskStartFailed': 'taskStartFailedEventDetails',
+    'TaskSubmitFailed': 'taskSubmitFailedEventDetails',
+}
+EXECUTION_FAILURE_DETAILS = {
+    'ExecutionFailed': 'executionFailedEventDetails',
+    'ExecutionTimedOut': 'executionTimedOutEventDetails',
+    'ExecutionAborted': 'executionAbortedEventDetails',
+}
+
+
+def _origin_of_failure(failure: Dict[str, Any], by_id: Dict[Any, Dict[str, Any]]):
+    """Follow previousEventId back from a failure to its scheduling event and the state it belongs to."""
+    scheduled = None
+    event = by_id.get(failure.get('previousEventId'))
+    for _ in range(100):
+        if event is None:
+            break
+        event_type = event.get('type', '')
+        if scheduled is None and event_type in ('LambdaFunctionScheduled', 'TaskScheduled'):
+            scheduled = event
+        if event_type.endswith('StateEntered'):
+            return scheduled, event.get('stateEnteredEventDetails', {}).get('name')
+        event = by_id.get(event.get('previousEventId'))
+    return scheduled, None
+
+
+def _failed_lambda(failure: Dict[str, Any], scheduled: Dict[str, Any]):
+    """The ARN or name of the Lambda function that failed, or None when the failing state was no Lambda."""
+    if failure['type'].startswith('LambdaFunction'):
+        if scheduled and scheduled.get('type') == 'LambdaFunctionScheduled':
+            return scheduled.get('lambdaFunctionScheduledEventDetails', {}).get('resource')
+        return None
+
+    details = failure.get(STATE_FAILURE_DETAILS[failure['type']], {})
+    if details.get('resourceType') != 'lambda':
+        return None  # a DynamoDB, SNS or other service step: no Lambda logs to read
+    resource = details.get('resource', '')
+    if resource.startswith('arn:aws:lambda:'):
+        return resource
+    if scheduled and scheduled.get('type') == 'TaskScheduled':
+        try:
+            parameters = json.loads(scheduled.get('taskScheduledEventDetails', {}).get('parameters') or '{}')
+        except ValueError:
+            return None
+        return parameters.get('FunctionName')
+    return None
 
 
 def list_executions_in_window(state_machine_arn: str, evaluation_window: Dict[str, Any], 
@@ -709,17 +744,14 @@ def filter_failed_executions_in_window(executions: List[Dict[str, Any]],
         if execution.get('status') != 'FAILED':
             continue
             
-        # Check if execution start time is within the evaluation window
-        start_date = execution.get('startDate')
-        if start_date:
+        # An execution belongs to the window when it failed inside it, wherever it started.
+        # stopDate is when it failed; startDate only stands in when stopDate is missing.
+        failed_at = execution.get('stopDate') or execution.get('startDate')
+        if failed_at:
             # Handle both datetime objects and ISO strings
-            if isinstance(start_date, str):
-                execution_start = parse(start_date)
-            else:
-                execution_start = start_date
-                
-            # Include if execution started within the evaluation window
-            if start_time <= execution_start <= end_time:
+            if isinstance(failed_at, str):
+                failed_at = parse(failed_at)
+            if start_time <= failed_at <= end_time:
                 filtered_executions.append(execution)
     
     return filtered_executions

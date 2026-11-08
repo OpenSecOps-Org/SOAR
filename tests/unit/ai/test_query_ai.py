@@ -170,6 +170,37 @@ class TestRequest:
         run(app, finding_data(), clients)
         assert '111111111111' not in clients.bodies[0]['messages'][0]['content'][0]['text']
 
+    def test_user_text_adds_the_enriched_context_after_the_email_text(self, app):
+        """The CloudWatch enrichment reaches the model: the prompts tell it to use enriched_context."""
+        enriched = {'failed_executions': [{'failure_details': {'error_type': 'ClientError'}}],
+                    'pattern_analysis': {'pattern_classification': {'pattern_type': 'isolated_occurrence'}}}
+        clients = Clients()
+        run(app, finding_data(enriched_context=enriched), clients)
+        user = clients.bodies[0]['messages'][0]['content'][0]['text']
+        assert user == ('HIGH incident in 111111111111\n\nenriched_context:\n'
+                        + json.dumps(enriched, indent=2, sort_keys=True, default=str))
+
+    def test_enriched_context_is_anonymised_like_the_email_text(self, monkeypatch):
+        app = load(monkeypatch, AI_ANONYMIZE_ACCOUNT_NUMBERS='Yes')
+        clients = Clients()
+        run(app, finding_data(enriched_context={'failed_executions': [{'logs_summary': 'AccessDenied in 222222222222'}]}),
+            clients)
+        user = clients.bodies[0]['messages'][0]['content'][0]['text']
+        assert 'enriched_context:' in user
+        assert '222222222222' not in user
+
+    def test_empty_enriched_context_adds_nothing(self, app):
+        clients = Clients()
+        run(app, finding_data(enriched_context={}), clients)
+        assert clients.bodies[0]['messages'][0]['content'][0]['text'] == 'HIGH incident in 111111111111\n\n'
+
+    def test_explicit_user_text_is_sent_as_is(self, app):
+        """The weekly report passes its own user text; enriched_context only extends the email text."""
+        clients = Clients()
+        run(app, {'system': '[INTRODUCTION]\nWeekly section.', 'user': '{"global_data": {}}',
+                  'no_html_post_processing': 'True', 'enriched_context': {'failed_executions': []}}, clients)
+        assert clients.bodies[0]['messages'][0]['content'][0]['text'] == '{"global_data": {}}'
+
     def test_sends_the_d2_body_to_the_primary_profile(self, app):
         clients = Clients()
         run(app, finding_data(), clients)

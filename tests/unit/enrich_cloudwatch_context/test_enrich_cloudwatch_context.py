@@ -50,7 +50,7 @@ import pytest
 import sys
 import os
 from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import botocore.exceptions
 
 # Add lambda layers to Python path for aws_utils imports
@@ -912,15 +912,15 @@ class TestLocalDynamoDBAccess:
         """Test that local DynamoDB client is used instead of cross-account role assumption"""
         from functions.findings.enrich_cloudwatch_context.app import query_dynamodb_incidents
         
-        # Mock successful DynamoDB response
+        # Mock successful DynamoDB response (attributes as Remember Incident Opened records them)
         mock_dynamodb_client.query.return_value = {
             'Items': [
                 {
-                    'incident_id': {'S': 'test-incident'},
-                    'alarm_type': {'S': 'test-alarm'},
-                    'timestamp': {'N': '1704110400'},
-                    'resolution_time_minutes': {'N': '10'},
-                    'auto_resolved': {'BOOL': True}
+                    'id': {'S': 'test-incident'},
+                    'GeneratorId': {'S': 'test-alarm'},
+                    'opened_at': {'S': '2024-01-01T12:00:00+00:00'},
+                    'severity_label': {'S': 'HIGH'},
+                    'ticket_id': {'S': 'ticket-1'}
                 }
             ]
         }
@@ -959,101 +959,104 @@ class TestDynamoDBPatternAnalysis:
     """Test DynamoDB historical incident pattern analysis"""
     
     @patch('functions.findings.enrich_cloudwatch_context.app.dynamodb_client')
-    def test_query_dynamodb_incidents_by_alarm_type(self, mock_dynamodb_client):
-        """Test querying DynamoDB incidents table for similar alarm patterns"""
+    def test_query_dynamodb_incidents_by_generator_id(self, mock_dynamodb_client):
+        """Test querying DynamoDB incidents table for earlier incidents of the same alarm"""
         from functions.findings.enrich_cloudwatch_context.app import query_dynamodb_incidents
-        
+
         # Setup
-        alarm_type = "INFRA-SOAR-ASFF-Processor-SM-Failure"
+        generator_id = "INFRA-SOAR-ASFF-Processor-SM-Failure-HIGH"
         retention_days = 30
-        
-        # Mock DynamoDB query response using module-level client
+
+        # Mock DynamoDB query response (attributes as Remember Incident Opened records them)
         mock_dynamodb_client.query.return_value = {
             'Items': [
                 {
-                    'incident_id': {'S': 'incident-001'},
-                    'alarm_type': {'S': 'INFRA-SOAR-ASFF-Processor-SM-Failure'},
-                    'timestamp': {'N': '1704110400'},  # 2024-01-01T12:00:00Z
-                    'severity': {'S': 'HIGH'},
-                    'resolution_time_minutes': {'N': '15'},
-                    'auto_resolved': {'BOOL': True}
+                    'id': {'S': 'incident-001'},
+                    'GeneratorId': {'S': generator_id},
+                    'opened_at': {'S': '2024-01-01T13:00:00+00:00'},
+                    'severity_label': {'S': 'HIGH'},
+                    'ticket_id': {'S': 'ticket-001'}
                 },
                 {
-                    'incident_id': {'S': 'incident-002'},
-                    'alarm_type': {'S': 'INFRA-SOAR-ASFF-Processor-SM-Failure'},
-                    'timestamp': {'N': '1704114000'},  # 2024-01-01T13:00:00Z
-                    'severity': {'S': 'HIGH'},
-                    'resolution_time_minutes': {'N': '8'},
-                    'auto_resolved': {'BOOL': True}
+                    'id': {'S': 'incident-002'},
+                    'GeneratorId': {'S': generator_id},
+                    'opened_at': {'S': '2024-01-01T12:00:00+00:00'},
+                    'severity_label': {'S': 'HIGH'},
+                    'ticket_id': {'S': 'ticket-002'}
                 }
             ]
         }
-        
+
         # Execute
-        incidents = query_dynamodb_incidents(alarm_type, retention_days)
-        
+        incidents = query_dynamodb_incidents(generator_id, retention_days)
+
         # Verify
         assert len(incidents) == 2
         assert incidents[0]['incident_id'] == 'incident-001'
         assert incidents[1]['incident_id'] == 'incident-002'
-        
+
         # Verify DynamoDB query call
         mock_dynamodb_client.query.assert_called_once()
         call_args = mock_dynamodb_client.query.call_args
         assert 'TableName' in call_args.kwargs
-        assert 'IndexName' in call_args.kwargs  # Should use GSI for alarm_type queries
-        assert call_args.kwargs['IndexName'] == 'alarm-type-timestamp-index'
+        assert call_args.kwargs['IndexName'] == 'GeneratorId-opened_at-index'
     
-    def test_classify_incident_pattern_frequent_occurrences(self):
-        """Test incident pattern classification for frequent recurring issues"""
+    # The classification reports only what the incidents table records: how often and when.
+    NOW = datetime(2026, 11, 8, 12, 0, tzinfo=timezone.utc)
+
+    @classmethod
+    def _incident(cls, days_ago, n=0):
+        opened_at = (cls.NOW - timedelta(days=days_ago)).isoformat()
+        return {'incident_id': f'incident-{days_ago}-{n}', 'opened_at': opened_at, 'severity': 'HIGH',
+                'ticket_id': f'ticket-{days_ago}-{n}'}
+
+    def test_classify_counts_occurrences_per_window(self):
         from functions.findings.enrich_cloudwatch_context.app import classify_incident_pattern
-        
-        # Setup - frequent recurring incidents (7+ for frequent classification)
-        incidents = [
-            {'incident_id': 'incident-001', 'timestamp': 1704110400, 'resolution_time_minutes': 15, 'auto_resolved': True},
-            {'incident_id': 'incident-002', 'timestamp': 1704114000, 'resolution_time_minutes': 8, 'auto_resolved': True},
-            {'incident_id': 'incident-003', 'timestamp': 1704117600, 'resolution_time_minutes': 12, 'auto_resolved': True},
-            {'incident_id': 'incident-004', 'timestamp': 1704121200, 'resolution_time_minutes': 10, 'auto_resolved': True},
-            {'incident_id': 'incident-005', 'timestamp': 1704124800, 'resolution_time_minutes': 14, 'auto_resolved': True},
-            {'incident_id': 'incident-006', 'timestamp': 1704128400, 'resolution_time_minutes': 9, 'auto_resolved': True},
-            {'incident_id': 'incident-007', 'timestamp': 1704132000, 'resolution_time_minutes': 11, 'auto_resolved': True}
-        ]
-        
-        # Execute
-        pattern = classify_incident_pattern(incidents)
-        
-        # Verify
-        assert pattern['pattern_type'] == 'frequent_recurring'
-        assert pattern['frequency_score'] == 7  # High frequency
-        assert pattern['auto_resolution_rate'] == 1.0  # 100% auto-resolved
-        assert pattern['avg_resolution_time_minutes'] == 11.29  # Average of all resolution times
-        assert pattern['trend'] == 'stable'  # Consistent resolution times
-        assert pattern['recommendation'] == 'monitor_for_root_cause'
-    
-    def test_classify_incident_pattern_isolated_occurrence(self):
-        """Test incident pattern classification for isolated/rare issues"""
+        incidents = [self._incident(2), self._incident(10), self._incident(40), self._incident(200)]
+
+        pattern = classify_incident_pattern(incidents, now=self.NOW)
+
+        assert pattern == {
+            'pattern_type': 'moderate_recurring',
+            'total_incidents_analyzed': 4,
+            'occurrences': {'last_7_days': 1, 'last_30_days': 2, 'last_90_days': 3, 'last_365_days': 4},
+            'first_occurrence': (self.NOW - timedelta(days=200)).isoformat(),
+            'last_occurrence': (self.NOW - timedelta(days=2)).isoformat(),
+        }
+
+    def test_classify_without_history(self):
         from functions.findings.enrich_cloudwatch_context.app import classify_incident_pattern
-        
-        # Setup - single isolated incident
-        incidents = [
-            {
-                'incident_id': 'incident-001',
-                'timestamp': 1704110400,
-                'resolution_time_minutes': 45,
-                'auto_resolved': False
-            }
-        ]
-        
-        # Execute
-        pattern = classify_incident_pattern(incidents)
-        
-        # Verify
-        assert pattern['pattern_type'] == 'isolated_occurrence'
-        assert pattern['frequency_score'] == 1  # Low frequency
-        assert pattern['auto_resolution_rate'] == 0.0  # 0% auto-resolved
-        assert pattern['avg_resolution_time_minutes'] == 45
-        assert pattern['trend'] == 'unknown'  # Not enough data for trend
-        assert pattern['recommendation'] == 'investigate_thoroughly'
+        assert classify_incident_pattern([], now=self.NOW) == {
+            'pattern_type': 'no_history',
+            'total_incidents_analyzed': 0,
+            'occurrences': {'last_7_days': 0, 'last_30_days': 0, 'last_90_days': 0, 'last_365_days': 0},
+            'first_occurrence': None,
+            'last_occurrence': None,
+        }
+
+    def test_classify_pattern_type_by_count(self):
+        from functions.findings.enrich_cloudwatch_context.app import classify_incident_pattern
+        expected = {1: 'isolated_occurrence', 2: 'infrequent_recurring', 3: 'moderate_recurring',
+                    6: 'moderate_recurring', 7: 'frequent_recurring', 12: 'frequent_recurring'}
+        for count, pattern_type in expected.items():
+            incidents = [self._incident(1, n) for n in range(count)]
+            assert classify_incident_pattern(incidents, now=self.NOW)['pattern_type'] == pattern_type, count
+
+    def test_classify_reports_nothing_the_table_does_not_record(self):
+        """No resolution times, auto-resolution, trends or recommendations: nothing records them"""
+        from functions.findings.enrich_cloudwatch_context.app import classify_incident_pattern
+        pattern = classify_incident_pattern([self._incident(1, n) for n in range(7)], now=self.NOW)
+        for absent in ('auto_resolution_rate', 'avg_resolution_time_minutes', 'trend', 'recommendation',
+                       'frequency_score', 'analysis_period_days'):
+            assert absent not in pattern
+
+    def test_classify_ignores_unreadable_dates_in_the_windows(self):
+        from functions.findings.enrich_cloudwatch_context.app import classify_incident_pattern
+        incidents = [self._incident(2), {'incident_id': 'x', 'opened_at': 'not-a-date'}]
+        pattern = classify_incident_pattern(incidents, now=self.NOW)
+        assert pattern['total_incidents_analyzed'] == 2
+        assert pattern['occurrences']['last_7_days'] == 1
+        assert pattern['first_occurrence'] == pattern['last_occurrence'] == (self.NOW - timedelta(days=2)).isoformat()
     
     def test_analyze_incident_patterns_integration(self):
         """Test full incident pattern analysis integration"""
@@ -1071,8 +1074,8 @@ class TestDynamoDBPatternAnalysis:
             with patch('functions.findings.enrich_cloudwatch_context.app.classify_incident_pattern') as mock_classify:
                 # Mock responses
                 mock_query.return_value = [
-                    {'incident_id': 'incident-001', 'timestamp': 1704110400},
-                    {'incident_id': 'incident-002', 'timestamp': 1704114000}
+                    {'incident_id': 'incident-001', 'opened_at': '2024-01-01T13:00:00+00:00'},
+                    {'incident_id': 'incident-002', 'opened_at': '2024-01-01T12:00:00+00:00'}
                 ]
                 mock_classify.return_value = {
                     'pattern_type': 'frequent_recurring',
@@ -1090,7 +1093,8 @@ class TestDynamoDBPatternAnalysis:
                 assert len(analysis['historical_incidents']) == 2
                 
                 # Verify function calls
-                mock_query.assert_called_once_with('INFRA-SOAR-ASFF-Processor-SM-Failure', 365)  # Default retention (uses INCIDENT_EXPIRATION_DAYS)
+                # No GeneratorId in this finding: the Title (the full alarm name) is used; default retention
+                mock_query.assert_called_once_with('INFRA-SOAR-ASFF-Processor-SM-Failure-HIGH', 365)
                 mock_classify.assert_called_once()
 
 
@@ -1301,4 +1305,215 @@ class TestConfigurationManagement:
         
         assert "Region not found in finding" in str(exc_info.value)
         assert "test-finding-no-region" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# Execution histories as Step Functions records them
+#
+# Field names follow the Step Functions API model (botocore). A Lambda state written as
+# `Resource: <function ARN>`, the style every OpenSecOps state machine uses, records
+# LambdaFunctionScheduled (resource = function ARN), LambdaFunctionStarted and then
+# LambdaFunctionFailed or LambdaFunctionTimedOut (error and cause only). Service
+# integrations record TaskScheduled and TaskFailed (resourceType, resource, error, cause).
+# ---------------------------------------------------------------------------
+
+FAILING_LAMBDA_ARN = 'arn:aws:lambda:eu-north-1:111111111111:function:INFRA-port-report-GetInstances'
+
+
+def _lambda_failure_events(failed_type='LambdaFunctionFailed', error='ClientError',
+                           cause='An error occurred (AccessDenied) when calling the AssumeRole operation'):
+    details_key = {'LambdaFunctionFailed': 'lambdaFunctionFailedEventDetails',
+                   'LambdaFunctionTimedOut': 'lambdaFunctionTimedOutEventDetails'}[failed_type]
+    return [
+        {'id': 1, 'previousEventId': 0, 'type': 'ExecutionStarted', 'executionStartedEventDetails': {'input': '{}'}},
+        {'id': 2, 'previousEventId': 1, 'type': 'TaskStateEntered',
+         'stateEnteredEventDetails': {'name': 'Get Instances', 'input': '{}'}},
+        {'id': 3, 'previousEventId': 2, 'type': 'LambdaFunctionScheduled',
+         'lambdaFunctionScheduledEventDetails': {'resource': FAILING_LAMBDA_ARN, 'input': '{}'}},
+        {'id': 4, 'previousEventId': 3, 'type': 'LambdaFunctionStarted'},
+        {'id': 5, 'previousEventId': 4, 'type': failed_type, details_key: {'error': error, 'cause': cause}},
+        {'id': 6, 'previousEventId': 5, 'type': 'ExecutionFailed',
+         'executionFailedEventDetails': {'error': error, 'cause': cause}},
+    ]
+
+
+class TestFailureDetailsFromRealHistoryShapes:
+    """REQUIREMENT: the failing state, its error and the failing Lambda come from the events Step Functions records"""
+
+    def test_lambda_failure_gives_error_cause_function_and_state(self):
+        from functions.findings.enrich_cloudwatch_context.app import extract_execution_failure_details
+        details = extract_execution_failure_details({'events': _lambda_failure_events()})
+        assert details == {
+            'error_type': 'ClientError',
+            'error_cause': 'An error occurred (AccessDenied) when calling the AssumeRole operation',
+            'failed_lambda_arn': FAILING_LAMBDA_ARN,
+            'failure_step': 'Get Instances',
+        }
+
+    def test_lambda_timeout_is_a_failure_too(self):
+        from functions.findings.enrich_cloudwatch_context.app import extract_execution_failure_details
+        details = extract_execution_failure_details({'events': _lambda_failure_events(
+            failed_type='LambdaFunctionTimedOut', error='States.Timeout', cause='Task timed out after 900.00 seconds')})
+        assert details['error_type'] == 'States.Timeout'
+        assert details['failed_lambda_arn'] == FAILING_LAMBDA_ARN
+        assert details['failure_step'] == 'Get Instances'
+
+    def test_events_newest_first_give_the_same_result(self):
+        from functions.findings.enrich_cloudwatch_context.app import extract_execution_failure_details
+        events = _lambda_failure_events()
+        assert (extract_execution_failure_details({'events': list(reversed(events))})
+                == extract_execution_failure_details({'events': events}))
+
+    def test_service_integration_failure_names_no_lambda(self):
+        """A DynamoDB or SNS step that fails is not a Lambda: no log lookup by its resource name"""
+        from functions.findings.enrich_cloudwatch_context.app import extract_execution_failure_details
+        events = [
+            {'id': 1, 'previousEventId': 0, 'type': 'ExecutionStarted'},
+            {'id': 2, 'previousEventId': 1, 'type': 'TaskStateEntered', 'stateEnteredEventDetails': {'name': 'Read Prompt'}},
+            {'id': 3, 'previousEventId': 2, 'type': 'TaskScheduled',
+             'taskScheduledEventDetails': {'resourceType': 'dynamodb', 'resource': 'getItem', 'region': 'eu-north-1',
+                                           'parameters': '{"TableName":"ai-prompts"}'}},
+            {'id': 4, 'previousEventId': 3, 'type': 'TaskStarted'},
+            {'id': 5, 'previousEventId': 4, 'type': 'TaskFailed',
+             'taskFailedEventDetails': {'resourceType': 'dynamodb', 'resource': 'getItem',
+                                        'error': 'DynamoDB.ResourceNotFoundException', 'cause': 'Table not found'}},
+            {'id': 6, 'previousEventId': 5, 'type': 'ExecutionFailed',
+             'executionFailedEventDetails': {'error': 'DynamoDB.ResourceNotFoundException', 'cause': 'Table not found'}},
+        ]
+        details = extract_execution_failure_details({'events': events})
+        assert details['error_type'] == 'DynamoDB.ResourceNotFoundException'
+        assert details['failed_lambda_arn'] is None
+        assert details['failure_step'] == 'Read Prompt'
+
+    def test_lambda_invoke_integration_failure_names_the_function(self):
+        """`arn:aws:states:::lambda:invoke` records resource "invoke"; the function is in the parameters"""
+        from functions.findings.enrich_cloudwatch_context.app import extract_execution_failure_details
+        events = [
+            {'id': 1, 'previousEventId': 0, 'type': 'ExecutionStarted'},
+            {'id': 2, 'previousEventId': 1, 'type': 'TaskStateEntered', 'stateEnteredEventDetails': {'name': 'Process'}},
+            {'id': 3, 'previousEventId': 2, 'type': 'TaskScheduled',
+             'taskScheduledEventDetails': {'resourceType': 'lambda', 'resource': 'invoke', 'region': 'eu-north-1',
+                                           'parameters': json_dumps({'FunctionName': FAILING_LAMBDA_ARN, 'Payload': {}})}},
+            {'id': 4, 'previousEventId': 3, 'type': 'TaskStarted'},
+            {'id': 5, 'previousEventId': 4, 'type': 'TaskFailed',
+             'taskFailedEventDetails': {'resourceType': 'lambda', 'resource': 'invoke',
+                                        'error': 'KeyError', 'cause': "'Account'"}},
+            {'id': 6, 'previousEventId': 5, 'type': 'ExecutionFailed',
+             'executionFailedEventDetails': {'error': 'KeyError', 'cause': "'Account'"}},
+        ]
+        details = extract_execution_failure_details({'events': events})
+        assert details['failed_lambda_arn'] == FAILING_LAMBDA_ARN
+        assert details['failure_step'] == 'Process'
+
+    def test_execution_level_failure_only(self):
+        """No failed task (for example States.Runtime): the execution's own error is reported"""
+        from functions.findings.enrich_cloudwatch_context.app import extract_execution_failure_details
+        events = [
+            {'id': 1, 'previousEventId': 0, 'type': 'ExecutionStarted'},
+            {'id': 2, 'previousEventId': 1, 'type': 'ExecutionFailed',
+             'executionFailedEventDetails': {'error': 'States.Runtime', 'cause': 'Invalid path'}},
+        ]
+        details = extract_execution_failure_details({'events': events})
+        assert details == {'error_type': 'States.Runtime', 'error_cause': 'Invalid path',
+                           'failed_lambda_arn': None, 'failure_step': 'Unknown'}
+
+    def test_history_is_read_newest_first(self):
+        """The failure is at the end of the history; read it newest first so a long history cannot hide it"""
+        from functions.findings.enrich_cloudwatch_context.app import enrich_stepfunctions_context
+        finding = {'AwsAccountId': '111111111111', 'Region': 'eu-north-1', 'Id': 'f1',
+                   'FirstObservedAt': '2026-11-08T10:59:11.191Z'}
+        service_context = {'service_type': 'stepfunctions', 'state_machine_name': 'PortReport',
+                           'state_machine_arn': 'arn:aws:states:eu-north-1:111111111111:stateMachine:PortReport'}
+        execution = {'executionArn': 'arn:aws:states:eu-north-1:111111111111:execution:PortReport:e1', 'status': 'FAILED',
+                     'startDate': datetime(2026, 11, 8, 10, 57, 0, tzinfo=timezone.utc),
+                     'stopDate': datetime(2026, 11, 8, 10, 58, 0, tzinfo=timezone.utc)}
+        with patch('functions.findings.enrich_cloudwatch_context.app.get_client') as mock_get_client:
+            sfn = MagicMock()
+            sfn.list_executions.return_value = {'executions': [execution]}
+            sfn.describe_execution.return_value = {'status': 'FAILED'}
+            sfn.get_execution_history.return_value = {'events': list(reversed(_lambda_failure_events()))}
+            mock_get_client.return_value = sfn
+            enrichment = enrich_stepfunctions_context(finding, service_context)
+        assert sfn.get_execution_history.call_args.kwargs.get('reverseOrder') is True
+        assert enrichment['failed_executions'][0]['failure_details']['failed_lambda_arn'] == FAILING_LAMBDA_ARN
+
+
+def json_dumps(value):
+    import json
+    return json.dumps(value)
+
+
+class TestFailedExecutionsInWindowByStopTime:
+    """REQUIREMENT: a failed execution belongs to the window when it failed inside it, wherever it started"""
+
+    WINDOW = {'start_time': '2024-01-01T12:00:00.000Z', 'end_time': '2024-01-01T12:30:00.000Z'}
+
+    @staticmethod
+    def _failed(start, stop):
+        execution = {'executionArn': f'arn:aws:states:us-east-1:123456789012:execution:SM:{start:%H%M}', 'status': 'FAILED',
+                     'startDate': start}
+        if stop:
+            execution['stopDate'] = stop
+        return execution
+
+    def test_started_before_window_but_failed_inside_is_kept(self):
+        from functions.findings.enrich_cloudwatch_context.app import filter_failed_executions_in_window
+        execution = self._failed(datetime(2024, 1, 1, 11, 50, tzinfo=timezone.utc),
+                                 datetime(2024, 1, 1, 12, 10, tzinfo=timezone.utc))
+        assert filter_failed_executions_in_window([execution], self.WINDOW) == [execution]
+
+    def test_failed_before_window_is_dropped(self):
+        from functions.findings.enrich_cloudwatch_context.app import filter_failed_executions_in_window
+        execution = self._failed(datetime(2024, 1, 1, 11, 40, tzinfo=timezone.utc),
+                                 datetime(2024, 1, 1, 11, 55, tzinfo=timezone.utc))
+        assert filter_failed_executions_in_window([execution], self.WINDOW) == []
+
+    def test_without_stop_date_the_start_date_is_used(self):
+        from functions.findings.enrich_cloudwatch_context.app import filter_failed_executions_in_window
+        execution = self._failed(datetime(2024, 1, 1, 12, 5, tzinfo=timezone.utc), None)
+        assert filter_failed_executions_in_window([execution], self.WINDOW) == [execution]
+
+
+class TestIncidentHistoryUsesRecordedAttributes:
+    """REQUIREMENT: past incidents are found by GeneratorId and opened_at, the attributes Remember Incident Opened writes"""
+
+    @patch('functions.findings.enrich_cloudwatch_context.app.dynamodb_client')
+    def test_query_uses_the_generator_id_opened_at_index(self, mock_dynamodb_client):
+        from functions.findings.enrich_cloudwatch_context.app import query_dynamodb_incidents
+        mock_dynamodb_client.query.return_value = {'Items': []}
+
+        query_dynamodb_incidents('INFRA-InstancePortReport-SM-Failure-LOW', 365)
+
+        kwargs = mock_dynamodb_client.query.call_args.kwargs
+        assert kwargs['IndexName'] == 'GeneratorId-opened_at-index'
+        assert kwargs['KeyConditionExpression'] == 'GeneratorId = :generator_id AND opened_at BETWEEN :start AND :end'
+        values = kwargs['ExpressionAttributeValues']
+        assert values[':generator_id'] == {'S': 'INFRA-InstancePortReport-SM-Failure-LOW'}
+        start, end = values[':start']['S'], values[':end']['S']
+        assert datetime.fromisoformat(start) < datetime.fromisoformat(end)
+
+    @patch('functions.findings.enrich_cloudwatch_context.app.dynamodb_client')
+    def test_query_maps_the_recorded_attributes(self, mock_dynamodb_client):
+        from functions.findings.enrich_cloudwatch_context.app import query_dynamodb_incidents
+        mock_dynamodb_client.query.return_value = {'Items': [{
+            'id': {'S': 'finding-1'},
+            'GeneratorId': {'S': 'INFRA-InstancePortReport-SM-Failure-LOW'},
+            'opened_at': {'S': '2026-11-08T11:00:05.123456+00:00'},
+            'severity_label': {'S': 'LOW'},
+            'ticket_id': {'S': 'ticket-1'},
+        }]}
+
+        incidents = query_dynamodb_incidents('INFRA-InstancePortReport-SM-Failure-LOW', 365)
+
+        assert incidents == [{'incident_id': 'finding-1', 'opened_at': '2026-11-08T11:00:05.123456+00:00',
+                              'severity': 'LOW', 'ticket_id': 'ticket-1'}]
+
+    def test_history_is_looked_up_by_the_exact_generator_id(self):
+        from functions.findings.enrich_cloudwatch_context.app import analyze_incident_patterns
+        finding = {'GeneratorId': 'INFRA-InstancePortReport-SM-Failure-LOW',
+                   'Title': 'INFRA-InstancePortReport-SM-Failure-LOW'}
+        with patch('functions.findings.enrich_cloudwatch_context.app.query_dynamodb_incidents',
+                   return_value=[]) as mock_query:
+            analyze_incident_patterns(finding)
+        assert mock_query.call_args.args[0] == 'INFRA-InstancePortReport-SM-Failure-LOW'
     

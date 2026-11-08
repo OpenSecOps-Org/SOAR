@@ -100,7 +100,21 @@ def build_system_text(data, system_prompt):
 
 
 def build_user_text(data):
-    return data.get('user') or anonymise(data['messages']['email']['body'].split('====================')[0])
+    """The call's own user text (the weekly report), or the email text plus any CloudWatch enrichment.
+
+    The email text is the part of the body before its YAML appendix. For incidents from CloudWatch
+    alarms, the enricher adds enriched_context (failed executions, errors, log lines, earlier
+    incidents), which the incident prompts tell the model to use; it is appended as JSON and
+    anonymised together with the email text.
+    """
+    if data.get('user'):
+        return data['user']
+    text = data['messages']['email']['body'].split('====================')[0]
+    enriched_context = data.get('enriched_context')
+    if enriched_context:
+        text = (text.rstrip() + '\n\nenriched_context:\n'
+                + json.dumps(enriched_context, indent=2, sort_keys=True, default=str))
+    return anonymise(text)
 
 
 # ---------------------------------------------------------------------------
